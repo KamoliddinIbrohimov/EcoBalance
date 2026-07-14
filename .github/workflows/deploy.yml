@@ -80,10 +80,14 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
           platforms: linux/amd64
 
+  # Skipped automatically if DEPLOY_HOST secret is not configured yet — this
+  # lets you push code and get GHCR images built even before the server is
+  # wired up. Once you add the secret, the next push deploys for real.
   deploy:
     name: Roll out to VPS
     runs-on: ubuntu-latest
     needs: build
+    if: ${{ vars.DEPLOY_ENABLED == 'true' || github.event_name == 'workflow_dispatch' }}
     permissions:
       contents: read
       packages: read
