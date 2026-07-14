@@ -1,0 +1,32 @@
+:80 {
+    # API — everything under /api/* goes to the NestJS container.
+    # We use plain `handle` (not `handle_path`) so the /api/v1/... prefix
+    # is preserved and forwarded to Nest as-is.
+    handle /api* {
+        reverse_proxy api:4000 {
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Everything else -> Next.js
+    handle {
+        reverse_proxy web:3000
+    }
+
+    # Compression
+    encode zstd gzip
+
+    # Basic security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}

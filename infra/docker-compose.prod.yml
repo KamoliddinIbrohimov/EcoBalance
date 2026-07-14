@@ -1,0 +1,113 @@
+## Eco-Balance — production compose file
+## Images are pulled from GHCR (no build: sections here).
+## Deploy script overrides IMAGE_TAG per release; falls back to :latest.
+## Only Caddy binds a host port (${NGINX_HTTP_PORT:-8890} → :80). Everything
+## else talks over the internal eco-balance_net bridge network.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "${NGINX_HTTP_PORT:-8890}:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - web
+      - api
+    networks:
+      - eco-balance_net
+
+  web:
+    image: ghcr.io/${IMAGE_OWNER}/eco-balance-web:${IMAGE_TAG:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - api
+    networks:
+      - eco-balance_net
+
+  api:
+    image: ghcr.io/${IMAGE_OWNER}/eco-balance-api:${IMAGE_TAG:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    networks:
+      - eco-balance_net
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - eco-balance_net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - eco-balance_net
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - eco-balance_net
+
+networks:
+  eco-balance_net:
+    name: eco-balance_net
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: eco-balance_postgres_data
+  redis_data:
+    name: eco-balance_redis_data
+  minio_data:
+    name: eco-balance_minio_data
+  caddy_data:
+    name: eco-balance_caddy_data

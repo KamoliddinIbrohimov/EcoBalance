@@ -26,7 +26,7 @@ async function bootstrap(): Promise<void> {
   app.useLogger(app.get(Logger));
 
   app.set('trust proxy', 1);
-  app.setGlobalPrefix('api', { exclude: ['health'] });
+  app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
   app.use(cookieParser());
