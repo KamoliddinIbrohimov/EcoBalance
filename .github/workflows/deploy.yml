@@ -154,7 +154,7 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME || 'deploy' }}
+          username: ${{ secrets.USERNAME || 'ecobalance' }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.PORT || 22 }}
           command_timeout: 20m

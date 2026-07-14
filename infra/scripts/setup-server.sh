@@ -38,7 +38,7 @@ ok()   { printf '%s✓ %s%s\n' "$C_GREEN"  "$*" "$C_RESET"; }
 # constants
 # -----------------------------------------------------------------------------
 APP_DIR=/opt/eco-balance
-DEPLOY_USER=deploy
+DEPLOY_USER="${DEPLOY_USER:-ecobalance}"
 REPO_URL=https://github.com/KamoliddinIbrohimov/EcoBalance.git
 
 log "Eco-Balance server bootstrap starting"

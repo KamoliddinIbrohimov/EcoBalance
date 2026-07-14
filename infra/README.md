@@ -7,7 +7,7 @@ Continuous delivery for Eco-Balance is a straight line:
    `api` and pushes them to **GitHub Container Registry** as
    `ghcr.io/kamoliddinibrohimov/eco-balance-{web,api}:sha-<full-sha>` (plus
    `:latest`).
-3. The workflow then SSHes to the VPS as the `deploy` user, `cd`s into
+3. The workflow then SSHes to the VPS as the `ecobalance` user, `cd`s into
    `/opt/eco-balance`, and runs `bash scripts/deploy.sh sha-<full-sha>`.
 4. `deploy.sh` pulls the new images, refreshes infra services, syncs the Prisma
    schema, and rolls the app containers.
@@ -30,27 +30,28 @@ The site is served over plain HTTP on port **8890**:
    ```
 
    If you already have a workstation SSH key you want to use for CI, pass it
-   inline so `deploy` can log in immediately:
+   inline so `ecobalance` can log in immediately:
 
    ```bash
    ssh root@62.171.187.218 \
-       "SSH_PUBLIC_KEY='ssh-ed25519 AAAA... deploy@ci' bash -s" \
+       "SSH_PUBLIC_KEY='ssh-ed25519 AAAA... ecobalance@ci' bash -s" \
        < infra/scripts/setup-server.sh
    ```
 
 3. Grab the private key that pairs with the public key above (either the one
-   from `/home/deploy/.ssh/id_ed25519` if you generated it on the server, or the
-   one from your workstation), and paste it into the GitHub secret **`SSH_KEY`**.
+   from `/home/ecobalance/.ssh/id_ed25519` if you generated it on the server,
+   or the one from your workstation), and paste it into the GitHub secret
+   **`SSH_KEY`**.
 
 4. Configure GitHub repository secrets
    (Settings → Secrets and variables → Actions → *New repository secret*):
 
-   | Secret     | Value                                                |
-   | ---------- | ---------------------------------------------------- |
-   | `HOST`     | `62.171.187.218`                                     |
-   | `USERNAME` | `deploy`                                             |
-   | `SSH_KEY`  | private key matching `deploy`'s `authorized_keys`    |
-   | `PORT`     | `22`                                                 |
+   | Secret     | Value                                                    |
+   | ---------- | -------------------------------------------------------- |
+   | `HOST`     | `62.171.187.218`                                         |
+   | `USERNAME` | `ecobalance`                                             |
+   | `SSH_KEY`  | private key matching `ecobalance`'s `authorized_keys`    |
+   | `PORT`     | `22`                                                     |
 
 5. Configure the repository variable (Settings → Secrets and variables →
    Actions → *Variables* tab):
@@ -86,7 +87,7 @@ Every push to `main` produces a live release in ~5–10 minutes at
 ## Manual deploy on the server
 
 ```bash
-ssh deploy@62.171.187.218
+ssh ecobalance@62.171.187.218
 cd /opt/eco-balance
 bash scripts/deploy.sh sha-<full-sha>
 ```
