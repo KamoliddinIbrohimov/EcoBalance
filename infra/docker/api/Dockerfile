@@ -57,4 +57,4 @@ EXPOSE 4000
 ENTRYPOINT ["/sbin/tini", "--"]
 # Runs prisma db push + start on first boot (safe idempotent); switches to migrate deploy once
 # the prisma/migrations/ folder is populated (Phase 1+).
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss --skip-generate && node dist/main.js"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss --skip-generate && (npx prisma db seed || true) && node dist/main.js"]
