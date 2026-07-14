@@ -20,7 +20,7 @@ services:
       - eco-balance_net
 
   web:
-    image: ghcr.io/${IMAGE_OWNER}/eco-balance-web:${IMAGE_TAG:-latest}
+    image: ghcr.io/${IMAGE_OWNER}/ecobalance-web:${IMAGE_TAG:-latest}
     pull_policy: always
     restart: unless-stopped
     env_file:
@@ -31,7 +31,7 @@ services:
       - eco-balance_net
 
   api:
-    image: ghcr.io/${IMAGE_OWNER}/eco-balance-api:${IMAGE_TAG:-latest}
+    image: ghcr.io/${IMAGE_OWNER}/ecobalance-api:${IMAGE_TAG:-latest}
     pull_policy: always
     restart: unless-stopped
     env_file:

@@ -76,7 +76,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/eco-balance-api
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/ecobalance-api
           tags: |
             type=sha,format=long,prefix=sha-
             type=sha,format=short,prefix=sha-
@@ -118,7 +118,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/eco-balance-web
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/ecobalance-web
           tags: |
             type=sha,format=long,prefix=sha-
             type=sha,format=short,prefix=sha-
