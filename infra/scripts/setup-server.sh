@@ -137,8 +137,19 @@ fi
 # -----------------------------------------------------------------------------
 log "[4/8] Preparing $APP_DIR"
 
-mkdir -p "$APP_DIR/scripts"
+mkdir -p "$APP_DIR"
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
+
+# Ensure rsync is available (used to overlay a fresh clone onto a possibly
+# non-empty $APP_DIR without touching /home or other stacks).
+if ! command -v rsync >/dev/null 2>&1; then
+    log "installing rsync"
+    apt-get update -qq && apt-get install -y -qq rsync
+fi
+
+# Nuke leftovers from any previous failed run so we start from a known state.
+find /tmp -maxdepth 1 -name 'eco-balance-clone-*' -type d -exec rm -rf {} + 2>/dev/null || true
+find /tmp -maxdepth 1 -name 'tmp.*' -type d -uid 0 -mmin +5 -exec rm -rf {} + 2>/dev/null || true
 
 if [[ -d "$APP_DIR/.git" ]]; then
     log "existing git repo detected — fetching latest main"
@@ -146,14 +157,14 @@ if [[ -d "$APP_DIR/.git" ]]; then
     sudo -u "$DEPLOY_USER" git -C "$APP_DIR" reset --hard origin/main
     ok "repo synced to origin/main"
 else
-    log "cloning $REPO_URL into $APP_DIR"
-    # clone into a tmp dir then move, because $APP_DIR may already contain scripts/
-    TMP_CLONE=$(mktemp -d)
-    sudo -u "$DEPLOY_USER" git clone --quiet "$REPO_URL" "$TMP_CLONE"
-    shopt -s dotglob
-    mv "$TMP_CLONE"/* "$APP_DIR"/ 2>/dev/null || true
-    shopt -u dotglob
-    rm -rf "$TMP_CLONE"
+    log "cloning $REPO_URL into $APP_DIR (via staging dir)"
+    STAGING="/tmp/eco-balance-clone-$$-$RANDOM"
+    rm -rf "$STAGING"
+    sudo -u "$DEPLOY_USER" git clone --quiet "$REPO_URL" "$STAGING"
+    # rsync copies contents (including dotfiles like .git) into $APP_DIR
+    # without needing $APP_DIR to be empty.
+    rsync -a "$STAGING/" "$APP_DIR/"
+    rm -rf "$STAGING"
     chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
     ok "repository cloned"
 fi
