@@ -157,14 +157,43 @@ if [[ -d "$APP_DIR/.git" ]]; then
     sudo -u "$DEPLOY_USER" git -C "$APP_DIR" reset --hard origin/main
     ok "repo synced to origin/main"
 else
-    log "cloning $REPO_URL into $APP_DIR (via staging dir)"
+    # If the repo is private, caller can pass GITHUB_TOKEN (fine-grained PAT
+    # with `Contents: Read` scope) via env. If unset, we clone anonymously —
+    # which only works if the repo is public.
+    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+        CLONE_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/KamoliddinIbrohimov/EcoBalance.git"
+        log "cloning private repo with token into $APP_DIR (via staging dir)"
+    else
+        CLONE_URL="$REPO_URL"
+        log "cloning $REPO_URL into $APP_DIR (via staging dir)"
+    fi
+
     STAGING="/tmp/eco-balance-clone-$$-$RANDOM"
     rm -rf "$STAGING"
-    sudo -u "$DEPLOY_USER" git clone --quiet "$REPO_URL" "$STAGING"
+
+    if ! sudo -u "$DEPLOY_USER" git clone --quiet "$CLONE_URL" "$STAGING" 2>/dev/null; then
+        rm -rf "$STAGING"
+        echo
+        echo '✗ Repository clone failed.'
+        echo '  The repo is private and no GITHUB_TOKEN was supplied. Either:'
+        echo '    a) Make the repo public'
+        echo '       https://github.com/KamoliddinIbrohimov/EcoBalance/settings → Change visibility'
+        echo '    b) Re-run this script with a PAT:'
+        echo "       ssh root@62.171.187.218 'GITHUB_TOKEN=ghp_xxx bash -s' < infra/scripts/setup-server.sh"
+        echo '       PAT: https://github.com/settings/tokens (fine-grained, Contents:Read for this repo)'
+        exit 1
+    fi
+
     # rsync copies contents (including dotfiles like .git) into $APP_DIR
     # without needing $APP_DIR to be empty.
     rsync -a "$STAGING/" "$APP_DIR/"
     rm -rf "$STAGING"
+
+    # Scrub any token from the remote URL so it isn't stored on disk.
+    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+        sudo -u "$DEPLOY_USER" git -C "$APP_DIR" remote set-url origin "$REPO_URL"
+    fi
+
     chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
     ok "repository cloned"
 fi
