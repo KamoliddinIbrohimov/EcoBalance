@@ -39,9 +39,11 @@ ENV PORT=4000
 COPY --from=builder /workspace/package.json /workspace/pnpm-lock.yaml /workspace/pnpm-workspace.yaml ./
 COPY --from=builder /workspace/node_modules ./node_modules
 
-# Shared package (compiled JS)
+# Shared package (compiled JS + its own node_modules — pnpm keeps zod symlinks
+# in packages/shared/node_modules so the compiled dist/*.js files can require them)
 COPY --from=builder /workspace/packages/shared/package.json ./packages/shared/
 COPY --from=builder /workspace/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /workspace/packages/shared/node_modules ./packages/shared/node_modules
 
 # API app
 COPY --from=builder /workspace/apps/api/package.json ./apps/api/
