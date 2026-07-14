@@ -261,6 +261,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
     POSTGRES_PW=$(gen_pw)
     REDIS_PW=$(gen_pw)
     MINIO_PW=$(gen_pw)
+    ADMIN_PW=$(gen_pw)
     JWT_ACCESS=$(gen_secret)
     JWT_REFRESH=$(gen_secret)
 
@@ -270,12 +271,15 @@ if [[ ! -f "$ENV_FILE" ]]; then
     awk -v pgpw="$POSTGRES_PW" \
         -v rdpw="$REDIS_PW" \
         -v mnpw="$MINIO_PW" \
+        -v adpw="$ADMIN_PW" \
         -v jwta="$JWT_ACCESS" \
         -v jwtr="$JWT_REFRESH" '
         BEGIN { FS="="; OFS="=" }
         /^POSTGRES_PASSWORD=CHANGE_ME/     { print $1, pgpw; next }
         /^REDIS_PASSWORD=CHANGE_ME/        { print $1, rdpw; next }
         /^MINIO_ROOT_PASSWORD=CHANGE_ME/   { print $1, mnpw; next }
+        /^S3_SECRET_KEY=CHANGE_ME/         { print $1, mnpw; next }
+        /^SUPER_ADMIN_PASSWORD=CHANGE_ME/  { print $1, adpw; next }
         /^JWT_ACCESS_SECRET=CHANGE_ME/     { print $1, jwta; next }
         /^JWT_REFRESH_SECRET=CHANGE_ME/    { print $1, jwtr; next }
         { print }
