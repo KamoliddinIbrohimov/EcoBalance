@@ -209,9 +209,9 @@ if [[ -f "$APP_DIR/infra/Caddyfile" ]] && [[ ! -e "$APP_DIR/Caddyfile" ]]; then
     sudo -u "$DEPLOY_USER" ln -s infra/Caddyfile "$APP_DIR/Caddyfile"
     ok "linked Caddyfile -> infra/Caddyfile"
 fi
-if [[ -f "$APP_DIR/infra/scripts/deploy.sh" ]] && [[ ! -e "$APP_DIR/scripts/deploy.sh" ]]; then
-    sudo -u "$DEPLOY_USER" ln -s ../infra/scripts/deploy.sh "$APP_DIR/scripts/deploy.sh"
-    ok "linked scripts/deploy.sh -> infra/scripts/deploy.sh"
+if [[ -d "$APP_DIR/infra/scripts" ]] && [[ ! -e "$APP_DIR/scripts" ]]; then
+    sudo -u "$DEPLOY_USER" ln -s infra/scripts "$APP_DIR/scripts"
+    ok "linked scripts/ -> infra/scripts/"
 fi
 
 # -----------------------------------------------------------------------------
