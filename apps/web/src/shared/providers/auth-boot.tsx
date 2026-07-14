@@ -3,7 +3,7 @@
 import { useEffect, type ReactNode } from 'react';
 
 import { apiClient } from '@/shared/lib/api-client';
-import { useAuthStore } from '@/shared/stores/auth-store';
+import { useAuthStore, type AuthUser } from '@/shared/stores/auth-store';
 
 /**
  * On first mount tries to hydrate the auth session:
@@ -27,9 +27,7 @@ export function AuthBoot({ children }: { children: ReactNode }) {
         if (cancelled) return;
         setAccessToken(data.data.accessToken, data.data.expiresIn);
 
-        const me = await apiClient.get<{ data: import('@/shared/stores/auth-store').AuthUser }>(
-          '/auth/me',
-        );
+        const me = await apiClient.get<{ data: AuthUser }>('/auth/me');
         if (cancelled) return;
         setUser(me.data.data);
       } catch {

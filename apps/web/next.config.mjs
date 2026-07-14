@@ -14,10 +14,10 @@ const nextConfig = {
   // Monorepo: point tracing to workspace root so shared packages are bundled.
   outputFileTracingRoot: path.join(__dirname, '../..'),
   transpilePackages: ['@eco/shared'],
+  // typedRoutes disabled until every route referenced by <Link> exists.
+  // Re-enable in Phase 1 when the full route map is stable.
+  typedRoutes: false,
   experimental: {
-    // typedRoutes disabled until every route referenced by <Link> exists.
-    // Re-enable in Phase 1 when the full route map is stable.
-    typedRoutes: false,
     optimizePackageImports: ['lucide-react'],
   },
   images: {

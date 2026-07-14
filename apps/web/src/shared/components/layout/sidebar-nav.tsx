@@ -26,26 +26,25 @@ import { useLogout } from '@/features/auth/hooks/use-auth';
 import { cn } from '@/shared/lib/cn';
 import { Logo } from './logo';
 
+type LabelKey =
+  | 'home'
+  | 'monitoring'
+  | 'learning'
+  | 'chatbot'
+  | 'dashboard'
+  | 'reports'
+  | 'analytics'
+  | 'recommendations'
+  | 'news'
+  | 'events'
+  | 'users'
+  | 'settings';
+
 interface NavItem {
   href: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
-  labelKey: keyof typeof labelKeys;
+  labelKey: LabelKey;
 }
-
-const labelKeys = {
-  home: 'home',
-  monitoring: 'monitoring',
-  learning: 'learning',
-  chatbot: 'chatbot',
-  dashboard: 'dashboard',
-  reports: 'reports',
-  analytics: 'analytics',
-  recommendations: 'recommendations',
-  news: 'news',
-  events: 'events',
-  users: 'users',
-  settings: 'settings',
-} as const;
 
 const NAV: NavItem[] = [
   { href: '/', icon: Home, labelKey: 'home' },

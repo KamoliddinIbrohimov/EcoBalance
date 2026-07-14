@@ -1,4 +1,5 @@
-import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
+import axios from 'axios';
+import type { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 import { env } from '@/shared/config/env';
 import { useAuthStore } from '@/shared/stores/auth-store';

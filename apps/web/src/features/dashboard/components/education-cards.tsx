@@ -1,4 +1,5 @@
-import { ArrowRight, Award, BookOpen, ClipboardList, LucideIcon, Users } from 'lucide-react';
+import { ArrowRight, Award, BookOpen, ClipboardList, Users } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 
 import { Card } from '@/shared/components/ui/card';
