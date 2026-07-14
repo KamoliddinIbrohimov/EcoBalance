@@ -153,8 +153,18 @@ find /tmp -maxdepth 1 -name 'tmp.*' -type d -uid 0 -mmin +5 -exec rm -rf {} + 2>
 
 if [[ -d "$APP_DIR/.git" ]]; then
     log "existing git repo detected — fetching latest main"
-    sudo -u "$DEPLOY_USER" git -C "$APP_DIR" fetch --quiet origin
-    sudo -u "$DEPLOY_USER" git -C "$APP_DIR" reset --hard origin/main
+    # Fix any "dubious ownership" warning left over from earlier root operations
+    sudo -u "$DEPLOY_USER" git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+    git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+
+    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+        FETCH_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/KamoliddinIbrohimov/EcoBalance.git"
+        sudo -u "$DEPLOY_USER" git -C "$APP_DIR" fetch --quiet "$FETCH_URL" main
+        sudo -u "$DEPLOY_USER" git -C "$APP_DIR" reset --hard FETCH_HEAD
+    else
+        sudo -u "$DEPLOY_USER" git -C "$APP_DIR" fetch --quiet origin main
+        sudo -u "$DEPLOY_USER" git -C "$APP_DIR" reset --hard origin/main
+    fi
     ok "repo synced to origin/main"
 else
     # If the repo is private, caller can pass GITHUB_TOKEN (fine-grained PAT
