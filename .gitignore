@@ -1,0 +1,58 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Claude Code agent sessions
+.claude/
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+
+# Turborepo
+.turbo/
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# NestJS
+dist/
+tmp/
+
+# Stray compiled JS next to TS sources (should never be checked in)
+packages/shared/src/**/*.js
+packages/shared/src/**/*.js.map
+packages/shared/src/**/*.d.ts
+packages/shared/src/**/*.d.ts.map
+
+# Prisma
+apps/api/prisma/generated/
+apps/api/prisma/*.db
+
+# Coverage / test
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# Docker
+.docker/data/
+docker-compose.override.yml
+
+# Logs
+*.log
+logs/

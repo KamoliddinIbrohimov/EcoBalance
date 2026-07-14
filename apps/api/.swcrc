@@ -1,0 +1,30 @@
+{
+  "$schema": "https://swc.rs/schema.json",
+  "jsc": {
+    "parser": {
+      "syntax": "typescript",
+      "decorators": true,
+      "dynamicImport": true
+    },
+    "transform": {
+      "legacyDecorator": true,
+      "decoratorMetadata": true,
+      "useDefineForClassFields": false
+    },
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@eco/shared": ["../../packages/shared/src"],
+      "@eco/shared/*": ["../../packages/shared/src/*"]
+    },
+    "target": "es2022",
+    "keepClassNames": true
+  },
+  "module": {
+    "type": "commonjs",
+    "strictMode": false,
+    "noInterop": false
+  },
+  "sourceMaps": true,
+  "exclude": ["node_modules", "dist", ".*\\.spec\\.ts$"]
+}

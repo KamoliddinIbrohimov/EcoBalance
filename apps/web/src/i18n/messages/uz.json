@@ -1,0 +1,125 @@
+{
+  "app": {
+    "name": "Eco-Balance",
+    "tagline": "Ekologik monitoring va uzluksiz ta'lim platformasi",
+    "copyright": "© {year} Eco-Balance Platformasi. Barcha huquqlar himoyalangan.",
+    "quote": "\"Tabiatni asrash – kelajakni asrash demakdir\""
+  },
+  "common": {
+    "loading": "Yuklanmoqda…",
+    "search": "Qidiruv",
+    "save": "Saqlash",
+    "cancel": "Bekor qilish",
+    "submit": "Yuborish",
+    "close": "Yopish",
+    "back": "Ortga",
+    "next": "Keyingi",
+    "previous": "Oldingi",
+    "delete": "O'chirish",
+    "edit": "Tahrirlash",
+    "create": "Yaratish",
+    "yes": "Ha",
+    "no": "Yo'q",
+    "moreDetails": "Batafsil ma'lumot",
+    "seeAll": "Barchasini ko'rish"
+  },
+  "status": {
+    "good": "Yaxshi",
+    "medium": "O'rta",
+    "bad": "Yomon"
+  },
+  "auth": {
+    "login": {
+      "title": "Tizimga kirish",
+      "subtitle": "Email va parolingizni kiriting",
+      "emailLabel": "Email",
+      "emailPlaceholder": "sizning@email.uz",
+      "passwordLabel": "Parol",
+      "passwordPlaceholder": "Parolingiz",
+      "forgotLink": "Parolni unutdingizmi?",
+      "submit": "Kirish",
+      "noAccount": "Hisobingiz yo'qmi?",
+      "registerLink": "Ro'yxatdan o'ting",
+      "invalidCredentials": "Email yoki parol noto'g'ri"
+    },
+    "register": {
+      "title": "Ro'yxatdan o'tish",
+      "subtitle": "Yangi Eco-Balance hisobi yaratish",
+      "firstNameLabel": "Ism",
+      "lastNameLabel": "Familiya",
+      "emailLabel": "Email",
+      "phoneLabel": "Telefon (ixtiyoriy)",
+      "phonePlaceholder": "+998 90 123 45 67",
+      "passwordLabel": "Parol",
+      "confirmPasswordLabel": "Parolni tasdiqlang",
+      "submit": "Ro'yxatdan o'tish",
+      "hasAccount": "Hisobingiz bormi?",
+      "loginLink": "Tizimga kiring",
+      "passwordHint": "Kamida 10 belgi: katta harf, kichik harf va raqam"
+    },
+    "forgot": {
+      "title": "Parolni tiklash",
+      "subtitle": "Email manzilingizni kiriting — parolni tiklash bo'yicha xat yuboramiz",
+      "submit": "Yuborish",
+      "backToLogin": "Kirish sahifasiga qaytish",
+      "sent": "Agar shu email ro'yxatda bo'lsa, tiklash bo'yicha ko'rsatmalar yuborildi"
+    },
+    "reset": {
+      "title": "Yangi parol",
+      "subtitle": "Xavfsiz yangi parolni tanlang",
+      "passwordLabel": "Yangi parol",
+      "confirmLabel": "Yangi parolni tasdiqlang",
+      "submit": "Parolni yangilash",
+      "success": "Parol yangilandi. Endi tizimga kirishingiz mumkin"
+    },
+    "logout": "Chiqish"
+  },
+  "sidebar": {
+    "home": "Bosh sahifa",
+    "monitoring": "Ekologik monitoring",
+    "learning": "Ta'lim (E-learning)",
+    "chatbot": "AI Chatbot",
+    "dashboard": "Dashboard",
+    "reports": "Hisobotlar",
+    "analytics": "Statistik tahlil",
+    "recommendations": "Tavsiyalar",
+    "news": "Yangiliklar",
+    "events": "Tadbirlar",
+    "users": "Foydalanuvchilar",
+    "settings": "Sozlamalar",
+    "projectArea": "Loyiha hududi"
+  },
+  "topbar": {
+    "notifications": "Bildirishnomalar",
+    "weather": "Ob-havo",
+    "myProfile": "Mening profilim",
+    "settings": "Sozlamalar",
+    "logout": "Chiqish"
+  },
+  "dashboard": {
+    "welcome": "Xush kelibsiz, {name}!",
+    "todayIs": "Bugun, {date}",
+    "phasePlaceholder": "Dashboard kontenti Phase 3 da qo'shiladi"
+  },
+  "roles": {
+    "SUPER_ADMIN": "Bosh administrator",
+    "ADMIN": "Administrator",
+    "CITY_ADMIN": "Shahar administratori",
+    "MAHALLA_MANAGER": "Mahalla rahbari",
+    "TEACHER": "O'qituvchi",
+    "STUDENT": "O'quvchi",
+    "CITIZEN": "Fuqaro"
+  },
+  "errors": {
+    "network": "Tarmoq xatosi. Iltimos, keyinroq urinib ko'ring",
+    "unauthorized": "Ushbu amal uchun ruxsat yo'q",
+    "notFound": "Topilmadi",
+    "validation": "Kiritilgan ma'lumotlarni tekshirib chiqing"
+  },
+  "underDev": {
+    "title": "Bu bo'lim ishlab chiqilmoqda",
+    "description": "Hozircha ushbu modul tayyor emas. Yaqin orada foydalanuvchilarga taqdim etiladi.",
+    "path": "Sahifa manzili",
+    "backHome": "Bosh sahifaga qaytish"
+  }
+}
