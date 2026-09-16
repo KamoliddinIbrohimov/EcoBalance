@@ -61,3 +61,11 @@ DEPLOY.local.md
 # Logs
 *.log
 logs/
+
+# Archive / binary materials — only extracted files go in git
+*.rar
+*.zip
+*.7z
+
+# Office temp files
+~$*
