@@ -14,18 +14,22 @@ export interface AuthTokensResponse {
   expiresIn: number;
 }
 
+export interface AuthLoginResponse extends AuthTokensResponse {
+  user: AuthUser;
+}
+
 interface Envelope<T> {
   data: T;
 }
 
 export const authApi = {
-  async login(input: LoginInput): Promise<AuthTokensResponse> {
-    const { data } = await apiClient.post<Envelope<AuthTokensResponse>>('/auth/login', input);
+  async login(input: LoginInput): Promise<AuthLoginResponse> {
+    const { data } = await apiClient.post<Envelope<AuthLoginResponse>>('/auth/login', input);
     return data.data;
   },
 
-  async register(input: RegisterInput): Promise<AuthTokensResponse> {
-    const { data } = await apiClient.post<Envelope<AuthTokensResponse>>('/auth/register', input);
+  async register(input: RegisterInput): Promise<AuthLoginResponse> {
+    const { data } = await apiClient.post<Envelope<AuthLoginResponse>>('/auth/register', input);
     return data.data;
   },
 
@@ -40,7 +44,9 @@ export const authApi = {
   },
 
   async logout(): Promise<void> {
-    await apiClient.post('/auth/logout');
+    // _skipAuthRetry — 401 kelsa refresh urinishi kerak emas (endpoint Public,
+    // access token yaroqsiz bo'lsa ham backend cookie'ni tozalaydi).
+    await apiClient.post('/auth/logout', undefined, { _skipAuthRetry: true } as never);
   },
 
   async me(): Promise<AuthUser> {

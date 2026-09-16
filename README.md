@@ -23,7 +23,7 @@ Eco-Balance/
 │   └── shared/       # Zod schemas, DTOs, constants (imported by both apps)
 ├── infra/
 │   └── docker/       # Dockerfiles + nginx
-├── docs/             # ARCHITECTURE.md, DB-SCHEMA.md
+├── docs/             # ARCHITECTURE.md, DB-SCHEMA.md, materials/ (reference content)
 ├── docker-compose.yml
 ├── Makefile
 ├── package.json      # workspace root
@@ -84,6 +84,15 @@ Default super admin (from Prisma seed):
 | 8 | Reports & exports (PDF/CSV/PNG) |
 | 9 | News & Events |
 | 10 | Hardening (perf, caching, load test, security audit) |
+
+## Reference materials
+
+`docs/materials/ekologiya/` — 15 ta "Ekologiya" fanidan amaliy/laboratoriya mashg'uloti
+hujjati (`.docx`), Phase 5 (Education/E-learning) uchun kelajakdagi kurs kontenti manbai
+sifatida saqlanmoqda. Hozircha kodga bog'lanmagan — faqat arxiv. Shu papkadagi
+`PROMPT.md` — ularni platformaga (Course/Lesson modellari, seed, CRUD, UI) qanday
+kiritish kerakligi bo'yicha keyingi AI sessiyasiga to'g'ridan-to'g'ri berish mumkin
+bo'lgan tayyor topshiriq matni.
 
 ## License
 

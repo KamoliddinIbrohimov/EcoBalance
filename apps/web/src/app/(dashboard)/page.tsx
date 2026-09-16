@@ -5,14 +5,11 @@ import { NewsCard } from '@/features/dashboard/components/news-card';
 import { ProjectMapCard } from '@/features/dashboard/components/project-map-card';
 import { QuickFactsCard } from '@/features/dashboard/components/quick-facts-card';
 import { QuickReportsRow } from '@/features/dashboard/components/quick-reports-row';
-import { TestModeBanner } from '@/features/dashboard/components/test-mode-banner';
 import { TrendsChartCard } from '@/features/dashboard/components/trends-chart-card';
 
 export default function HomePage() {
   return (
     <div className="mx-auto flex max-w-[1500px] flex-col gap-6">
-      <TestModeBanner />
-
       <HeroBanner />
 
       <KpiGrid />

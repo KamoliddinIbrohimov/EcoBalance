@@ -95,7 +95,50 @@ export class TokenService {
     }
 
     if (record.revokedAt) {
-      // Presented token was already used → reuse attack. Revoke entire family.
+      // Bu tokenni allaqachon rotate qilingan. Concurrent /auth/refresh oqimida
+      // (masalan React StrictMode double-mount yoki multi-tab) bu tabiiy hodisa.
+      // Grace davri ichida — familyni bekor qilmaymiz, aktiv tokenni topib
+      // qaytaramiz yoki qayta rotate qilamiz.
+      const GRACE_MS = 30_000;
+      const revokedAgo = Date.now() - record.revokedAt.getTime();
+      if (revokedAgo <= GRACE_MS) {
+        // Concurrent rotation'ning yangi tokeni hali insert bo'lmagan holati bor.
+        // Shuning uchun bir necha marta polling qilamiz — max 500ms.
+        const DEADLINE = Date.now() + 500;
+        const findLatestActive = () =>
+          this.prisma.refreshToken.findFirst({
+            where: { familyId, revokedAt: null },
+            include: { user: { include: { roles: { include: { role: true } } } } },
+            orderBy: { createdAt: 'desc' },
+          });
+        let latest: Awaited<ReturnType<typeof findLatestActive>> = null;
+        while (Date.now() <= DEADLINE) {
+          latest = await findLatestActive();
+          if (latest) break;
+          await new Promise((r) => setTimeout(r, 25));
+        }
+        if (latest) {
+          if (!latest.user.isActive) throw new UnauthorizedException('User is inactive');
+          const permissions = await this.permissionsFor(latest.userId);
+          const roleSlugs = latest.user.roles.map((r) => r.role.slug);
+          // Reorder: yangi token yaratamiz avval, keyin eski aktivini revoke qilamiz.
+          // Shu tariqa parallel readerlar hech qachon "familyda aktiv token yo'q"
+          // holatida qolmaydi.
+          const tokens = await this.issueTokens(
+            latest.userId,
+            latest.user.email,
+            roleSlugs,
+            permissions,
+            { ...context, familyId },
+          );
+          await this.prisma.refreshToken.update({
+            where: { id: latest.id },
+            data: { revokedAt: new Date() },
+          });
+          return { ...tokens, userId: latest.userId };
+        }
+      }
+      // Grace-period tashqarisida — haqiqiy reuse deb hisoblaymiz.
       this.logger.warn(
         `Refresh reuse detected for family=${familyId} user=${record.userId} — revoking family`,
       );
@@ -107,12 +150,6 @@ export class TokenService {
       throw new UnauthorizedException('Refresh token expired');
     }
 
-    // Revoke the presented one (rotation)
-    await this.prisma.refreshToken.update({
-      where: { id: record.id },
-      data: { revokedAt: new Date() },
-    });
-
     if (!record.user.isActive) {
       throw new UnauthorizedException('User is inactive');
     }
@@ -120,6 +157,10 @@ export class TokenService {
     const permissions = await this.permissionsFor(record.userId);
     const roleSlugs = record.user.roles.map((r) => r.role.slug);
 
+    // Reorder: yangi tokenni AVVAL yaratamiz, keyin eskisini revoke qilamiz.
+    // Shu tariqa concurrent /auth/refresh oqimida hech qachon "familyda hech
+    // qanday aktiv token yo'q" holati yuz bermaydi — false-positive "reuse
+    // detected" oldi olinadi.
     const tokens = await this.issueTokens(
       record.userId,
       record.user.email,
@@ -127,6 +168,11 @@ export class TokenService {
       permissions,
       { ...context, familyId },
     );
+
+    await this.prisma.refreshToken.update({
+      where: { id: record.id },
+      data: { revokedAt: new Date() },
+    });
 
     return { ...tokens, userId: record.userId };
   }

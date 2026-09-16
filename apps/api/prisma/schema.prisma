@@ -48,35 +48,79 @@ enum AuditAction {
   TOKEN_REVOKED
 }
 
+enum LessonType {
+  MARUZA
+  AMALIY
+  LABORATORIYA
+  EKSKURSIYA
+}
+
+enum EducationLevel {
+  MAKTABGACHA
+  MAKTAB
+  OLIY_TALIM
+  RESERVED
+}
+
+enum AiMessageRole {
+  USER
+  ASSISTANT
+}
+
+enum EcoReportCategory {
+  WASTE
+  WATER
+  GREEN_AREA
+  AIR_NOISE
+  ENERGY
+  OTHER
+}
+
+enum EcoReportRisk {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum EcoReportStatus {
+  REPORTED
+  IN_REVIEW
+  IN_PROGRESS
+  RESOLVED
+}
+
 // ---------------------------------------------------------------
 // Users, roles, permissions
 // ---------------------------------------------------------------
 
 model User {
-  id                String    @id @db.Uuid
-  firstName         String    @map("first_name")   @db.VarChar(100)
-  lastName          String    @map("last_name")    @db.VarChar(100)
-  email             String    @unique              @db.VarChar(255)
-  phone             String?   @unique              @db.VarChar(32)
-  passwordHash      String    @map("password_hash") @db.VarChar(255)
-  avatarUrl         String?   @map("avatar_url")   @db.VarChar(512)
-  locale            String    @default("uz")       @db.VarChar(8)
-  emailVerifiedAt   DateTime? @map("email_verified_at")
-  lastLoginAt       DateTime? @map("last_login_at")
-  lastLoginIp       String?   @map("last_login_ip") @db.VarChar(45)
-  isActive          Boolean   @default(true)       @map("is_active")
+  id              String    @id @db.Uuid
+  firstName       String    @map("first_name") @db.VarChar(100)
+  lastName        String    @map("last_name") @db.VarChar(100)
+  email           String    @unique @db.VarChar(255)
+  phone           String?   @unique @db.VarChar(32)
+  passwordHash    String    @map("password_hash") @db.VarChar(255)
+  avatarUrl       String?   @map("avatar_url") @db.Text
+  locale          String    @default("uz") @db.VarChar(8)
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  lastLoginAt     DateTime? @map("last_login_at")
+  lastLoginIp     String?   @map("last_login_ip") @db.VarChar(45)
+  isActive        Boolean   @default(true) @map("is_active")
 
-  organizationId    String?   @map("organization_id") @db.Uuid
-  organization      Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organizationId String?       @map("organization_id") @db.Uuid
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
-  roles             UserRole[]
-  auditLogs         AuditLog[]
-  notifications     Notification[]
-  refreshTokens     RefreshToken[]
-  passwordResets    PasswordResetToken[]
+  roles           UserRole[]
+  auditLogs       AuditLog[]
+  notifications   Notification[]
+  refreshTokens   RefreshToken[]
+  passwordResets  PasswordResetToken[]
+  ecoReports      EcoReport[]
+  aiConversations AiConversation[]
+  news            News[]
 
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt      @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([organizationId])
   @@index([createdAt(sort: Desc)])
@@ -84,31 +128,31 @@ model User {
 }
 
 model Role {
-  id          String        @id @db.Uuid
-  slug        RoleSlug      @unique
-  nameUz      String        @map("name_uz") @db.VarChar(120)
-  description String?       @db.VarChar(500)
+  id          String   @id @db.Uuid
+  slug        RoleSlug @unique
+  nameUz      String   @map("name_uz") @db.VarChar(120)
+  description String?  @db.VarChar(500)
 
   users       UserRole[]
   permissions RolePermission[]
 
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt      @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("roles")
 }
 
 model Permission {
-  id        String            @id @db.Uuid
-  slug      String            @unique @db.VarChar(120)   // e.g. "users.create"
-  module    String            @db.VarChar(60)             // e.g. "users"
-  action    String            @db.VarChar(60)             // e.g. "create"
-  nameUz    String            @map("name_uz") @db.VarChar(160)
+  id     String @id @db.Uuid
+  slug   String @unique @db.VarChar(120) // e.g. "users.create"
+  module String @db.VarChar(60) // e.g. "users"
+  action String @db.VarChar(60) // e.g. "create"
+  nameUz String @map("name_uz") @db.VarChar(160)
 
-  roles     RolePermission[]
+  roles RolePermission[]
 
-  createdAt DateTime          @default(now()) @map("created_at")
-  updatedAt DateTime          @updatedAt      @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([module])
   @@map("permissions")
@@ -143,22 +187,23 @@ model RolePermission {
 // ---------------------------------------------------------------
 
 model Organization {
-  id          String            @id @db.Uuid
-  parentId    String?           @map("parent_id") @db.Uuid
-  parent      Organization?     @relation("OrgTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children    Organization[]    @relation("OrgTree")
+  id       String         @id @db.Uuid
+  parentId String?        @map("parent_id") @db.Uuid
+  parent   Organization?  @relation("OrgTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Organization[] @relation("OrgTree")
 
-  type        OrganizationType
-  nameUz      String            @map("name_uz") @db.VarChar(255)
-  code        String            @unique @db.VarChar(60)  // e.g. "chirchiq", "kimyogar-mahalla"
-  address     Json?             @db.JsonB
-  latitude    Decimal?          @db.Decimal(10, 7)
-  longitude   Decimal?          @db.Decimal(10, 7)
+  type      OrganizationType
+  nameUz    String           @map("name_uz") @db.VarChar(255)
+  code      String           @unique @db.VarChar(60) // e.g. "chirchiq", "kimyogar-mahalla"
+  address   Json?            @db.JsonB
+  latitude  Decimal?         @db.Decimal(10, 7)
+  longitude Decimal?         @db.Decimal(10, 7)
 
-  users       User[]
+  users      User[]
+  ecoReports EcoReport[]
 
-  createdAt   DateTime          @default(now()) @map("created_at")
-  updatedAt   DateTime          @updatedAt      @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([parentId])
   @@index([type])
@@ -170,18 +215,18 @@ model Organization {
 // ---------------------------------------------------------------
 
 model AuditLog {
-  id           String       @id @db.Uuid
-  userId       String?      @map("user_id") @db.Uuid
-  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id     String  @id @db.Uuid
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  action       AuditAction
-  subjectType  String?      @map("subject_type") @db.VarChar(120)
-  subjectId    String?      @map("subject_id")   @db.Uuid
-  changes      Json?        @db.JsonB
-  ipAddress    String?      @map("ip_address") @db.VarChar(45)
-  userAgent    String?      @map("user_agent") @db.VarChar(500)
+  action      AuditAction
+  subjectType String?     @map("subject_type") @db.VarChar(120)
+  subjectId   String?     @map("subject_id") @db.Uuid
+  changes     Json?       @db.JsonB
+  ipAddress   String?     @map("ip_address") @db.VarChar(45)
+  userAgent   String?     @map("user_agent") @db.VarChar(500)
 
-  createdAt    DateTime     @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([userId])
   @@index([action])
@@ -191,22 +236,65 @@ model AuditLog {
 }
 
 // ---------------------------------------------------------------
+// PlatformSetting — Super Admin sozlaydigan yagona kalit-qiymatlar
+// (AI API kaliti, model, boshqa integratsiyalar). Kalit unique,
+// qiymat text (shifrlanmagan — .env kabi).
+// ---------------------------------------------------------------
+
+model PlatformSetting {
+  key       String    @id @db.VarChar(80)
+  value     String    @db.Text
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.Uuid
+
+  @@map("platform_settings")
+}
+
+// ---------------------------------------------------------------
+// News (Bosh sahifadagi yangiliklar oqimi)
+// ---------------------------------------------------------------
+
+model News {
+  id           String    @id @db.Uuid
+  titleUz      String    @map("title_uz") @db.VarChar(255)
+  bodyUz       String    @map("body_uz") @db.Text
+  /// Optional file uploaded to MinIO — masalan rasm yoki hujjat.
+  attachmentKey      String? @map("attachment_key") @db.VarChar(500)
+  attachmentFileName String? @map("attachment_file_name") @db.VarChar(255)
+  attachmentMimeType String? @map("attachment_mime_type") @db.VarChar(120)
+  attachmentSizeBytes Int?  @map("attachment_size_bytes")
+
+  isPublished  Boolean   @default(false) @map("is_published")
+  publishedAt  DateTime? @map("published_at")
+
+  authorId     String?   @map("author_id") @db.Uuid
+  author       User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([isPublished, publishedAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@map("news")
+}
+
+// ---------------------------------------------------------------
 // Notifications
 // ---------------------------------------------------------------
 
 model Notification {
-  id        String    @id @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  type      String    @db.VarChar(120)
-  titleUz   String    @map("title_uz") @db.VarChar(255)
-  bodyUz    String    @map("body_uz")  @db.Text
-  data      Json?     @db.JsonB
-  readAt    DateTime? @map("read_at")
+  type    String    @db.VarChar(120)
+  titleUz String    @map("title_uz") @db.VarChar(255)
+  bodyUz  String    @map("body_uz") @db.Text
+  data    Json?     @db.JsonB
+  readAt  DateTime? @map("read_at")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt      @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([userId, readAt])
   @@index([createdAt(sort: Desc)])
@@ -218,19 +306,19 @@ model Notification {
 // ---------------------------------------------------------------
 
 model RefreshToken {
-  id            String    @id @db.Uuid
-  userId        String    @map("user_id") @db.Uuid
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tokenHash     String    @unique @map("token_hash") @db.VarChar(255)
-  familyId      String    @map("family_id") @db.Uuid   // rotation family — reuse detection
-  revokedAt     DateTime? @map("revoked_at")
-  expiresAt     DateTime  @map("expires_at")
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
+  familyId  String    @map("family_id") @db.Uuid // rotation family — reuse detection
+  revokedAt DateTime? @map("revoked_at")
+  expiresAt DateTime  @map("expires_at")
 
-  ipAddress     String?   @map("ip_address") @db.VarChar(45)
-  userAgent     String?   @map("user_agent") @db.VarChar(500)
+  ipAddress String? @map("ip_address") @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.VarChar(500)
 
-  createdAt     DateTime  @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([userId])
   @@index([familyId])
@@ -239,17 +327,179 @@ model RefreshToken {
 }
 
 model PasswordResetToken {
-  id        String   @id @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tokenHash String   @unique @map("token_hash") @db.VarChar(255)
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
   usedAt    DateTime? @map("used_at")
-  expiresAt DateTime @map("expires_at")
+  expiresAt DateTime  @map("expires_at")
 
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([userId])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+// ---------------------------------------------------------------
+// E-learning (Phase 5) — Courses & lessons
+// ---------------------------------------------------------------
+
+model Course {
+  id             String  @id @db.Uuid
+  slug           String  @unique @db.VarChar(80)
+  nameUz         String  @map("name_uz") @db.VarChar(255)
+  descriptionUz  String? @map("description_uz") @db.Text
+  // Dinamik `education_level_items` jadvalidagi slug'ga havola qiladi. FK sifatida
+  // biriktirilmagan — chunki daraja o'chirilsa ham kurs saqlanadi (level orphan
+  // bo'ladi, UI'da "—" ko'rinadi va admin qayta biriktiradi).
+  educationLevel String  @map("education_level") @db.VarChar(60)
+  isPublished    Boolean @default(false) @map("is_published")
+
+  lessons   Lesson[]
+  materials CourseMaterial[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isPublished])
+  @@index([educationLevel])
+  @@map("courses")
+}
+
+/// Dinamik ta'lim darajalari — Super Admin CRUD qila oladi. Sidebar shu jadvaldan
+/// ro'yxatni oladi. `isBuiltIn=true` bo'lgan qatorlar o'chirilmaydi (asosiy 4 daraja).
+model EducationLevelItem {
+  id            String   @id @db.Uuid
+  slug          String   @unique @db.VarChar(60)
+  nameUz        String   @map("name_uz") @db.VarChar(120)
+  descriptionUz String?  @map("description_uz") @db.VarChar(500)
+  iconName      String   @default("GraduationCap") @map("icon_name") @db.VarChar(60)
+  orderIndex    Int      @default(0) @map("order_index") @db.SmallInt
+  linkedEnum    EducationLevel? @map("linked_enum")
+  isBuiltIn     Boolean  @default(false) @map("is_built_in")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt      @map("updated_at")
+
+  @@index([orderIndex])
+  @@map("education_level_items")
+}
+
+model Lesson {
+  id       String @id @db.Uuid
+  courseId String @map("course_id") @db.Uuid
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  orderIndex  Int        @map("order_index") @db.SmallInt
+  lessonType  LessonType @map("lesson_type")
+  titleUz     String     @map("title_uz") @db.VarChar(255)
+  objectiveUz String?    @map("objective_uz") @db.Text
+  equipmentUz String?    @map("equipment_uz") @db.Text
+  theoryUz    String?    @map("theory_uz") @db.Text
+  procedureUz Json       @default("[]") @map("procedure_uz") @db.JsonB
+
+  materials CourseMaterial[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([courseId, orderIndex], map: "lessons_course_order_unique")
+  @@index([courseId])
+  @@index([lessonType])
+  @@map("lessons")
+}
+
+/// Kurs materiallari (docx/pdf) + ularning matn holatida saqlangan indeksi.
+/// contentText — RAG (chatbot) uchun, uploadda mammoth bilan chiqarilgan.
+model CourseMaterial {
+  id       String  @id @db.Uuid
+  courseId String  @map("course_id") @db.Uuid
+  course   Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonId String? @map("lesson_id") @db.Uuid
+  lesson   Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  fileName   String  @map("file_name") @db.VarChar(255)
+  storageKey String  @unique @map("storage_key") @db.VarChar(512)
+  mimeType   String  @map("mime_type") @db.VarChar(120)
+  sizeBytes  Int     @map("size_bytes")
+  uploadedBy String? @map("uploaded_by") @db.Uuid
+
+  /// Fayldan chiqarilgan matn — chatbot RAG uchun (docx/txt). Yo'q bo'lsa null.
+  contentText String? @map("content_text") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([courseId])
+  @@index([lessonId])
+  @@map("course_materials")
+}
+
+// ---------------------------------------------------------------
+// AI Chatbot (Phase 7) — conversation history
+// ---------------------------------------------------------------
+
+model AiConversation {
+  id     String @id @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title  String @db.VarChar(255)
+
+  messages AiMessage[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([updatedAt(sort: Desc)])
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id             String         @id @db.Uuid
+  conversationId String         @map("conversation_id") @db.Uuid
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role    AiMessageRole
+  content String        @db.Text
+  /// AI provayder tomonidan aytilgan token sarfi (billing statistikasi uchun).
+  tokens  Int?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([conversationId])
+  @@map("ai_messages")
+}
+
+model EcoReport {
+  id             String            @id @db.Uuid
+  organizationId String?           @map("organization_id") @db.Uuid
+  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  reportedBy     String            @map("reported_by") @db.Uuid
+  reporter       User              @relation(fields: [reportedBy], references: [id], onDelete: Cascade)
+
+  category       EcoReportCategory
+  riskLevel      EcoReportRisk     @map("risk_level")
+  status         EcoReportStatus   @default(REPORTED)
+  descriptionUz  String            @map("description_uz") @db.Text
+  suggestionUz   String?           @map("suggestion_uz") @db.Text
+  aiNoteUz       String?           @map("ai_note_uz") @db.Text
+
+  latitude       Decimal?          @db.Decimal(10, 7)
+  longitude      Decimal?          @db.Decimal(10, 7)
+  locationLabel  String?           @map("location_label") @db.VarChar(255)
+
+  photoBeforeKey String?           @map("photo_before_key") @db.VarChar(512)
+  photoAfterKey  String?           @map("photo_after_key")  @db.VarChar(512)
+
+  resolvedAt     DateTime?         @map("resolved_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt      @map("updated_at")
+
+  @@index([category])
+  @@index([status])
+  @@index([organizationId])
+  @@index([createdAt(sort: Desc)])
+  @@map("eco_reports")
 }

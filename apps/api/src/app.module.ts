@@ -8,8 +8,19 @@ import { LoggerModule } from 'nestjs-pino';
 import { envSchema } from './config/env.validation';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { ChatbotModule } from './modules/chatbot/chatbot.module';
+import { CoursesModule } from './modules/courses/courses.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { EcoReportsModule } from './modules/eco-reports/eco-reports.module';
+import { EducationLevelsModule } from './modules/education-levels/education-levels.module';
 import { HealthModule } from './modules/health/health.module';
+import { NewsModule } from './modules/news/news.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
+import { PlatformSettingsModule } from './modules/platform-settings/platform-settings.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
+import { RolesModule } from './modules/roles/roles.module';
+import { StorageModule } from './modules/storage/storage.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -44,14 +55,30 @@ import { UsersModule } from './modules/users/users.module';
         ttl: 60_000,
         limit: Number(process.env.RATE_LIMIT_DEFAULT ?? 60),
       },
+      {
+        name: 'chatbot',
+        ttl: 60_000,
+        limit: Number(process.env.RATE_LIMIT_CHATBOT ?? 20),
+      },
     ]),
 
     ScheduleModule.forRoot(),
 
     PrismaModule,
+    StorageModule,
     HealthModule,
     AuthModule,
     UsersModule,
+    OrganizationsModule,
+    RolesModule,
+    CoursesModule,
+    EducationLevelsModule,
+    EcoReportsModule,
+    AnalyticsModule,
+    NotificationsModule,
+    NewsModule,
+    PlatformSettingsModule,
+    ChatbotModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

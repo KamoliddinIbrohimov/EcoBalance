@@ -45,7 +45,7 @@ function MapLegend() {
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white">
             <Building2 className="h-3 w-3" />
           </span>
-          <span className="font-medium text-foreground">15 ta maktab</span>
+          <span className="font-medium text-foreground">Chirchiq 15-maktab</span>
         </li>
         <li className="flex items-center gap-2">
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-warning text-white">

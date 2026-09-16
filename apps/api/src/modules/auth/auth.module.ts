@@ -4,8 +4,11 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ThrottlerModule } from '@nestjs/throttler';
 
+import { StorageModule } from '../storage/storage.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { CaslAbilityFactory } from './authorization/casl-ability.factory';
+import { PermissionsGuard } from './authorization/permissions.guard';
 import { TokenService } from './services/token.service';
 import { PasswordService } from './services/password.service';
 import { AuditService } from './services/audit.service';
@@ -35,6 +38,7 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
         limit: Number(process.env.RATE_LIMIT_FORGOT_PASSWORD ?? 3),
       },
     ]),
+    StorageModule,
   ],
   controllers: [AuthController],
   providers: [
@@ -44,7 +48,13 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
     AuditService,
     JwtAccessStrategy,
     JwtRefreshStrategy,
+    CaslAbilityFactory,
+    PermissionsGuard,
   ],
-  exports: [AuthService, TokenService, PasswordService, AuditService],
+  // Exported so feature modules (Users, Organizations, Roles, ...) can import
+  // AuthModule once and get PasswordService/AuditService for their own
+  // services plus PermissionsGuard/CaslAbilityFactory for their controllers'
+  // `@UseGuards(PermissionsGuard)` + `@RequirePermissions(...)`.
+  exports: [AuthService, TokenService, PasswordService, AuditService, CaslAbilityFactory, PermissionsGuard],
 })
 export class AuthModule {}

@@ -38,8 +38,23 @@ export const envSchema = z.object({
   RATE_LIMIT_DEFAULT: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_AUTH: z.coerce.number().int().positive().default(10),
   RATE_LIMIT_FORGOT_PASSWORD: z.coerce.number().int().positive().default(3),
+  RATE_LIMIT_CHATBOT: z.coerce.number().int().positive().default(20),
 
   SENTRY_DSN: z.string().optional(),
+
+  // AI Chatbot — provider config. Missing ANTHROPIC_API_KEY at runtime disables
+  // outgoing chatbot messages (endpoints return 503); CRUD on stored history
+  // keeps working. Keeping the key optional at boot lets typecheck/build succeed
+  // before the project owner supplies it.
+  AI_PROVIDER: z.enum(['anthropic']).default('anthropic'),
+  AI_MODEL: z.string().default('claude-sonnet-4-5'),
+  AI_MAX_TOKENS: z.coerce.number().int().positive().default(1024),
+  AI_SYSTEM_PROMPT: z
+    .string()
+    .default(
+      'Sen Eco-Balance platformasi uchun mehribon va foydali AI yordamchisisan. Foydalanuvchilarga ekologiya, o‘quv kurslari va platforma xususiyatlari bo‘yicha o‘zbek tilida qisqa va aniq javob ber. Agar savol platformadan tashqarida bo‘lsa ham, imkon qadar yordam berishga harakat qil.',
+    ),
+  ANTHROPIC_API_KEY: z.string().optional(),
 
   SUPER_ADMIN_EMAIL: z.string().email().default('admin@eco-balance.uz'),
   SUPER_ADMIN_PASSWORD: z.string().min(10).default('ChangeMe!2026'),

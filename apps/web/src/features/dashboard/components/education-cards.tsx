@@ -1,34 +1,39 @@
-import { ArrowRight, Award, BookOpen, ClipboardList, Users } from 'lucide-react';
+'use client';
+
+import { ArrowRight, BookOpen, FileText, GraduationCap, Layers } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
+import { useMemo } from 'react';
 
+import { useEducationLevels } from '@/features/learning/hooks/use-education-levels';
+import { useCoursesList } from '@/features/learning/hooks/use-learning';
 import { Card } from '@/shared/components/ui/card';
 import { cn } from '@/shared/lib/cn';
 import { EDUCATION_STATS, type EducationStat } from '../data/mock';
 
 const ICON_BY_KEY: Record<EducationStat['icon'], LucideIcon> = {
-  courses:     BookOpen,
-  students:    Users,
-  assignments: ClipboardList,
-  certs:       Award,
+  levels:    Layers,
+  courses:   BookOpen,
+  lessons:   GraduationCap,
+  materials: FileText,
 };
 
 const CAPTIONS: Record<string, string> = {
-  coursesCaption:      "Ekologiya va atrof-muhit mavzusidagi kurslar",
-  studentsCaption:     'Bugungi faol foydalanuvchilar',
-  assignmentsCaption:  "Faol topshiriqlar soni",
-  certsCaption:        'Berilgan sertifikatlar soni',
-  coursesCta:          "Kurslarga o'tish",
-  studentsCta:         "Batafsil ko'rish",
-  assignmentsCta:      "Topshiriqlarga o'tish",
-  certsCta:            "Sertifikatlarni ko'rish",
+  levelsCaption:    "Maktabgacha, Maktab va Oliy ta'lim bo'limlari",
+  coursesCaption:   'Har darajaga mos ekologiya kursi',
+  lessonsCaption:   'Amaliy, laboratoriya va ekskursiya darslar',
+  materialsCaption: 'Yuklab olish uchun docx metodichkalar',
+  levelsCta:        "Darajalar ro'yxati",
+  coursesCta:       "Kurslarga o'tish",
+  lessonsCta:       "Darslarga o'tish",
+  materialsCta:     "Materiallarni ko'rish",
 };
 
 const TITLES: Record<EducationStat['key'], string> = {
-  courses:        'E-learning kurslari',
-  activeStudents: "O'quvchilar faolligi",
-  assignments:    'Topshiriqlar',
-  certificates:   'Sertifikatlar',
+  levels:    "Ta'lim darajalari",
+  courses:   'E-learning kurslari',
+  lessons:   'Darslar',
+  materials: 'Metodik materiallar',
 };
 
 const TONE_MAP = {
@@ -39,12 +44,31 @@ const TONE_MAP = {
 };
 
 export function EducationCards() {
+  const { data: levels } = useEducationLevels();
+  const { data: coursesData } = useCoursesList({ page: 1, perPage: 200, isPublished: true });
+
+  // Real DB'dan kelgan qiymatlar. Backend ma'lumot bermasa mock qiymatlar
+  // (docs/materials/ dan olingan sonlar) fallback bo'ladi.
+  const liveValues = useMemo(() => {
+    const map: Record<EducationStat['key'], string | null> = {
+      levels: levels ? `${levels.length} daraja` : null,
+      courses: coursesData ? `${coursesData.data.length} kurs` : null,
+      lessons: coursesData
+        ? `${coursesData.data.reduce((s, c) => s + (c.lessonsCount ?? 0), 0)} dars`
+        : null,
+      // Materials count backend'da alohida totalsda yo'q — mockdan olamiz.
+      materials: null,
+    };
+    return map;
+  }, [levels, coursesData]);
+
   return (
     <section>
       <h2 className="mb-3 text-base font-semibold text-foreground">Ta&apos;lim jarayoni</h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {EDUCATION_STATS.map((s) => {
           const Icon = ICON_BY_KEY[s.icon];
+          const value = liveValues[s.key] ?? s.value;
           return (
             <Card key={s.key} className="p-5">
               <div className="flex items-start gap-3">
@@ -56,7 +80,7 @@ export function EducationCards() {
                   <div className="mt-0.5 text-xs text-muted-foreground">{CAPTIONS[s.captionKey]}</div>
                 </div>
               </div>
-              <div className="mt-4 text-2xl font-bold text-foreground">{s.value}</div>
+              <div className="mt-4 text-2xl font-bold text-foreground">{value}</div>
               <Link
                 href={s.href}
                 className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary transition-colors hover:underline"

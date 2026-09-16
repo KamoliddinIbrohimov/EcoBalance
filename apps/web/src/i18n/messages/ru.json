@@ -1,0 +1,161 @@
+{
+  "app": {
+    "name": "Eco-Balance",
+    "tagline": "Платформа экологического мониторинга и непрерывного образования",
+    "copyright": "© {year} Платформа Eco-Balance. Все права защищены.",
+    "quote": "\"Беречь природу — значит беречь будущее\""
+  },
+  "common": {
+    "loading": "Загрузка…",
+    "search": "Поиск",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "submit": "Отправить",
+    "close": "Закрыть",
+    "back": "Назад",
+    "next": "Далее",
+    "previous": "Предыдущий",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "create": "Создать",
+    "yes": "Да",
+    "no": "Нет",
+    "moreDetails": "Подробнее",
+    "seeAll": "Показать все"
+  },
+  "status": {
+    "good": "Хорошо",
+    "medium": "Средне",
+    "bad": "Плохо"
+  },
+  "auth": {
+    "login": {
+      "title": "Вход в систему",
+      "subtitle": "Введите email и пароль",
+      "emailLabel": "Email",
+      "emailPlaceholder": "ваш@email.uz",
+      "passwordLabel": "Пароль",
+      "passwordPlaceholder": "Ваш пароль",
+      "forgotLink": "Забыли пароль?",
+      "submit": "Войти",
+      "noAccount": "Нет учётной записи?",
+      "registerLink": "Зарегистрироваться",
+      "invalidCredentials": "Неверный email или пароль"
+    },
+    "register": {
+      "title": "Регистрация",
+      "subtitle": "Создать новый аккаунт Eco-Balance",
+      "firstNameLabel": "Имя",
+      "lastNameLabel": "Фамилия",
+      "emailLabel": "Email",
+      "phoneLabel": "Телефон (необязательно)",
+      "phonePlaceholder": "+998 90 123 45 67",
+      "passwordLabel": "Пароль",
+      "confirmPasswordLabel": "Подтвердите пароль",
+      "submit": "Зарегистрироваться",
+      "hasAccount": "Уже есть аккаунт?",
+      "loginLink": "Войти",
+      "passwordHint": "Минимум 10 символов: заглавные, строчные буквы и цифры"
+    },
+    "forgot": {
+      "title": "Восстановление пароля",
+      "subtitle": "Введите email — отправим инструкции по восстановлению",
+      "submit": "Отправить",
+      "backToLogin": "Вернуться ко входу",
+      "sent": "Если такой email зарегистрирован, инструкции отправлены"
+    },
+    "reset": {
+      "title": "Новый пароль",
+      "subtitle": "Выберите надёжный новый пароль",
+      "passwordLabel": "Новый пароль",
+      "confirmLabel": "Подтвердите новый пароль",
+      "submit": "Обновить пароль",
+      "success": "Пароль обновлён. Теперь вы можете войти"
+    },
+    "logout": "Выйти"
+  },
+  "sidebar": {
+    "home": "Главная",
+    "monitoring": "Экологический мониторинг",
+    "learning": "Обучение (E-learning)",
+    "learningPreschool": "Дошкольное образование",
+    "learningSchool": "Школа",
+    "learningHigher": "Высшее образование",
+    "learningReserved": "Другое (скоро)",
+    "chatbot": "AI Chatbot",
+    "dashboard": "Панель",
+    "reports": "Отчёты",
+    "analytics": "Аналитика",
+    "recommendations": "Рекомендации",
+    "news": "Новости",
+    "events": "Мероприятия",
+    "users": "Пользователи",
+    "organizations": "Организации",
+    "settings": "Настройки",
+    "profile": "Мой профиль",
+    "aiSettings": "Настройки AI",
+    "projectArea": "Территория проекта"
+  },
+  "topbar": {
+    "notifications": "Уведомления",
+    "weather": "Погода",
+    "myProfile": "Мой профиль",
+    "settings": "Настройки",
+    "logout": "Выйти"
+  },
+  "dashboard": {
+    "welcome": "Добро пожаловать, {name}!",
+    "todayIs": "Сегодня, {date}",
+    "phasePlaceholder": "Содержимое панели будет добавлено на этапе 3"
+  },
+  "roles": {
+    "SUPER_ADMIN": "Главный администратор",
+    "ADMIN": "Администратор",
+    "CITY_ADMIN": "Администратор города",
+    "MAHALLA_MANAGER": "Руководитель махалли",
+    "TEACHER": "Преподаватель",
+    "STUDENT": "Учащийся",
+    "CITIZEN": "Гражданин"
+  },
+  "errors": {
+    "network": "Сетевая ошибка. Пожалуйста, попробуйте позже",
+    "unauthorized": "Нет доступа к этой операции",
+    "notFound": "Не найдено",
+    "validation": "Проверьте введённые данные"
+  },
+  "underDev": {
+    "title": "Раздел в разработке",
+    "description": "Этот модуль пока не готов. Скоро будет доступен пользователям.",
+    "path": "Адрес страницы",
+    "backHome": "Вернуться на главную"
+  },
+  "learning": {
+    "allCourses": "Все курсы",
+    "manage": "Управление",
+    "editMode": "Редактировать",
+    "viewMode": "Режим просмотра",
+    "newCourse": "Новый курс",
+    "newLesson": "Новый урок",
+    "courseSettings": "Настройки курса",
+    "searchPlaceholder": "Поиск курса по названию…",
+    "noCoursesForLevel": "Пока нет курсов в этом разделе.",
+    "noSearchMatches": "По запросу ничего не найдено.",
+    "coursesLabel": "Курсы",
+    "lessonsLabel": "Уроки",
+    "materialsLabel": "Учебные файлы",
+    "lessonMaterialsLabel": "Файлы этого урока",
+    "noLessonsYet": "В этом курсе пока нет уроков.",
+    "noMaterialsYet": "Материалы пока не загружены.",
+    "draft": "Черновик",
+    "published": "Опубликован",
+    "lessonsCount": "уроков: {count}",
+    "loading": "Загрузка…",
+    "courseNotFound": "Курс не найден.",
+    "lessonNotFound": "Урок не найден.",
+    "objective": "Цель",
+    "equipment": "Необходимое оборудование",
+    "theory": "Теоретическая часть",
+    "practice": "Практические задания",
+    "lessonNumber": "Урок №{n}"
+  }
+}

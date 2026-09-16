@@ -29,6 +29,23 @@ export const PERMISSION = {
   // Notifications
   NOTIFICATIONS_READ_OWN: 'notifications.read.own',
   NOTIFICATIONS_MANAGE: 'notifications.manage',
+
+  // Courses / lessons (Phase 5 — E-learning)
+  COURSES_READ: 'courses.read',
+  COURSES_CREATE: 'courses.create',
+  COURSES_UPDATE: 'courses.update',
+  COURSES_DELETE: 'courses.delete',
+  LESSONS_MANAGE: 'lessons.manage',
+  MATERIALS_MANAGE: 'materials.manage',
+
+  // Eco Reports (Phase 4 — Environmental monitoring / EKO-PATRUL)
+  ECO_REPORTS_CREATE: 'eco_reports.create',
+  ECO_REPORTS_READ: 'eco_reports.read',
+  ECO_REPORTS_MANAGE: 'eco_reports.manage',
+
+  // News (nashr etilgan yangiliklar barchaga ko'rinadi; boshqarish — SUPER_ADMIN)
+  NEWS_READ: 'news.read',
+  NEWS_MANAGE: 'news.manage',
 } as const;
 
 export type Permission = (typeof PERMISSION)[keyof typeof PERMISSION];

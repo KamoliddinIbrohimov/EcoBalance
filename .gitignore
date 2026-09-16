@@ -33,6 +33,7 @@ next-env.d.ts
 # NestJS
 dist/
 tmp/
+apps/api/src/metadata.ts
 
 # Stray compiled JS next to TS sources (should never be checked in)
 packages/shared/src/**/*.js
@@ -52,6 +53,10 @@ coverage/
 # Docker
 .docker/data/
 docker-compose.override.yml
+
+# Local server deploy notes (SSH, IPs, ops commands) — never commit
+SERVER.md
+DEPLOY.local.md
 
 # Logs
 *.log

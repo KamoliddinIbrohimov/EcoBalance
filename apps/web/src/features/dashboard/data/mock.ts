@@ -1,6 +1,8 @@
 /**
- * All mock data used by the Phase 0 dashboard.
- * When real endpoints are wired in Phase 3, this file goes away.
+ * Bosh sahifa ma'lumotlari.
+ * Ilova real DB'dan ba'zi ko'rsatkichlarni useAnalyticsOverview orqali oladi
+ * (EducationCards); qolgan qismlar (KPI, xarita, yangiliklar) — sizning
+ * `docs/materials/` papkangizdagi kontentga asoslangan sample ma'lumotlar.
  */
 
 export interface KpiPoint {
@@ -10,6 +12,8 @@ export interface KpiPoint {
   status: 'good' | 'medium' | 'bad';
 }
 
+// Chirchiq shahri uchun namunaviy ekologik indekslar (Phase 0 — real IoT
+// sensorlari ulanmagan, bu qiymatlar dashboard prototipini ko'rsatish uchun).
 export const KPIS: KpiPoint[] = [
   { key: 'ecoIndex', value: 78, unit: '/100', status: 'good' },
   { key: 'airQuality', value: 28, unit: 'µg/m³', status: 'good' },
@@ -27,67 +31,70 @@ export const TREND_SERIES = [
   { month: 'May', airQuality: 85, waterQuality: 65, greenAreas: 42 },
 ];
 
+// Loyihaning Chirchiq shahridagi hozirgi hududiy qamrovi.
 export const QUICK_FACTS = [
-  { key: 'schools',    label: 'Maktablar soni',           value: '15 ta' },
-  { key: 'kg',         label: "Bog'cha soni",              value: '1 ta' },
-  { key: 'university', label: "Oliy ta'lim muassasasi",    value: '1 ta (ChDPU)' },
-  { key: 'mahallas',   label: 'Mahallalar soni',           value: '2 ta' },
-  { key: 'monitoring', label: 'Monitoring nuqtalari',      value: '24 ta' },
+  { key: 'schools',    label: 'Chirchiq 15-maktab',         value: '1 ta' },
+  { key: 'kg',         label: "Bog'chalar",                 value: '1 ta' },
+  { key: 'university', label: "Oliy ta'lim (ChDPU)",        value: '1 ta' },
+  { key: 'mahallas',   label: 'Mahallalar',                 value: '2 ta' },
+  { key: 'monitoring', label: 'Monitoring nuqtalari',       value: '24 ta' },
 ] as const;
 
 export const MAP_LEGEND = [
-  { icon: 'school',       label: '15 ta maktab',                             color: 'primary' as const },
-  { icon: 'kindergarten', label: "1 ta bog'cha",                              color: 'warning' as const },
-  { icon: 'university',   label: 'ChDPU',                                    color: 'purple' as const },
+  { icon: 'school',       label: 'Chirchiq 15-maktab',                       color: 'primary' as const },
+  { icon: 'kindergarten', label: "1 ta bog'cha",                             color: 'warning' as const },
+  { icon: 'university',   label: 'ChDPU (Chirchiq davlat pedagogika u.)',    color: 'purple' as const },
   { icon: 'mahalla',      label: 'Kimyogar mahallasi (Chirchiq shahri)',     color: 'primary' as const },
-  { icon: 'mahalla',      label: "Abay mahallasi (Bektemir tumani)",         color: 'destructive' as const },
+  { icon: 'mahalla',      label: 'Abay mahallasi (Bektemir tumani)',         color: 'destructive' as const },
 ];
 
 export interface EducationStat {
-  key: 'courses' | 'activeStudents' | 'assignments' | 'certificates';
+  key: 'courses' | 'lessons' | 'materials' | 'levels';
   value: string;
   captionKey: string;
   ctaKey: string;
   href: string;
-  icon: 'courses' | 'students' | 'assignments' | 'certs';
+  icon: 'courses' | 'lessons' | 'materials' | 'levels';
   tone: 'primary' | 'blue' | 'warning' | 'success';
 }
 
+// Ta'lim jarayoni bo'limi — E-learning platformasining hozirgi holati.
+// Sonlar `docs/materials/` papkasidan yuklab qo'yilgan kontentga muvofiq.
 export const EDUCATION_STATS: EducationStat[] = [
   {
+    key: 'levels',
+    value: '3 daraja',
+    captionKey: 'levelsCaption',
+    ctaKey: 'levelsCta',
+    href: '/learning',
+    icon: 'levels',
+    tone: 'primary',
+  },
+  {
     key: 'courses',
-    value: '12 kurs',
+    value: '4 kurs',
     captionKey: 'coursesCaption',
     ctaKey: 'coursesCta',
     href: '/learning',
     icon: 'courses',
-    tone: 'primary',
-  },
-  {
-    key: 'activeStudents',
-    value: '1 245',
-    captionKey: 'studentsCaption',
-    ctaKey: 'studentsCta',
-    href: '/users',
-    icon: 'students',
     tone: 'success',
   },
   {
-    key: 'assignments',
-    value: '18',
-    captionKey: 'assignmentsCaption',
-    ctaKey: 'assignmentsCta',
+    key: 'lessons',
+    value: '57 dars',
+    captionKey: 'lessonsCaption',
+    ctaKey: 'lessonsCta',
     href: '/learning',
-    icon: 'assignments',
+    icon: 'lessons',
     tone: 'blue',
   },
   {
-    key: 'certificates',
-    value: '532',
-    captionKey: 'certsCaption',
-    ctaKey: 'certsCta',
+    key: 'materials',
+    value: '48 fayl',
+    captionKey: 'materialsCaption',
+    ctaKey: 'materialsCta',
     href: '/learning',
-    icon: 'certs',
+    icon: 'materials',
     tone: 'warning',
   },
 ];
@@ -99,17 +106,34 @@ export interface NewsItem {
   thumbnailHue: 'green' | 'blue';
 }
 
+// Platformaga yuklab qo'yilgan real kontent haqidagi yangiliklar.
 export const NEWS: NewsItem[] = [
   {
     id: '1',
-    title: 'Kimyogar mahallasida "Yashil makon" doirasida daraxt ekish aksiyasi o\'tkazildi.',
-    date: '14.05.2025',
+    title:
+      "Maktabgacha ta'lim bo'limiga 10 ta yangi ekologik dars qo'shildi: tabiat, suv, chiqindi, hayvonlar va boshqa mavzular.",
+    date: '15.09.2026',
     thumbnailHue: 'green',
   },
   {
     id: '2',
-    title: 'Maktablarda ekologik bilimlar viktorinasi boshlandi.',
-    date: '12.05.2025',
+    title:
+      "Maktab bo'limi 6–7 sinf o'quvchilari uchun 10 ta ma'ruzali kurs bilan boyitildi (havo, iqlim, energiya, chiqindilar).",
+    date: '15.09.2026',
+    thumbnailHue: 'blue',
+  },
+  {
+    id: '3',
+    title:
+      "Oliy ta'lim bo'limi ChDPU talabalari uchun 15 mavzuli amaliy-laboratoriya kursi bilan ochildi: biosfera, Orol muammosi, ekologik pasport.",
+    date: '15.09.2026',
+    thumbnailHue: 'green',
+  },
+  {
+    id: '4',
+    title:
+      "Oliy ta'lim bo'limiga «Pedagogik dasturiy vositalar» kursi qo'shildi: 15 ma'ruza va 7 amaliy mashg'ulot — virtual laboratoriya, LMS Moodle, iSpring, MOOC va boshqalar.",
+    date: '16.09.2026',
     thumbnailHue: 'blue',
   },
 ];

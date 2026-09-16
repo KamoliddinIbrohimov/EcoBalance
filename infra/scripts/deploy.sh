@@ -117,8 +117,6 @@ fi
 # -----------------------------------------------------------------------------
 # 6) Prisma schema sync
 # -----------------------------------------------------------------------------
-# Phase 0: no migrations/ directory yet, so db push is the source of truth.
-# When migrations/ appears, switch this to `npx prisma migrate deploy`.
 log "syncing Prisma schema (prisma db push --accept-data-loss)"
 "${COMPOSE[@]}" run --rm api npx prisma db push --accept-data-loss --skip-generate
 ok "database schema synced"

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
-import { getMessages } from 'next-intl/server';
+import { getLocale, getMessages } from 'next-intl/server';
 import type { ReactNode } from 'react';
 
 import { AccentProvider } from '@/shared/providers/accent-provider';
@@ -44,11 +44,12 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
+  const locale = await getLocale();
   const messages = await getMessages();
   return (
-    <html lang="uz" suppressHydrationWarning className={inter.variable}>
+    <html lang={locale} suppressHydrationWarning className={inter.variable}>
       <body className="min-h-screen font-sans">
-        <NextIntlClientProvider messages={messages} locale="uz" timeZone="Asia/Tashkent">
+        <NextIntlClientProvider messages={messages} locale={locale} timeZone="Asia/Tashkent">
           <ThemeProvider>
             <QueryProvider>
               <AuthBoot>

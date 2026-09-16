@@ -2,9 +2,9 @@ import axios from 'axios';
 import type { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 import { env } from '@/shared/config/env';
-import { useAuthStore } from '@/shared/stores/auth-store';
+import { useAuthStore, type AuthUser } from '@/shared/stores/auth-store';
 
-type Retry = InternalAxiosRequestConfig & { _retry?: boolean };
+type Retry = InternalAxiosRequestConfig & { _retry?: boolean; _skipAuthRetry?: boolean };
 
 interface ProblemDetails {
   type?: string;
@@ -30,22 +30,56 @@ export class ApiError extends Error {
   }
 }
 
-let refreshInFlight: Promise<string | null> | null = null;
+export interface AuthRefreshResult {
+  accessToken: string;
+  expiresIn: number;
+  user: AuthUser;
+}
 
-async function refreshAccessToken(client: AxiosInstance): Promise<string | null> {
+/**
+ * Butun ilova bo'ylab yagona /auth/refresh singleton'i.
+ *
+ * Nima uchun bu muhim:
+ *   • Sahifa yuklanganda AuthBoot va bir necha React Query hook bir vaqtda
+ *     ishga tushadi. Har biri o'zicha /auth/refresh yuborsa — server ustida
+ *     N ta refresh nuqtasi qamalib, rate limit tez to'ladi va race condition
+ *     paydo bo'ladi.
+ *   • Bu funksiya birinchi chaqirg'ida "in-flight promise" yaratadi va tugaguncha
+ *     har kim shu promise'ni kutadi. Server faqat 1 marta uriladi. Natija —
+ *     access token va user — auth-store'ga yozib qo'yiladi.
+ */
+let refreshInFlight: Promise<AuthRefreshResult> | null = null;
+
+/**
+ * /auth/refresh singleton — muvaffaqiyatli bo'lsa tokenlarni auth-store'ga
+ * yozadi va natijani qaytaradi. Muvaffaqiyatsizlikda ApiError bilan tashlaydi:
+ *   • status 401 — cookie yaroqsiz, auth-store'ni tozalaydi
+ *   • boshqa (5xx / 429 / 0) — tranzient, store'ga tegmaydi
+ */
+export function refreshAuthSession(
+  client: AxiosInstance = apiClient,
+): Promise<AuthRefreshResult> {
   refreshInFlight ??= (async () => {
     try {
-      const { data } = await client.post<{ data: { accessToken: string; expiresIn: number } }>(
+      const { data } = await client.post<{
+        data: AuthRefreshResult;
+      }>(
         '/auth/refresh',
         {},
         { withCredentials: true, _skipAuthRetry: true } as never,
       );
-      const token = data.data.accessToken;
-      useAuthStore.getState().setAccessToken(token, data.data.expiresIn);
-      return token;
-    } catch {
-      useAuthStore.getState().clear();
-      return null;
+      const result = data.data;
+      const store = useAuthStore.getState();
+      store.setAccessToken(result.accessToken, result.expiresIn);
+      store.setUser(result.user);
+      return result;
+    } catch (err) {
+      const status = (err as AxiosError | ApiError)?.status
+        ?? (err as AxiosError)?.response?.status;
+      if (status === 401) {
+        useAuthStore.getState().clear();
+      }
+      throw err;
     } finally {
       refreshInFlight = null;
     }
@@ -74,23 +108,36 @@ export function createApiClient(): AxiosInstance {
     async (error: AxiosError<ProblemDetails>) => {
       const original = error.config as Retry | undefined;
 
-      if (error.response?.status === 401 && original && !original._retry) {
+      if (
+        error.response?.status === 401 &&
+        original &&
+        !original._retry &&
+        !original._skipAuthRetry
+      ) {
         original._retry = true;
-        const newToken = await refreshAccessToken(client);
-        if (newToken) {
+        try {
+          const result = await refreshAuthSession(client);
           original.headers = original.headers ?? {};
-          (original.headers as Record<string, string>).Authorization = `Bearer ${newToken}`;
+          (original.headers as Record<string, string>).Authorization =
+            `Bearer ${result.accessToken}`;
           return client(original);
+        } catch {
+          // Refresh muvaffaqiyatsiz — asl xatoni ApiError'ga aylantirib ta'shlaymiz.
         }
       }
 
-      if (error.response?.data) {
-        throw new ApiError(error.response.data);
+      const httpStatus = error.response?.status ?? 0;
+      const body = error.response?.data as ProblemDetails | string | undefined;
+
+      // Backend problem+json javob qaytargan bo'lsa — o'shandan foydalanamiz.
+      if (body && typeof body === 'object' && typeof body.title === 'string') {
+        throw new ApiError({ ...body, status: body.status ?? httpStatus });
       }
 
+      // 5xx / nginx HTML / boshqa "flat" javoblar — status'ni HTTP dan olamiz.
       throw new ApiError({
-        title: 'Network error',
-        status: 0,
+        title: httpStatus >= 500 ? 'Server error' : 'Network error',
+        status: httpStatus,
         detail: error.message,
       });
     },

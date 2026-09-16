@@ -5,3 +5,7 @@ export * from './schemas/auth';
 export * from './schemas/user';
 export * from './schemas/organization';
 export * from './schemas/pagination';
+export * from './schemas/course';
+export * from './schemas/chatbot';
+export * from './schemas/eco-report';
+export * from './schemas/news';

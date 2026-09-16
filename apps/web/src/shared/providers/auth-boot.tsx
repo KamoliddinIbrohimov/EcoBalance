@@ -2,45 +2,65 @@
 
 import { useEffect, type ReactNode } from 'react';
 
-import { apiClient } from '@/shared/lib/api-client';
-import { useAuthStore, type AuthUser } from '@/shared/stores/auth-store';
+import { ApiError, refreshAuthSession } from '@/shared/lib/api-client';
+import { useAuthStore } from '@/shared/stores/auth-store';
 
 /**
- * On first mount tries to hydrate the auth session:
- *   - Hits /auth/refresh (uses the httpOnly refresh cookie if present)
- *   - If successful, stores the fresh access token and fetches /auth/me
- *   - If refresh fails, silently stays logged out
+ * Ilk yuklamada refresh cookie orqali sessiyani tiklaydi. Ichkarida
+ * shared `refreshAuthSession` singleton'idan foydalanadi — bu bir vaqtda
+ * ishga tushgan react-query hook'lari bilan bir xil in-flight promise'ni
+ * o'rtoq qiladi, shu tariqa server'ga faqat 1 ta /auth/refresh yuboriladi.
+ *
+ * Xatolarga munosabat:
+ *   • 401 — refresh cookie yaroqsiz → jimgina logged-out qoladi.
+ *   • 5xx / 429 / tarmoq xatosi — tranzient. Backoff bilan qayta uramiz.
  */
+const MAX_RETRIES = 4;
+const BACKOFF_MS = [500, 1500, 3000, 6000];
+
+function isTransient(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return true;
+  return err.status !== 401;
+}
+
+async function sleep(ms: number, signal: { cancelled: boolean }) {
+  return new Promise<void>((resolve) => {
+    const id = setTimeout(resolve, ms);
+    const check = setInterval(() => {
+      if (signal.cancelled) {
+        clearTimeout(id);
+        clearInterval(check);
+        resolve();
+      }
+    }, 100);
+  });
+}
+
 export function AuthBoot({ children }: { children: ReactNode }) {
   const hydrate = useAuthStore((s) => s.hydrate);
-  const setAccessToken = useAuthStore((s) => s.setAccessToken);
-  const setUser = useAuthStore((s) => s.setUser);
 
   useEffect(() => {
-    let cancelled = false;
+    const signal = { cancelled: false };
 
     (async () => {
-      try {
-        const { data } = await apiClient.post<{
-          data: { accessToken: string; expiresIn: number };
-        }>('/auth/refresh', {});
-        if (cancelled) return;
-        setAccessToken(data.data.accessToken, data.data.expiresIn);
-
-        const me = await apiClient.get<{ data: AuthUser }>('/auth/me');
-        if (cancelled) return;
-        setUser(me.data.data);
-      } catch {
-        /* not logged in — that's fine */
-      } finally {
-        if (!cancelled) hydrate();
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        if (signal.cancelled) return;
+        try {
+          await refreshAuthSession();
+          break;
+        } catch (err) {
+          if (signal.cancelled) return;
+          if (!isTransient(err) || attempt === MAX_RETRIES) break;
+          await sleep(BACKOFF_MS[attempt] ?? 6000, signal);
+        }
       }
+      if (!signal.cancelled) hydrate();
     })();
 
     return () => {
-      cancelled = true;
+      signal.cancelled = true;
     };
-  }, [hydrate, setAccessToken, setUser]);
+  }, [hydrate]);
 
   return <>{children}</>;
 }

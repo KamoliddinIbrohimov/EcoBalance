@@ -28,7 +28,7 @@ export function MobileSidebar() {
         <button
           type="button"
           aria-label="Menyuni ochish"
-          className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:hidden"
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:h-11 sm:w-11 lg:hidden"
         >
           <Menu className="h-5 w-5" />
         </button>

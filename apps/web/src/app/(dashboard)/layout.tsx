@@ -10,7 +10,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <SidebarNav />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
-        <main className="flex-1 overflow-x-hidden p-6 md:p-8">{children}</main>
+        <main className="flex-1 overflow-x-hidden p-4 sm:p-6 md:p-8">{children}</main>
         <footer className="border-t border-border/60 bg-card py-3 text-center text-xs text-muted-foreground">
           © {new Date().getFullYear()} Eco-Balance Platformasi. Barcha huquqlar himoyalangan.
         </footer>

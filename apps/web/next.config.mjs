@@ -11,6 +11,7 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: 'standalone',
+  devIndicators: false,
   // Monorepo: point tracing to workspace root so shared packages are bundled.
   outputFileTracingRoot: path.join(__dirname, '../..'),
   transpilePackages: ['@eco/shared'],

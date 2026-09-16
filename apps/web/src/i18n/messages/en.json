@@ -1,0 +1,161 @@
+{
+  "app": {
+    "name": "Eco-Balance",
+    "tagline": "Ecological monitoring and continuous education platform",
+    "copyright": "© {year} Eco-Balance Platform. All rights reserved.",
+    "quote": "\"Protecting nature means protecting the future\""
+  },
+  "common": {
+    "loading": "Loading…",
+    "search": "Search",
+    "save": "Save",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "yes": "Yes",
+    "no": "No",
+    "moreDetails": "More details",
+    "seeAll": "See all"
+  },
+  "status": {
+    "good": "Good",
+    "medium": "Medium",
+    "bad": "Poor"
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Enter your email and password",
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@email.uz",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "Your password",
+      "forgotLink": "Forgot password?",
+      "submit": "Sign in",
+      "noAccount": "Don't have an account?",
+      "registerLink": "Register",
+      "invalidCredentials": "Invalid email or password"
+    },
+    "register": {
+      "title": "Register",
+      "subtitle": "Create a new Eco-Balance account",
+      "firstNameLabel": "First name",
+      "lastNameLabel": "Last name",
+      "emailLabel": "Email",
+      "phoneLabel": "Phone (optional)",
+      "phonePlaceholder": "+998 90 123 45 67",
+      "passwordLabel": "Password",
+      "confirmPasswordLabel": "Confirm password",
+      "submit": "Register",
+      "hasAccount": "Already have an account?",
+      "loginLink": "Sign in",
+      "passwordHint": "At least 10 characters: uppercase, lowercase and digits"
+    },
+    "forgot": {
+      "title": "Reset password",
+      "subtitle": "Enter your email — we'll send reset instructions",
+      "submit": "Send",
+      "backToLogin": "Back to sign in",
+      "sent": "If this email is registered, reset instructions have been sent"
+    },
+    "reset": {
+      "title": "New password",
+      "subtitle": "Choose a secure new password",
+      "passwordLabel": "New password",
+      "confirmLabel": "Confirm new password",
+      "submit": "Update password",
+      "success": "Password updated. You can now sign in"
+    },
+    "logout": "Sign out"
+  },
+  "sidebar": {
+    "home": "Home",
+    "monitoring": "Ecological monitoring",
+    "learning": "Education (E-learning)",
+    "learningPreschool": "Preschool education",
+    "learningSchool": "School",
+    "learningHigher": "Higher education",
+    "learningReserved": "Other (coming soon)",
+    "chatbot": "AI Chatbot",
+    "dashboard": "Dashboard",
+    "reports": "Reports",
+    "analytics": "Analytics",
+    "recommendations": "Recommendations",
+    "news": "News",
+    "events": "Events",
+    "users": "Users",
+    "organizations": "Organizations",
+    "settings": "Settings",
+    "profile": "My profile",
+    "aiSettings": "AI settings",
+    "projectArea": "Project area"
+  },
+  "topbar": {
+    "notifications": "Notifications",
+    "weather": "Weather",
+    "myProfile": "My profile",
+    "settings": "Settings",
+    "logout": "Sign out"
+  },
+  "dashboard": {
+    "welcome": "Welcome, {name}!",
+    "todayIs": "Today, {date}",
+    "phasePlaceholder": "Dashboard content will be added in Phase 3"
+  },
+  "roles": {
+    "SUPER_ADMIN": "Super administrator",
+    "ADMIN": "Administrator",
+    "CITY_ADMIN": "City administrator",
+    "MAHALLA_MANAGER": "Mahalla manager",
+    "TEACHER": "Teacher",
+    "STUDENT": "Student",
+    "CITIZEN": "Citizen"
+  },
+  "errors": {
+    "network": "Network error. Please try again later",
+    "unauthorized": "You don't have access to this action",
+    "notFound": "Not found",
+    "validation": "Please check the entered data"
+  },
+  "underDev": {
+    "title": "This section is under development",
+    "description": "This module isn't ready yet. It'll be available soon.",
+    "path": "Page path",
+    "backHome": "Back to home"
+  },
+  "learning": {
+    "allCourses": "All courses",
+    "manage": "Manage",
+    "editMode": "Edit",
+    "viewMode": "View mode",
+    "newCourse": "New course",
+    "newLesson": "New lesson",
+    "courseSettings": "Course settings",
+    "searchPlaceholder": "Search courses by name…",
+    "noCoursesForLevel": "No courses in this section yet.",
+    "noSearchMatches": "No courses match your search.",
+    "coursesLabel": "Courses",
+    "lessonsLabel": "Lessons",
+    "materialsLabel": "Course materials",
+    "lessonMaterialsLabel": "Files for this lesson",
+    "noLessonsYet": "No lessons in this course yet.",
+    "noMaterialsYet": "No materials uploaded yet.",
+    "draft": "Draft",
+    "published": "Published",
+    "lessonsCount": "{count} lessons",
+    "loading": "Loading…",
+    "courseNotFound": "Course not found.",
+    "lessonNotFound": "Lesson not found.",
+    "objective": "Objective",
+    "equipment": "Equipment",
+    "theory": "Theory",
+    "practice": "Practice tasks",
+    "lessonNumber": "Lesson #{n}"
+  }
+}

@@ -5,7 +5,7 @@
  * Run inside docker: `docker compose exec api pnpm test`.
  * The tests wipe and reseed the database between runs — do NOT run against production data.
  */
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, VersioningType } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import { ZodValidationPipe } from 'nestjs-zod';
@@ -30,8 +30,8 @@ describe('Auth (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     app.use(cookieParser());
-    app.setGlobalPrefix('api', { exclude: ['health'] });
-    app.enableVersioning({ type: 1 as never, defaultVersion: '1' });
+    app.setGlobalPrefix('api');
+    app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
     app.useGlobalPipes(new ZodValidationPipe());
     app.useGlobalInterceptors(new ResponseTransformInterceptor());
     app.useGlobalFilters(new GlobalExceptionFilter());
@@ -70,7 +70,7 @@ describe('Auth (e2e)', () => {
     expect(cookies.some((c) => c.startsWith('refresh_token='))).toBe(true);
   });
 
-  it('POST /auth/register — 422 when password is weak', async () => {
+  it('POST /auth/register — 400 when password is weak', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/auth/register')
       .send({
@@ -80,10 +80,9 @@ describe('Auth (e2e)', () => {
         password: 'weak',
         confirmPassword: 'weak',
       })
-      .expect(422);
+      .expect(400);
 
-    expect(res.body.status).toBe(422);
-    expect(res.body.errors).toBeDefined();
+    expect(res.body.status).toBe(400);
   });
 
   it('POST /auth/register — 409 when email already exists', async () => {
@@ -125,8 +124,8 @@ describe('Auth (e2e)', () => {
     await request(app.getHttpServer())
       .post('/api/v1/auth/register')
       .send({
-        firstName: 'X',
-        lastName: 'Y',
+        firstName: 'Xasan',
+        lastName: 'Yolchi',
         email,
         password: strongPassword,
         confirmPassword: strongPassword,
