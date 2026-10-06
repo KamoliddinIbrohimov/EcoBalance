@@ -19,7 +19,6 @@ import { formatLongDate } from '@/shared/lib/format-date';
 import type { AppLocale } from '@/i18n/request';
 
 // Screenshotdagi ko'rsatkichlar — keyinchalik haqiqiy API ga ulanadi
-const ECO_INDEX = 81;
 const STATS = [
   { label: 'Mahalla ekologik indeksi', value: '81%', sub: 'Yaxshi 🌿', color: 'text-emerald-600', bg: 'bg-emerald-50' },
   { label: 'Faol aholi', value: '1 245', sub: 'Ro\'yxatdagi fuqarolar', color: 'text-blue-600', bg: 'bg-blue-50' },

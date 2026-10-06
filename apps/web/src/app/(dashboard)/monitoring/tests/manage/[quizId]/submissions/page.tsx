@@ -17,7 +17,6 @@ import {
   useQuizSubmissions,
 } from '@/features/quizzes/hooks/use-quizzes';
 import { Badge } from '@/shared/components/ui/badge';
-import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
 import { PaginationBar } from '@/shared/components/ui/pagination-bar';
 import {
