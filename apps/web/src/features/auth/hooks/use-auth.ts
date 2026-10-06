@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 
+import { getRoleHomePath } from '@/shared/lib/role-path';
 import { useAuthStore } from '@/shared/stores/auth-store';
 import { authApi } from '../api/auth-api';
 
@@ -37,7 +38,7 @@ export function useLogin() {
       setAccessToken(result.accessToken, result.expiresIn);
       setUser(result.user);
       qc.setQueryData(ME_KEY, result.user);
-      router.push('/');
+      router.push(getRoleHomePath(result.user.roles));
     },
   });
 }
@@ -54,7 +55,7 @@ export function useRegister() {
       setAccessToken(result.accessToken, result.expiresIn);
       setUser(result.user);
       qc.setQueryData(ME_KEY, result.user);
-      router.push('/');
+      router.push(getRoleHomePath(result.user.roles));
     },
   });
 }

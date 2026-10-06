@@ -46,6 +46,12 @@ export const PERMISSION = {
   // News (nashr etilgan yangiliklar barchaga ko'rinadi; boshqarish — SUPER_ADMIN)
   NEWS_READ: 'news.read',
   NEWS_MANAGE: 'news.manage',
+
+  // Quizzes / Tests (Phase 8 — ekologik manbalar bo'limiga biriktirilgan testlar)
+  // QUIZZES_TAKE barcha autentifikatsiyadan o'tgan foydalanuvchilarga beriladi;
+  // QUIZZES_MANAGE faqat o'qituvchi/admin — test yaratish/tahrirlash/natijalarni ko'rish uchun.
+  QUIZZES_TAKE: 'quizzes.take',
+  QUIZZES_MANAGE: 'quizzes.manage',
 } as const;
 
 export type Permission = (typeof PERMISSION)[keyof typeof PERMISSION];

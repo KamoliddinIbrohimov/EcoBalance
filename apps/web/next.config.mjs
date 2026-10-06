@@ -21,6 +21,18 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
+  // Docker Desktop's Windows bind mount doesn't reliably forward native file
+  // change events into the Linux container, so webpack's default watcher
+  // silently misses edits. Polling guarantees changes are picked up.
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+      };
+    }
+    return config;
+  },
   images: {
     remotePatterns: [
       { protocol: 'http', hostname: 'localhost' },
@@ -29,9 +41,17 @@ const nextConfig = {
     ],
   },
   async rewrites() {
+    // Dev: nginx yo'q, API portiga to'g'ridan-to'g'ri proxy.
+    // Prod: nginx handles /api/v1 → api:4000, so this never runs.
+    const apiTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:4000';
     return {
       beforeFiles: [],
-      afterFiles: [],
+      afterFiles: [
+        {
+          source: '/api/v1/:path*',
+          destination: `${apiTarget}/api/v1/:path*`,
+        },
+      ],
       fallback: [],
     };
   },

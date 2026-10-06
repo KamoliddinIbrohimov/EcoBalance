@@ -256,7 +256,9 @@ export default function DashboardPage() {
             </Link>
           </div>
           {!recentReports || recentReports.data.length === 0 ? (
-            <TableEmpty colSpan={1}>Murojaatlar yo&apos;q</TableEmpty>
+            <p className="px-2 py-10 text-center text-sm text-muted-foreground">
+              Murojaatlar yo&apos;q
+            </p>
           ) : (
             <ul className="space-y-2">
               {recentReports.data.map((r) => (

@@ -16,6 +16,7 @@ import {
   Cat,
   ChevronDown,
   CircuitBoard,
+  ClipboardList,
   Cloud,
   Code,
   Compass,
@@ -78,6 +79,7 @@ import { useEffect, useState, type ComponentType, type SVGProps } from 'react';
 import { useLogout } from '@/features/auth/hooks/use-auth';
 import { useEducationLevels } from '@/features/learning/hooks/use-education-levels';
 import { cn } from '@/shared/lib/cn';
+import { useAuthStore } from '@/shared/stores/auth-store';
 import { Logo } from './logo';
 
 // Lucide icon name → component map. Custom levels can pick from these.
@@ -151,6 +153,8 @@ const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
 type LabelKey =
   | 'home'
   | 'monitoring'
+  | 'monitoringPatrul'
+  | 'monitoringTests'
   | 'learning'
   | 'learningPreschool'
   | 'learningSchool'
@@ -178,16 +182,27 @@ interface NavItem {
   dynamicLabel?: string;
 }
 
-const NAV: NavItem[] = [
+// ---------------------------------------------------------------
+// Rol bo'yicha ko'rinadigan sahifalar
+// ---------------------------------------------------------------
+
+type RoleGroup = 'admin' | 'mahalla' | 'user';
+
+function getRoleGroup(roles: string[]): RoleGroup {
+  if (roles.some((r) => ['SUPER_ADMIN', 'ADMIN', 'CITY_ADMIN', 'TEACHER'].includes(r))) return 'admin';
+  if (roles.includes('MAHALLA_MANAGER')) return 'mahalla';
+  return 'user';
+}
+
+const MONITORING_CHILDREN: NavItem[] = [
+  { href: '/monitoring', icon: Leaf, labelKey: 'monitoringPatrul' },
+  { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
+];
+
+const NAV_ADMIN: NavItem[] = [
   { href: '/', icon: Home, labelKey: 'home' },
-  { href: '/monitoring', icon: Leaf, labelKey: 'monitoring' },
-  {
-    href: '/learning',
-    icon: GraduationCap,
-    labelKey: 'learning',
-    // Children are injected dynamically from EducationLevels API at render time.
-    children: [],
-  },
+  { href: '/monitoring', icon: Leaf, labelKey: 'monitoring', children: MONITORING_CHILDREN },
+  { href: '/learning', icon: GraduationCap, labelKey: 'learning', children: [] },
   { href: '/chatbot', icon: Bot, labelKey: 'chatbot' },
   { href: '/dashboard', icon: BarChart3, labelKey: 'dashboard' },
   { href: '/reports', icon: FileText, labelKey: 'reports' },
@@ -199,6 +214,25 @@ const NAV: NavItem[] = [
   { href: '/organizations', icon: Building2, labelKey: 'organizations' },
   { href: '/settings/profile', icon: UserCircle, labelKey: 'profile' },
   { href: '/settings', icon: Settings, labelKey: 'settings' },
+];
+
+const NAV_MAHALLA: NavItem[] = [
+  { href: '/mahalla', icon: Home, labelKey: 'home' },
+  { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
+  { href: '/learning', icon: GraduationCap, labelKey: 'learning', children: [] },
+  { href: '/news', icon: Newspaper, labelKey: 'news' },
+  { href: '/chatbot', icon: Bot, labelKey: 'chatbot' },
+  { href: '/settings/profile', icon: UserCircle, labelKey: 'profile' },
+];
+
+const NAV_USER: NavItem[] = [
+  { href: '/home', icon: Home, labelKey: 'home' },
+  { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
+  { href: '/learning', icon: GraduationCap, labelKey: 'learning', children: [] },
+  { href: '/news', icon: Newspaper, labelKey: 'news' },
+  { href: '/recommendations', icon: Lightbulb, labelKey: 'recommendations' },
+  { href: '/chatbot', icon: Bot, labelKey: 'chatbot' },
+  { href: '/settings/profile', icon: UserCircle, labelKey: 'profile' },
 ];
 
 /**
@@ -222,9 +256,15 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const logout = useLogout();
   const { data: levels } = useEducationLevels();
+  const roles = useAuthStore((s) => s.user?.roles) ?? [];
 
-  const isActive = (href: string) =>
-    href === '/' ? pathname === '/' : pathname.startsWith(href);
+  const roleGroup = getRoleGroup(roles as string[]);
+  const baseNav = roleGroup === 'admin' ? NAV_ADMIN : roleGroup === 'mahalla' ? NAV_MAHALLA : NAV_USER;
+
+  const isActive = (href: string) => {
+    if (href === '/' || href === '/home' || href === '/mahalla') return pathname === href;
+    return pathname.startsWith(href);
+  };
 
   // Ta'lim darajalarini dinamik ravishda /learning bandi ostiga qo'shamiz.
   const learningChildren: NavItem[] = (levels ?? [])
@@ -237,7 +277,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       dynamicLabel: l.nameUz,
     }));
 
-  const enrichedNav: NavItem[] = NAV.map((item) =>
+  const enrichedNav: NavItem[] = baseNav.map((item) =>
     item.href === '/learning' ? { ...item, children: learningChildren } : item,
   );
 

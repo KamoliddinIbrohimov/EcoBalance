@@ -89,6 +89,16 @@ enum EcoReportStatus {
   RESOLVED
 }
 
+enum QuizQuestionType {
+  SINGLE_CHOICE // A/B/C/D — one correct option, scored
+  LIKERT_5 // 1..5 scale — survey question, not scored (contributes to likertSum)
+}
+
+enum QuizSubmissionStatus {
+  IN_PROGRESS
+  SUBMITTED
+}
+
 // ---------------------------------------------------------------
 // Users, roles, permissions
 // ---------------------------------------------------------------
@@ -118,6 +128,7 @@ model User {
   ecoReports      EcoReport[]
   aiConversations AiConversation[]
   news            News[]
+  quizSubmissions QuizSubmission[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -242,10 +253,10 @@ model AuditLog {
 // ---------------------------------------------------------------
 
 model PlatformSetting {
-  key       String    @id @db.VarChar(80)
-  value     String    @db.Text
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  updatedBy String?   @map("updated_by") @db.Uuid
+  key       String   @id @db.VarChar(80)
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
 
   @@map("platform_settings")
 }
@@ -255,23 +266,23 @@ model PlatformSetting {
 // ---------------------------------------------------------------
 
 model News {
-  id           String    @id @db.Uuid
-  titleUz      String    @map("title_uz") @db.VarChar(255)
-  bodyUz       String    @map("body_uz") @db.Text
+  id                  String  @id @db.Uuid
+  titleUz             String  @map("title_uz") @db.VarChar(255)
+  bodyUz              String  @map("body_uz") @db.Text
   /// Optional file uploaded to MinIO — masalan rasm yoki hujjat.
-  attachmentKey      String? @map("attachment_key") @db.VarChar(500)
-  attachmentFileName String? @map("attachment_file_name") @db.VarChar(255)
-  attachmentMimeType String? @map("attachment_mime_type") @db.VarChar(120)
-  attachmentSizeBytes Int?  @map("attachment_size_bytes")
+  attachmentKey       String? @map("attachment_key") @db.VarChar(500)
+  attachmentFileName  String? @map("attachment_file_name") @db.VarChar(255)
+  attachmentMimeType  String? @map("attachment_mime_type") @db.VarChar(120)
+  attachmentSizeBytes Int?    @map("attachment_size_bytes")
 
-  isPublished  Boolean   @default(false) @map("is_published")
-  publishedAt  DateTime? @map("published_at")
+  isPublished Boolean   @default(false) @map("is_published")
+  publishedAt DateTime? @map("published_at")
 
-  authorId     String?   @map("author_id") @db.Uuid
-  author       User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId String? @map("author_id") @db.Uuid
+  author   User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([isPublished, publishedAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
@@ -371,17 +382,17 @@ model Course {
 /// Dinamik ta'lim darajalari — Super Admin CRUD qila oladi. Sidebar shu jadvaldan
 /// ro'yxatni oladi. `isBuiltIn=true` bo'lgan qatorlar o'chirilmaydi (asosiy 4 daraja).
 model EducationLevelItem {
-  id            String   @id @db.Uuid
-  slug          String   @unique @db.VarChar(60)
-  nameUz        String   @map("name_uz") @db.VarChar(120)
-  descriptionUz String?  @map("description_uz") @db.VarChar(500)
-  iconName      String   @default("GraduationCap") @map("icon_name") @db.VarChar(60)
-  orderIndex    Int      @default(0) @map("order_index") @db.SmallInt
+  id            String          @id @db.Uuid
+  slug          String          @unique @db.VarChar(60)
+  nameUz        String          @map("name_uz") @db.VarChar(120)
+  descriptionUz String?         @map("description_uz") @db.VarChar(500)
+  iconName      String          @default("GraduationCap") @map("icon_name") @db.VarChar(60)
+  orderIndex    Int             @default(0) @map("order_index") @db.SmallInt
   linkedEnum    EducationLevel? @map("linked_enum")
-  isBuiltIn     Boolean  @default(false) @map("is_built_in")
+  isBuiltIn     Boolean         @default(false) @map("is_built_in")
 
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt      @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([orderIndex])
   @@map("education_level_items")
@@ -401,6 +412,7 @@ model Lesson {
   procedureUz Json       @default("[]") @map("procedure_uz") @db.JsonB
 
   materials CourseMaterial[]
+  quizzes   Quiz[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -473,33 +485,138 @@ model AiMessage {
 }
 
 model EcoReport {
-  id             String            @id @db.Uuid
-  organizationId String?           @map("organization_id") @db.Uuid
-  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  reportedBy     String            @map("reported_by") @db.Uuid
-  reporter       User              @relation(fields: [reportedBy], references: [id], onDelete: Cascade)
+  id             String        @id @db.Uuid
+  organizationId String?       @map("organization_id") @db.Uuid
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  reportedBy     String        @map("reported_by") @db.Uuid
+  reporter       User          @relation(fields: [reportedBy], references: [id], onDelete: Cascade)
 
-  category       EcoReportCategory
-  riskLevel      EcoReportRisk     @map("risk_level")
-  status         EcoReportStatus   @default(REPORTED)
-  descriptionUz  String            @map("description_uz") @db.Text
-  suggestionUz   String?           @map("suggestion_uz") @db.Text
-  aiNoteUz       String?           @map("ai_note_uz") @db.Text
+  category      EcoReportCategory
+  riskLevel     EcoReportRisk     @map("risk_level")
+  status        EcoReportStatus   @default(REPORTED)
+  descriptionUz String            @map("description_uz") @db.Text
+  suggestionUz  String?           @map("suggestion_uz") @db.Text
+  aiNoteUz      String?           @map("ai_note_uz") @db.Text
 
-  latitude       Decimal?          @db.Decimal(10, 7)
-  longitude      Decimal?          @db.Decimal(10, 7)
-  locationLabel  String?           @map("location_label") @db.VarChar(255)
+  latitude      Decimal? @db.Decimal(10, 7)
+  longitude     Decimal? @db.Decimal(10, 7)
+  locationLabel String?  @map("location_label") @db.VarChar(255)
 
-  photoBeforeKey String?           @map("photo_before_key") @db.VarChar(512)
-  photoAfterKey  String?           @map("photo_after_key")  @db.VarChar(512)
+  photoBeforeKey String? @map("photo_before_key") @db.VarChar(512)
+  photoAfterKey  String? @map("photo_after_key") @db.VarChar(512)
 
-  resolvedAt     DateTime?         @map("resolved_at")
-  createdAt      DateTime          @default(now()) @map("created_at")
-  updatedAt      DateTime          @updatedAt      @map("updated_at")
+  resolvedAt DateTime? @map("resolved_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
   @@index([category])
   @@index([status])
   @@index([organizationId])
   @@index([createdAt(sort: Desc)])
   @@map("eco_reports")
+}
+
+// ---------------------------------------------------------------
+// Quizzes / Tests (Phase 8) — attached to a Lesson
+// ---------------------------------------------------------------
+
+/// Dars tagidagi test/so'rovnoma. Bir xil quizda ikki tur savol aralash bo'lishi
+/// mumkin (SINGLE_CHOICE — ballanadi, LIKERT_5 — faqat yig'iladi, baholanmaydi).
+model Quiz {
+  id       String  @id @db.Uuid
+  /// Darsga biriktirilgan testlar — kurs kontekstida. null bo'lsa — "Ekologik
+  /// monitoring" bo'limidagi standalone test.
+  lessonId String? @map("lesson_id") @db.Uuid
+  lesson   Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  titleUz       String  @map("title_uz") @db.VarChar(255)
+  descriptionUz String? @map("description_uz") @db.Text
+  /// Ball bilan baholanadigan savollar bo'yicha o'tish foizi (0..100).
+  passPercent   Int     @default(60) @map("pass_percent") @db.SmallInt
+  isPublished   Boolean @default(false) @map("is_published")
+
+  questions   QuizQuestion[]
+  submissions QuizSubmission[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([lessonId])
+  @@index([isPublished])
+  @@map("quizzes")
+}
+
+/// options JSON formati:
+///   SINGLE_CHOICE: [{"key":"A","textUz":"...","isCorrect":true}, ...]
+///   LIKERT_5:      [] (bo'sh — variantlar 1..5 UI tomonidan render qilinadi)
+model QuizQuestion {
+  id     String @id @db.Uuid
+  quizId String @map("quiz_id") @db.Uuid
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  orderIndex Int              @map("order_index") @db.SmallInt
+  type       QuizQuestionType
+  textUz     String           @map("text_uz") @db.Text
+  options    Json             @default("[]") @db.JsonB
+
+  answers QuizAnswer[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([quizId, orderIndex], map: "quiz_questions_quiz_order_unique")
+  @@index([quizId])
+  @@map("quiz_questions")
+}
+
+/// Foydalanuvchining bitta urinishi. Bir odam quizni bir necha marta
+/// topshirishi mumkin (har safar yangi submission). IN_PROGRESS holati
+/// kelajakda "qoldirilgan" draft'lar uchun — hozircha hamma darhol SUBMITTED
+/// bo'ladi.
+model QuizSubmission {
+  id     String @id @db.Uuid
+  quizId String @map("quiz_id") @db.Uuid
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status QuizSubmissionStatus @default(IN_PROGRESS)
+
+  /// Scored (SINGLE_CHOICE) metrics — null if the quiz has no scored questions.
+  scoreTotal   Int?     @map("score_total") @db.SmallInt
+  scoreMax     Int?     @map("score_max") @db.SmallInt
+  scorePercent Int?     @map("score_percent") @db.SmallInt
+  passed       Boolean? @map("passed")
+
+  /// Survey (LIKERT_5) metrics — null if there are no survey questions.
+  likertSum Int? @map("likert_sum") @db.SmallInt
+  likertMax Int? @map("likert_max") @db.SmallInt
+
+  answers QuizAnswer[]
+
+  startedAt   DateTime  @default(now()) @map("started_at")
+  submittedAt DateTime? @map("submitted_at")
+
+  @@index([quizId, userId])
+  @@index([userId])
+  @@index([submittedAt(sort: Desc)])
+  @@map("quiz_submissions")
+}
+
+model QuizAnswer {
+  id           String         @id @db.Uuid
+  submissionId String         @map("submission_id") @db.Uuid
+  submission   QuizSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  questionId   String         @map("question_id") @db.Uuid
+  question     QuizQuestion   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  /// SINGLE_CHOICE: tanlangan option kaliti ("A", "B", "C", "D").
+  /// LIKERT_5: raqam "1".."5".
+  value String @db.VarChar(10)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([submissionId, questionId], map: "quiz_answers_submission_question_unique")
+  @@index([questionId])
+  @@map("quiz_answers")
 }

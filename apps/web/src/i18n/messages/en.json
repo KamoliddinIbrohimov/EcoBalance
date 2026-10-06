@@ -77,6 +77,8 @@
   "sidebar": {
     "home": "Home",
     "monitoring": "Ecological monitoring",
+    "monitoringPatrul": "ECO-PATROL",
+    "monitoringTests": "Tests",
     "learning": "Education (E-learning)",
     "learningPreschool": "Preschool education",
     "learningSchool": "School",

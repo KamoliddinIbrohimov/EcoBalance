@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { paginationQuerySchema } from './pagination';
 
 export const LESSON_TYPE = {
+  MARUZA: 'MARUZA',
   AMALIY: 'AMALIY',
   LABORATORIYA: 'LABORATORIYA',
   EKSKURSIYA: 'EKSKURSIYA',
@@ -9,6 +10,7 @@ export const LESSON_TYPE = {
 export type LessonType = (typeof LESSON_TYPE)[keyof typeof LESSON_TYPE];
 
 export const LESSON_TYPE_LABELS_UZ: Record<LessonType, string> = {
+  MARUZA: 'Ma‘ruza',
   AMALIY: 'Amaliy mashg‘ulot',
   LABORATORIYA: 'Laboratoriya',
   EKSKURSIYA: 'Ekskursiya',

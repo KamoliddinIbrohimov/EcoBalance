@@ -34,6 +34,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1131.0",
     "@casl/ability": "^6.7.2",
     "@eco/shared": "workspace:*",
+    "@google/generative-ai": "^0.24.1",
     "@nestjs/bullmq": "^11.0.2",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.0",

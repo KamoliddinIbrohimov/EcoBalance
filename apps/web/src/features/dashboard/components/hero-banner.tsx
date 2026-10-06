@@ -1,24 +1,21 @@
 'use client';
 
 import { Leaf } from 'lucide-react';
-import { useFormatter } from 'next-intl';
+import { useLocale } from 'next-intl';
 
 import { useAuthStore } from '@/shared/stores/auth-store';
+import { formatLongDate } from '@/shared/lib/format-date';
+import type { AppLocale } from '@/i18n/request';
 
 /**
  * Welcome hero — sarlavha + sana chap tomonda, iqtibos kartasi o‘ng tomonda.
  */
 export function HeroBanner() {
   const user = useAuthStore((s) => s.user);
-  const format = useFormatter();
+  const locale = useLocale() as AppLocale;
 
   const displayName = user ? `${user.firstName} ${user.lastName}` : 'Foydalanuvchi';
-  const dateStr = format.dateTime(new Date(), {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    weekday: 'long',
-  });
+  const dateStr = formatLongDate(new Date(), locale);
 
   return (
     <section className="grid gap-4 lg:max-w-[1160px] lg:grid-cols-[minmax(0,1fr),minmax(0,300px)]">

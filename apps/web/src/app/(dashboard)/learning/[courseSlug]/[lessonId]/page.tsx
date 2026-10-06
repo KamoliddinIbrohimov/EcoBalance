@@ -1,7 +1,7 @@
 'use client';
 
 import { LESSON_TYPE_LABELS_UZ, PERMISSION } from '@eco/shared';
-import { ArrowLeft, Beaker, ClipboardList, Compass, Target, Wrench } from 'lucide-react';
+import { ArrowLeft, Beaker, BookOpen, ClipboardList, Compass, Target, Wrench } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -14,6 +14,7 @@ import { UnderDevelopment } from '@/shared/components/layout/under-development';
 import { useAuthStore } from '@/shared/stores/auth-store';
 
 const TYPE_ICON = {
+  MARUZA: BookOpen,
   AMALIY: ClipboardList,
   LABORATORIYA: Beaker,
   EKSKURSIYA: Compass,

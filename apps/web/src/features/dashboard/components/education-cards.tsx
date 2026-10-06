@@ -45,7 +45,7 @@ const TONE_MAP = {
 
 export function EducationCards() {
   const { data: levels } = useEducationLevels();
-  const { data: coursesData } = useCoursesList({ page: 1, perPage: 200, isPublished: true });
+  const { data: coursesData } = useCoursesList({ page: 1, perPage: 100, isPublished: true });
 
   // Real DB'dan kelgan qiymatlar. Backend ma'lumot bermasa mock qiymatlar
   // (docs/materials/ dan olingan sonlar) fallback bo'ladi.

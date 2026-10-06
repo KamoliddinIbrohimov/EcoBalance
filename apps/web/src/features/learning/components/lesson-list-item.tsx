@@ -2,7 +2,7 @@
 
 import type { LessonDto } from '@eco/shared';
 import { LESSON_TYPE_LABELS_UZ } from '@eco/shared';
-import { Beaker, ChevronRight, Compass, ClipboardList, Pencil, Trash2 } from 'lucide-react';
+import { Beaker, BookOpen, ChevronRight, Compass, ClipboardList, Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 import { Badge } from '@/shared/components/ui/badge';
@@ -10,6 +10,7 @@ import { Button } from '@/shared/components/ui/button';
 import { cn } from '@/shared/lib/cn';
 
 const TYPE_ICON = {
+  MARUZA: BookOpen,
   AMALIY: ClipboardList,
   LABORATORIYA: Beaker,
   EKSKURSIYA: Compass,

@@ -77,6 +77,8 @@
   "sidebar": {
     "home": "Главная",
     "monitoring": "Экологический мониторинг",
+    "monitoringPatrul": "ЭКО-ПАТРУЛЬ",
+    "monitoringTests": "Тесты",
     "learning": "Обучение (E-learning)",
     "learningPreschool": "Дошкольное образование",
     "learningSchool": "Школа",

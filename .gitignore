@@ -6,6 +6,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Stray temporary files from docker-compose bind mounts
+_tmp_*
+
 # Claude Code agent sessions
 .claude/
 

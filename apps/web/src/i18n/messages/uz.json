@@ -77,6 +77,8 @@
   "sidebar": {
     "home": "Bosh sahifa",
     "monitoring": "Ekologik monitoring",
+    "monitoringPatrul": "EKO-PATRUL",
+    "monitoringTests": "Testlar",
     "learning": "Ta'lim (E-learning)",
     "learningPreschool": "Maktabgacha ta'lim",
     "learningSchool": "Maktab",
@@ -94,7 +96,11 @@
     "settings": "Sozlamalar",
     "profile": "Mening profilim",
     "aiSettings": "AI sozlamalari",
-    "projectArea": "Loyiha hududi"
+    "projectArea": "Loyiha hududi",
+    "mahallaDashboard": "Mahalla paneli",
+    "activeResidents": "Faol aholi",
+    "events": "Tadbirlar",
+    "ecoStatus": "Ekologik holat"
   },
   "topbar": {
     "notifications": "Bildirishnomalar",

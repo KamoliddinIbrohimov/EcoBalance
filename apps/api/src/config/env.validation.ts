@@ -46,7 +46,7 @@ export const envSchema = z.object({
   // outgoing chatbot messages (endpoints return 503); CRUD on stored history
   // keeps working. Keeping the key optional at boot lets typecheck/build succeed
   // before the project owner supplies it.
-  AI_PROVIDER: z.enum(['anthropic']).default('anthropic'),
+  AI_PROVIDER: z.enum(['anthropic', 'gemini']).default('anthropic'),
   AI_MODEL: z.string().default('claude-sonnet-4-5'),
   AI_MAX_TOKENS: z.coerce.number().int().positive().default(1024),
   AI_SYSTEM_PROMPT: z

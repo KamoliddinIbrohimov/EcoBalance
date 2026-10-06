@@ -19,6 +19,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { PlatformSettingsModule } from './modules/platform-settings/platform-settings.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
+import { QuizzesModule } from './modules/quizzes/quizzes.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { UsersModule } from './modules/users/users.module';
@@ -79,6 +80,7 @@ import { UsersModule } from './modules/users/users.module';
     NewsModule,
     PlatformSettingsModule,
     ChatbotModule,
+    QuizzesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
