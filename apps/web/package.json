@@ -2,7 +2,7 @@
   "name": "@eco/web",
   "version": "0.1.0",
   "private": true,
-  "description": "Eco-Balance Next.js web app",
+  "description": "PedResearch Lab Next.js web app",
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "next build",

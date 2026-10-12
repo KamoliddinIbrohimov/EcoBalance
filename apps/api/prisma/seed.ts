@@ -336,7 +336,7 @@ async function seedPDVCourse(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  console.log('🌱 Seeding Eco-Balance base data…');
+  console.log('🌱 Seeding PedResearch Lab base data…');
   const permissionIds = await seedPermissions();
   console.log(`  ✓ ${permissionIds.size} permissions`);
   const roleIds = await seedRoles(permissionIds);

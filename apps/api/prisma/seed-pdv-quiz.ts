@@ -331,7 +331,7 @@ const KOGNITIV: Mcq[] = [
     correctKey: 'A',
   },
   {
-    textUz: 'Eco-Balance platformasidan "Pedagogik dasturiy vositalar" fanida qanday foydalanish maqsadga muvofiq?',
+    textUz: 'PedResearch Lab platformasidan "Pedagogik dasturiy vositalar" fanida qanday foydalanish maqsadga muvofiq?',
     options: [
       { key: 'A', textUz: 'Real elektron o‘quv-tadqiqot muhiti sifatida' },
       { key: 'B', textUz: 'Faqat ekologik rasm albomi sifatida' },
@@ -365,7 +365,7 @@ const MOTIVATSION: string[] = [
   'Yaratgan elektron mahsulotimni ekspert fikri asosida takomillashtirishga tayyorman.',
   'Jamoaviy tadqiqot va fikr almashish men uchun foydali.',
   'Tadqiqot natijalarini taqdim etish va muhokama qilishga qiziqaman.',
-  'Eco-Balance kabi real elektron muhitda tadqiqot olib borish mening kasbiy rivojlanishimga yordam beradi.',
+  'PedResearch Lab kabi real elektron muhitda tadqiqot olib borish mening kasbiy rivojlanishimga yordam beradi.',
   'Kelajakdagi pedagogik faoliyatimda tadqiqotchilik yondashuvidan foydalanishni rejalashtiraman.',
 ];
 

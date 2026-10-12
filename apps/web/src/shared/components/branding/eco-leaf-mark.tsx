@@ -3,7 +3,7 @@ import type { SVGProps } from 'react';
 import { cn } from '@/shared/lib/cn';
 
 /**
- * Eco-Balance brand mark.
+ * PedResearch Lab brand mark.
  *
  * Recreated from the reference logo: a central stem with four teardrop leaves
  * — one big upper-left, one small upper-center, one big right, one big lower-left.

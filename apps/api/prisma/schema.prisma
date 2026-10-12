@@ -1,4 +1,4 @@
-// Eco-Balance Platform — Prisma schema (Phase 0)
+// PedResearch Lab Platform — Prisma schema (Phase 0)
 // PostgreSQL 16 with UUIDv7 default IDs (via app-level uuid v7)
 
 generator client {

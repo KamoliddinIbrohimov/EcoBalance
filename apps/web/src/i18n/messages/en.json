@@ -1,8 +1,8 @@
 {
   "app": {
-    "name": "Eco-Balance",
+    "name": "PedResearch Lab",
     "tagline": "Ecological monitoring and continuous education platform",
-    "copyright": "© {year} Eco-Balance Platform. All rights reserved.",
+    "copyright": "© {year} PedResearch Lab Platform. All rights reserved.",
     "quote": "\"Protecting nature means protecting the future\""
   },
   "common": {
@@ -44,7 +44,7 @@
     },
     "register": {
       "title": "Register",
-      "subtitle": "Create a new Eco-Balance account",
+      "subtitle": "Create a new PedResearch Lab account",
       "firstNameLabel": "First name",
       "lastNameLabel": "Last name",
       "emailLabel": "Email",

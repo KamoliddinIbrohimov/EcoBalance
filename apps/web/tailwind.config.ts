@@ -2,7 +2,7 @@ import type { Config } from 'tailwindcss';
 import animate from 'tailwindcss-animate';
 
 /**
- * Eco-Balance design tokens.
+ * PedResearch Lab design tokens.
  * All colors reference CSS variables defined in globals.css so that
  * light/dark themes and role-based accent (green/blue/purple) work automatically.
  */

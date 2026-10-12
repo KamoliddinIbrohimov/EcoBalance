@@ -1,8 +1,8 @@
 {
   "app": {
-    "name": "Eco-Balance",
+    "name": "PedResearch Lab",
     "tagline": "Платформа экологического мониторинга и непрерывного образования",
-    "copyright": "© {year} Платформа Eco-Balance. Все права защищены.",
+    "copyright": "© {year} Платформа PedResearch Lab. Все права защищены.",
     "quote": "\"Беречь природу — значит беречь будущее\""
   },
   "common": {
@@ -44,7 +44,7 @@
     },
     "register": {
       "title": "Регистрация",
-      "subtitle": "Создать новый аккаунт Eco-Balance",
+      "subtitle": "Создать новый аккаунт PedResearch Lab",
       "firstNameLabel": "Имя",
       "lastNameLabel": "Фамилия",
       "emailLabel": "Email",

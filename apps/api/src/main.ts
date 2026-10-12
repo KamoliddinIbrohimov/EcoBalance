@@ -54,7 +54,7 @@ async function bootstrap(): Promise<void> {
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Eco-Balance API')
+    .setTitle('PedResearch Lab API')
     .setDescription('Government-grade ecological monitoring platform — REST API')
     .setVersion('1.0.0')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
@@ -70,7 +70,7 @@ async function bootstrap(): Promise<void> {
   await app.listen(port, '0.0.0.0');
 
   const logger = app.get(Logger);
-  logger.log(`🌱 Eco-Balance API listening on http://0.0.0.0:${port}`);
+  logger.log(`🌱 PedResearch Lab API listening on http://0.0.0.0:${port}`);
   logger.log(`📚 Swagger UI:  http://0.0.0.0:${port}/api/docs`);
 }
 

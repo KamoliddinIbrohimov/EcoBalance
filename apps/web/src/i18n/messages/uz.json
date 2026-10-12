@@ -1,8 +1,8 @@
 {
   "app": {
-    "name": "Eco-Balance",
+    "name": "PedResearch Lab",
     "tagline": "Ekologik monitoring va uzluksiz ta'lim platformasi",
-    "copyright": "© {year} Eco-Balance Platformasi. Barcha huquqlar himoyalangan.",
+    "copyright": "© {year} PedResearch Lab Platformasi. Barcha huquqlar himoyalangan.",
     "quote": "\"Tabiatni asrash – kelajakni asrash demakdir\""
   },
   "common": {
@@ -44,7 +44,7 @@
     },
     "register": {
       "title": "Ro'yxatdan o'tish",
-      "subtitle": "Yangi Eco-Balance hisobi yaratish",
+      "subtitle": "Yangi PedResearch Lab hisobi yaratish",
       "firstNameLabel": "Ism",
       "lastNameLabel": "Familiya",
       "emailLabel": "Email",

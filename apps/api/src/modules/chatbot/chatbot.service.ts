@@ -33,9 +33,9 @@ import { AI_PROVIDER, type AiProvider } from './providers/ai-provider.interface'
  *      ~15× kam token sarflaydi.
  */
 
-const OFF_TOPIC_REPLY = "Kechirasiz, bu savol Eco-Balance platformasidagi ekologiya kurslariga aloqador emas. Iltimos, ekologiya, tabiat yoki kurs mavzulari bo'yicha savol bering.";
+const OFF_TOPIC_REPLY = "Kechirasiz, bu savol PedResearch Lab platformasidagi ekologiya kurslariga aloqador emas. Iltimos, ekologiya, tabiat yoki kurs mavzulari bo'yicha savol bering.";
 
-const STRICT_SYSTEM_PROMPT = `Sen Eco-Balance platformasining AI yordamchisiisan.
+const STRICT_SYSTEM_PROMPT = `Sen PedResearch Lab platformasining AI yordamchisiisan.
 
 QOIDALAR:
 1. Ekologiya, tabiat, kurs materiallari bo'yicha savollarga to'liq javob ber.
@@ -52,7 +52,7 @@ const GREETING_PATTERNS: RegExp[] = [
 ];
 
 const GREETING_REPLIES: string[] = [
-  "Salom! Men Eco-Balance AI yordamchisiman. Sizga ekologiya, tabiat va platformadagi kurslar bo'yicha yordam berishga tayyorman. Qanday savolingiz bor?",
+  "Salom! Men PedResearch Lab AI yordamchisiman. Sizga ekologiya, tabiat va platformadagi kurslar bo'yicha yordam berishga tayyorman. Qanday savolingiz bor?",
   "Assalomu alaykum! Sizga qanday yordam berishim mumkin? Ekologiya kurslari, darslar yoki tabiat mavzusida savollaringizni bering.",
   "Salom! Bugun ekologiya haqida nima o'rganmoqchisiz? Kurs materiallari bo'yicha savolingizni yuboring, birga o'ylab ko'ramiz.",
 ];

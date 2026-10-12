@@ -12,7 +12,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <Topbar />
         <main className="flex-1 overflow-x-hidden p-4 sm:p-6 md:p-8">{children}</main>
         <footer className="border-t border-border/60 bg-card py-3 text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Eco-Balance Platformasi. Barcha huquqlar himoyalangan.
+          © {new Date().getFullYear()} PedResearch Lab. Barcha huquqlar himoyalangan.
         </footer>
       </div>
 

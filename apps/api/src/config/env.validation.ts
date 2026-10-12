@@ -33,7 +33,7 @@ export const envSchema = z.object({
   MAIL_USER: z.string().optional(),
   MAIL_PASSWORD: z.string().optional(),
   MAIL_FROM_ADDRESS: z.string().email().default('no-reply@eco-balance.uz'),
-  MAIL_FROM_NAME: z.string().default('Eco-Balance Platformasi'),
+  MAIL_FROM_NAME: z.string().default('PedResearch Lab'),
 
   RATE_LIMIT_DEFAULT: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_AUTH: z.coerce.number().int().positive().default(10),
@@ -52,7 +52,7 @@ export const envSchema = z.object({
   AI_SYSTEM_PROMPT: z
     .string()
     .default(
-      'Sen Eco-Balance platformasi uchun mehribon va foydali AI yordamchisisan. Foydalanuvchilarga ekologiya, o‘quv kurslari va platforma xususiyatlari bo‘yicha o‘zbek tilida qisqa va aniq javob ber. Agar savol platformadan tashqarida bo‘lsa ham, imkon qadar yordam berishga harakat qil.',
+      'Sen PedResearch Lab platformasi uchun mehribon va foydali AI yordamchisisan. Foydalanuvchilarga ekologiya, o‘quv kurslari va platforma xususiyatlari bo‘yicha o‘zbek tilida qisqa va aniq javob ber. Agar savol platformadan tashqarida bo‘lsa ham, imkon qadar yordam berishga harakat qil.',
     ),
   ANTHROPIC_API_KEY: z.string().optional(),
 

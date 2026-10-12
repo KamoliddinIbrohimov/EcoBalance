@@ -1,4 +1,4 @@
-# Eco-Balance Platform
+# PedResearch Lab Platform
 
 Government-grade ecological monitoring, education and analytics platform for Uzbekistan.
 

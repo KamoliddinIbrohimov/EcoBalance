@@ -19,11 +19,11 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Eco-Balance Platformasi',
-    template: '%s · Eco-Balance',
+    default: 'PedResearch Lab',
+    template: '%s · PedResearch Lab',
   },
   description: 'Ekologik monitoring va uzluksiz ta\'lim platformasi',
-  applicationName: 'Eco-Balance',
+  applicationName: 'PedResearch Lab',
   robots: { index: false, follow: false },
   icons: {
     icon: [

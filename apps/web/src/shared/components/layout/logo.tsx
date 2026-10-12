@@ -19,7 +19,7 @@ export function Logo({ className, showTagline = true }: LogoProps) {
       <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary-soft">
         <Image
           src="/logo.png"
-          alt="Eco-Balance logo"
+          alt="PedResearch Lab logo"
           width={56}
           height={56}
           className="h-12 w-12 object-contain"
@@ -27,8 +27,8 @@ export function Logo({ className, showTagline = true }: LogoProps) {
         />
       </div>
       <div className="min-w-0">
-        <div className="text-xl font-bold leading-tight tracking-tight text-primary">
-          ECO-BALANCE
+        <div className="text-lg font-bold leading-tight tracking-tight text-primary">
+          PedResearch Lab
         </div>
         {showTagline ? (
           <div className="mt-0.5 text-[11px] leading-tight text-muted-foreground">

@@ -2,7 +2,7 @@
   "name": "@eco/api",
   "version": "0.1.0",
   "private": true,
-  "description": "Eco-Balance NestJS API",
+  "description": "PedResearch Lab NestJS API",
   "main": "dist/main.js",
   "scripts": {
     "build": "nest build",
