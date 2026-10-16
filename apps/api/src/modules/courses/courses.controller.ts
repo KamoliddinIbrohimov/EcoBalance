@@ -20,6 +20,7 @@ import type { Request } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PermissionsGuard } from '../auth/authorization/permissions.guard';
 import { RequirePermissions } from '../auth/authorization/permissions.decorator';
+import type { AuthenticatedUser } from '../auth/strategies/jwt-access.strategy';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import {
@@ -41,23 +42,23 @@ export class CoursesController {
 
   @Get()
   @RequirePermissions(PERMISSION.COURSES_READ)
-  @ApiOperation({ summary: 'Kurslar ro‘yxati (sahifalash, qidiruv, nashr filtri)' })
-  async list(@Query() query: QueryCourseDto) {
-    return this.courses.listCourses(query);
+  @ApiOperation({ summary: 'Kurslar ro‘yxati (STUDENT faqat published)' })
+  async list(@Query() query: QueryCourseDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.courses.listCourses(query, actor.roles);
   }
 
   @Get('slug/:slug')
   @RequirePermissions(PERMISSION.COURSES_READ)
-  @ApiOperation({ summary: 'Kursni slug bo‘yicha topish' })
-  async detailBySlug(@Param('slug') slug: string) {
-    return this.courses.findCourseBySlug(slug);
+  @ApiOperation({ summary: 'Kursni slug bo‘yicha topish (STUDENT faqat published)' })
+  async detailBySlug(@Param('slug') slug: string, @CurrentUser() actor: AuthenticatedUser) {
+    return this.courses.findCourseBySlug(slug, actor.roles);
   }
 
   @Get(':id')
   @RequirePermissions(PERMISSION.COURSES_READ)
-  @ApiOperation({ summary: 'Kurs tafsilotlari' })
-  async detail(@Param('id') id: string) {
-    return this.courses.findCourseById(id);
+  @ApiOperation({ summary: 'Kurs tafsilotlari (STUDENT faqat published)' })
+  async detail(@Param('id') id: string, @CurrentUser() actor: AuthenticatedUser) {
+    return this.courses.findCourseById(id, actor.roles);
   }
 
   @Get(':id/lessons')
@@ -82,31 +83,36 @@ export class CoursesController {
 
   @Patch(':id')
   @RequirePermissions(PERMISSION.COURSES_UPDATE)
-  @ApiOperation({ summary: 'Kursni tahrirlash' })
+  @ApiOperation({ summary: 'Kursni tahrirlash (TEACHER faqat o‘ziniki)' })
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateCourseDto,
-    @CurrentUser('id') actorId: string,
+    @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
     @Ip() ip: string,
   ) {
-    return this.courses.updateCourse(id, dto, {
-      actorId,
-      ip,
-      userAgent: req.headers['user-agent'],
-    });
+    return this.courses.updateCourse(
+      id,
+      dto,
+      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
+      actor.roles,
+    );
   }
 
   @Delete(':id')
   @RequirePermissions(PERMISSION.COURSES_DELETE)
-  @ApiOperation({ summary: 'Kursni o‘chirish (barcha darslari ham o‘chiriladi)' })
+  @ApiOperation({ summary: 'Kursni o‘chirish (TEACHER faqat o‘ziniki)' })
   async remove(
     @Param('id') id: string,
-    @CurrentUser('id') actorId: string,
+    @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
     @Ip() ip: string,
   ) {
-    return this.courses.removeCourse(id, { actorId, ip, userAgent: req.headers['user-agent'] });
+    return this.courses.removeCourse(
+      id,
+      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
+      actor.roles,
+    );
   }
 }
 

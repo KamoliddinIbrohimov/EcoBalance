@@ -64,19 +64,32 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         typeof res === 'string'
           ? res
           : ((res as Record<string, unknown>).message as string | string[] | undefined);
+      // 5xx HttpException'larda title ichida ichki ma'lumot bo'lishi mumkin
+      // (masalan "PrismaClientKnownRequestError: ..."). Prod'da bir xil
+      // "Server xatosi" matniga aylantiramiz.
+      const safeTitle =
+        status >= 500 && process.env.NODE_ENV !== 'development'
+          ? 'Server xatosi'
+          : exception.message;
       return {
         type: `https://eco-balance.uz/errors/${status}`,
-        title: exception.message,
+        title: safeTitle,
         status,
-        detail: Array.isArray(detail) ? detail.join('; ') : detail,
+        detail:
+          status >= 500 && process.env.NODE_ENV !== 'development'
+            ? undefined
+            : Array.isArray(detail)
+              ? detail.join('; ')
+              : detail,
         instance,
         traceId,
       };
     }
 
+    // Noma'lum xato (Prisma, dastur ichidagi) — mutlaqo hech narsa sizmaslik.
     return {
       type: 'https://eco-balance.uz/errors/internal',
-      title: 'Internal Server Error',
+      title: 'Server xatosi',
       status: HttpStatus.INTERNAL_SERVER_ERROR,
       detail:
         process.env.NODE_ENV === 'development' && exception instanceof Error

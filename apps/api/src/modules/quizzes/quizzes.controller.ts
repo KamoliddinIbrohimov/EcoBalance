@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PERMISSION } from '@eco/shared';
 
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/strategies/jwt-access.strategy';
 import { PermissionsGuard } from '../auth/authorization/permissions.guard';
 import { RequirePermissions } from '../auth/authorization/permissions.decorator';
 import { CreateQuestionDto, ReorderQuestionsDto, UpdateQuestionDto } from './dto/question.dto';
@@ -54,8 +55,8 @@ export class QuizzesAdminController {
   @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Darsga yangi test qo‘shish' })
-  async create(@Body() dto: CreateQuizDto) {
-    return this.quizzes.create(dto);
+  async create(@Body() dto: CreateQuizDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.quizzes.create(dto, actor.id);
   }
 
   @Patch(':id')
@@ -64,16 +65,20 @@ export class QuizzesAdminController {
   async update(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateQuizDto,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.quizzes.update(id, dto);
+    return this.quizzes.update(id, dto, { id: actor.id, roles: actor.roles });
   }
 
   @Delete(':id')
   @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Testni o‘chirish (savollar va topshiriqlar bilan)' })
-  async remove(@Param('id', new ParseUUIDPipe()) id: string) {
-    await this.quizzes.remove(id);
+  async remove(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    await this.quizzes.remove(id, { id: actor.id, roles: actor.roles });
   }
 
   // -------- Questions --------
@@ -126,8 +131,9 @@ export class QuizzesAdminController {
   async submissionsAdmin(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Query() query: QuerySubmissionDto,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.quizzes.listSubmissionsAdmin(id, query);
+    return this.quizzes.listSubmissionsAdmin(id, query, { id: actor.id, roles: actor.roles });
   }
 }
 

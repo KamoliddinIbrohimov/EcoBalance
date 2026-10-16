@@ -41,17 +41,17 @@ export class UsersController {
   @Get()
   @UseGuards(PermissionsGuard)
   @RequirePermissions(PERMISSION.USERS_READ)
-  @ApiOperation({ summary: 'Foydalanuvchilar ro‘yxati (sahifalash, qidiruv, filtr)' })
-  async list(@Query() query: QueryUserDto) {
-    return this.users.list(query);
+  @ApiOperation({ summary: 'Foydalanuvchilar ro‘yxati (TEACHER o‘zi yaratganlarini, SA hammasini)' })
+  async list(@Query() query: QueryUserDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.users.list(query, actor.roles, actor.id);
   }
 
   @Get(':id')
   @UseGuards(PermissionsGuard)
   @RequirePermissions(PERMISSION.USERS_READ)
-  @ApiOperation({ summary: 'Foydalanuvchi tafsilotlari (admin ko‘rinishi)' })
-  async detail(@Param('id') id: string) {
-    return this.users.findAdminDetail(id);
+  @ApiOperation({ summary: 'Foydalanuvchi tafsilotlari (TEACHER faqat o‘ziniki)' })
+  async detail(@Param('id') id: string, @CurrentUser() actor: AuthenticatedUser) {
+    return this.users.findAdminDetail(id, actor.roles, actor.id);
   }
 
   @Post()
@@ -75,27 +75,36 @@ export class UsersController {
   @Patch(':id')
   @UseGuards(PermissionsGuard)
   @RequirePermissions(PERMISSION.USERS_UPDATE)
-  @ApiOperation({ summary: 'Foydalanuvchi ma’lumotlari, tashkiloti va rollarini tahrirlash' })
+  @ApiOperation({ summary: 'Foydalanuvchini tahrirlash (TEACHER faqat o‘zi yaratganlarini)' })
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
-    @CurrentUser('id') actorId: string,
+    @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
     @Ip() ip: string,
   ) {
-    return this.users.update(id, dto, { actorId, ip, userAgent: req.headers['user-agent'] });
+    return this.users.update(
+      id,
+      dto,
+      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
+      actor.roles,
+    );
   }
 
   @Delete(':id')
   @UseGuards(PermissionsGuard)
   @RequirePermissions(PERMISSION.USERS_DELETE)
-  @ApiOperation({ summary: 'Foydalanuvchini faolsizlantirish (soft delete)' })
+  @ApiOperation({ summary: 'Foydalanuvchini faolsizlantirish (TEACHER faqat o‘zi yaratganlarini)' })
   async deactivate(
     @Param('id') id: string,
-    @CurrentUser('id') actorId: string,
+    @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
     @Ip() ip: string,
   ) {
-    return this.users.deactivate(id, { actorId, ip, userAgent: req.headers['user-agent'] });
+    return this.users.deactivate(
+      id,
+      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
+      actor.roles,
+    );
   }
 }

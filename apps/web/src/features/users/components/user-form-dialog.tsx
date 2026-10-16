@@ -73,7 +73,10 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const { data: roles } = useRolesOptions();
+  const { data: allRoles } = useRolesOptions();
+  // SUPER_ADMIN tanlanmasin — tizimda faqat bitta bo'ladi va DB trigger
+  // ushlab oladi; UI'da ko'rsatish ham mantiqsiz.
+  const roles = (allRoles ?? []).filter((r) => r.slug !== 'SUPER_ADMIN');
   const { data: tree } = useOrganizationsTree();
   const create = useCreateUser();
   const update = useUpdateUser();

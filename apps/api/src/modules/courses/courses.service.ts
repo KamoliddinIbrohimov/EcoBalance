@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -100,11 +101,13 @@ export class CoursesService {
 
   // ------------- Courses -------------
 
-  async listCourses(query: CourseQuery) {
+  async listCourses(query: CourseQuery, actorRoles: string[] = []) {
     const { page, perPage, search, isPublished, educationLevel } = query;
+    const isStudent = !actorRoles.includes('SUPER_ADMIN') && !actorRoles.includes('TEACHER');
 
     const where: Prisma.CourseWhereInput = {
-      ...(isPublished !== undefined ? { isPublished } : {}),
+      // STUDENT faqat nashr etilgan kurslarni ko'radi (query filtersiz).
+      ...(isStudent ? { isPublished: true } : isPublished !== undefined ? { isPublished } : {}),
       ...(educationLevel ? { educationLevel } : {}),
       ...(search
         ? {
@@ -138,18 +141,23 @@ export class CoursesService {
     };
   }
 
-  async findCourseBySlug(slug: string): Promise<CourseDto> {
+  async findCourseBySlug(slug: string, actorRoles: string[] = []): Promise<CourseDto> {
     const row = await this.prisma.course.findUnique({
       where: { slug: slug.toLowerCase() },
       select: COURSE_SELECT,
     });
     if (!row) throw new NotFoundException('Kurs topilmadi');
+    const isStudent = !actorRoles.includes('SUPER_ADMIN') && !actorRoles.includes('TEACHER');
+    if (isStudent && !row.isPublished) throw new NotFoundException('Kurs topilmadi');
     return toCourseDto(row);
   }
 
-  async findCourseById(id: string): Promise<CourseDto> {
+  async findCourseById(id: string, actorRoles: string[] = []): Promise<CourseDto> {
     const row = await this.prisma.course.findUnique({ where: { id }, select: COURSE_SELECT });
     if (!row) throw new NotFoundException('Kurs topilmadi');
+    const isStudent = !actorRoles.includes('SUPER_ADMIN') && !actorRoles.includes('TEACHER');
+    // STUDENT qoralama kurslarni ko'rolmaydi (404 probe-safe).
+    if (isStudent && !row.isPublished) throw new NotFoundException('Kurs topilmadi');
     return toCourseDto(row);
   }
 
@@ -184,9 +192,19 @@ export class CoursesService {
     return toCourseDto(row);
   }
 
-  async updateCourse(id: string, dto: UpdateCourseInput, ctx: RequestContext): Promise<CourseDto> {
+  async updateCourse(
+    id: string,
+    dto: UpdateCourseInput,
+    ctx: RequestContext,
+    actorRoles: string[] = [],
+  ): Promise<CourseDto> {
     const existing = await this.prisma.course.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Kurs topilmadi');
+
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+    if (!isSuperAdmin && existing.ownerId !== ctx.actorId) {
+      throw new ForbiddenException('Faqat o‘z kursingizni tahrirlashingiz mumkin');
+    }
 
     let slug: string | undefined;
     if (dto.slug !== undefined) {
@@ -222,12 +240,17 @@ export class CoursesService {
     return toCourseDto(row);
   }
 
-  async removeCourse(id: string, ctx: RequestContext) {
+  async removeCourse(id: string, ctx: RequestContext, actorRoles: string[] = []) {
     const existing = await this.prisma.course.findUnique({
       where: { id },
       include: { _count: { select: { lessons: true } } },
     });
     if (!existing) throw new NotFoundException('Kurs topilmadi');
+
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+    if (!isSuperAdmin && existing.ownerId !== ctx.actorId) {
+      throw new ForbiddenException('Faqat o‘z kursingizni o‘chira olasiz');
+    }
 
     // Lessons cascade-delete tufayli avtomatik o'chadi.
     await this.prisma.course.delete({ where: { id } });

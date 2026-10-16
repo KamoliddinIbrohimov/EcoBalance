@@ -87,8 +87,9 @@ export class UsersService {
     return user;
   }
 
-  async list(query: UserQuery) {
+  async list(query: UserQuery, actorRoles: string[] = [], actorId?: string) {
     const { page, perPage, search, organizationId, role, isActive } = query;
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
 
     const where: Prisma.UserWhereInput = {
       ...(organizationId ? { organizationId } : {}),
@@ -105,6 +106,12 @@ export class UsersService {
           }
         : {}),
     };
+
+    // TEACHER faqat o'zi yaratgan foydalanuvchilarni (odatda STUDENT) ko'radi.
+    // Boshqa o'qituvchi, admin yoki boshqa guruh talabalari ko'rinmaydi.
+    if (!isSuperAdmin && actorId) {
+      where.createdById = actorId;
+    }
 
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.user.count({ where }),
@@ -128,10 +135,26 @@ export class UsersService {
     };
   }
 
-  async findAdminDetail(id: string) {
+  async findAdminDetail(id: string, actorRoles: string[] = [], actorId?: string) {
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
     const user = await this.prisma.user.findUnique({ where: { id }, select: ADMIN_SELECT });
     if (!user) throw new NotFoundException('Foydalanuvchi topilmadi');
+    // TEACHER faqat o'zi yaratgan foydalanuvchini ko'radi (404 — probe-safe).
+    const isSelf = actorId === id;
+    const createdByActor = await this.wasCreatedBy(id, actorId);
+    if (!isSuperAdmin && !isSelf && !createdByActor) {
+      throw new NotFoundException('Foydalanuvchi topilmadi');
+    }
     return toAdminDto(user);
+  }
+
+  private async wasCreatedBy(userId: string, actorId?: string): Promise<boolean> {
+    if (!actorId) return false;
+    const row = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { createdById: true },
+    });
+    return row?.createdById === actorId;
   }
 
   async create(
@@ -210,9 +233,53 @@ export class UsersService {
     return toAdminDto(user);
   }
 
-  async update(id: string, dto: UpdateUserInput, ctx: RequestContext) {
-    const existing = await this.prisma.user.findUnique({ where: { id } });
+  async update(id: string, dto: UpdateUserInput, ctx: RequestContext, actorRoles: string[] = []) {
+    const existing = await this.prisma.user.findUnique({
+      where: { id },
+      include: { roles: { include: { role: true } } },
+    });
     if (!existing) throw new NotFoundException('Foydalanuvchi topilmadi');
+
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+    const isSelf = ctx.actorId === id;
+    const createdByActor = existing.createdById === ctx.actorId;
+
+    // TEACHER faqat o'zi yaratgan foydalanuvchini tahrir qila oladi.
+    // O'zini (profilini) ham tahrir qila olmaydi bu endpoint orqali — buning
+    // uchun /auth/me alohida.
+    if (!isSuperAdmin && !createdByActor) {
+      throw new NotFoundException('Foydalanuvchi topilmadi');
+    }
+    if (!isSuperAdmin && isSelf) {
+      throw new ForbiddenException('O‘z profilingizni Settings → Profile orqali tahrirlang');
+    }
+
+    // Super Admin ham o'z rolini o'zgartira olmaydi (singleton).
+    if (dto.roleSlugs && isSelf) {
+      throw new ForbiddenException('O‘z rolingizni o‘zgartira olmaysiz');
+    }
+
+    // TEACHER STUDENT'ni boshqa rolga o'zgartira olmaydi.
+    if (dto.roleSlugs && !isSuperAdmin) {
+      const invalid = dto.roleSlugs.filter((s) => s !== 'STUDENT');
+      if (invalid.length > 0) {
+        throw new ForbiddenException(
+          'O‘qituvchi o‘z talabasini faqat STUDENT holatida qoldirishi mumkin',
+        );
+      }
+    }
+    // Hech kim SUPER_ADMIN qila olmaydi (DB trigger ushlab oladi, lekin UX uchun erta rad)
+    if (dto.roleSlugs?.includes('SUPER_ADMIN')) {
+      throw new ForbiddenException('Tizimda faqat BITTA SUPER_ADMIN bo‘lishi mumkin');
+    }
+
+    // Super Admin'ni blocklab bo'lmaydi.
+    if (dto.isActive === false) {
+      const targetIsSuperAdmin = existing.roles.some((r) => r.role.slug === 'SUPER_ADMIN');
+      if (targetIsSuperAdmin) {
+        throw new ForbiddenException('SUPER_ADMIN hisobini bloklab bo‘lmaydi');
+      }
+    }
 
     if (dto.organizationId) {
       const org = await this.prisma.organization.findUnique({
@@ -273,11 +340,22 @@ export class UsersService {
    * reversible deactivate over destroying history. Reactivating is a normal
    * `PATCH /users/:id` with `{ isActive: true }`.
    */
-  async deactivate(id: string, ctx: RequestContext) {
-    const existing = await this.prisma.user.findUnique({ where: { id } });
+  async deactivate(id: string, ctx: RequestContext, actorRoles: string[] = []) {
+    const existing = await this.prisma.user.findUnique({
+      where: { id },
+      include: { roles: { include: { role: true } } },
+    });
     if (!existing) throw new NotFoundException('Foydalanuvchi topilmadi');
     if (ctx.actorId === id) {
       throw new ForbiddenException('O‘zingizni faolsizlantira olmaysiz');
+    }
+
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+    if (!isSuperAdmin && existing.createdById !== ctx.actorId) {
+      throw new NotFoundException('Foydalanuvchi topilmadi');
+    }
+    if (existing.roles.some((r) => r.role.slug === 'SUPER_ADMIN')) {
+      throw new ForbiddenException('SUPER_ADMIN hisobini bloklab bo‘lmaydi');
     }
 
     await this.prisma.user.update({ where: { id }, data: { isActive: false } });

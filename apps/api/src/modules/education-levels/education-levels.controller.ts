@@ -41,7 +41,7 @@ export class EducationLevelsController {
   }
 
   @Post()
-  @RequirePermissions(PERMISSION.COURSES_CREATE)
+  @RequirePermissions(PERMISSION.ROLES_MANAGE)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Yangi ta‘lim darajasi qo‘shish' })
   async create(
@@ -54,7 +54,7 @@ export class EducationLevelsController {
   }
 
   @Patch(':id')
-  @RequirePermissions(PERMISSION.COURSES_UPDATE)
+  @RequirePermissions(PERMISSION.ROLES_MANAGE)
   @ApiOperation({ summary: 'Ta‘lim darajasini tahrirlash' })
   async update(
     @Param('id') id: string,
@@ -67,7 +67,7 @@ export class EducationLevelsController {
   }
 
   @Delete(':id')
-  @RequirePermissions(PERMISSION.COURSES_DELETE)
+  @RequirePermissions(PERMISSION.ROLES_MANAGE)
   @ApiOperation({ summary: 'Ta‘lim darajasini o‘chirish (built-in emas)' })
   async remove(
     @Param('id') id: string,

@@ -79,11 +79,8 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
-        {t('noAccount')}{' '}
-        <Link href="/register" className="font-semibold text-primary hover:underline">
-          {t('registerLink')}
-        </Link>
+      <p className="mt-6 text-center text-xs text-muted-foreground">
+        Hisob kerakmi? Administrator sizga akkaunt yaratib beradi.
       </p>
     </div>
   );
