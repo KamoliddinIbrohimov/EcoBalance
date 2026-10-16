@@ -13,6 +13,7 @@ import { CourseFormDialog } from '@/features/learning/components/course-form-dia
 import { LessonFormDialog } from '@/features/learning/components/lesson-form-dialog';
 import { LevelsPanel } from '@/features/learning/components/levels-panel';
 import { MaterialsPanel } from '@/features/learning/components/materials-panel';
+import { ModulesPanel } from '@/features/learning/components/modules-panel';
 import { useEducationLevels } from '@/features/learning/hooks/use-education-levels';
 import {
   useCourseLessons,
@@ -285,6 +286,8 @@ export default function LearningManagePage() {
           )}
         </Card>
       ) : null}
+
+      {currentCourse ? <ModulesPanel courseId={currentCourse.id} /> : null}
 
       {currentCourse ? <MaterialsPanel courseId={currentCourse.id} /> : null}
 
