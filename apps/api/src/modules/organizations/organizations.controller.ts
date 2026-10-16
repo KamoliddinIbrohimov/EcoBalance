@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Ip,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -51,7 +52,7 @@ export class OrganizationsController {
   @Get(':id')
   @RequirePermissions(PERMISSION.ORGS_READ)
   @ApiOperation({ summary: 'Tashkilot tafsilotlari' })
-  async detail(@Param('id') id: string) {
+  async detail(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.organizations.findById(id);
   }
 
@@ -72,7 +73,7 @@ export class OrganizationsController {
   @RequirePermissions(PERMISSION.ORGS_UPDATE)
   @ApiOperation({ summary: 'Tashkilot ma’lumotlarini tahrirlash' })
   async update(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateOrganizationDto,
     @CurrentUser('id') actorId: string,
     @Req() req: Request,
@@ -89,7 +90,7 @@ export class OrganizationsController {
   @RequirePermissions(PERMISSION.ORGS_DELETE)
   @ApiOperation({ summary: 'Tashkilotni o‘chirish (faqat bo‘sh — foydalanuvchi/quyi tashkiloti yo‘q)' })
   async remove(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser('id') actorId: string,
     @Req() req: Request,
     @Ip() ip: string,

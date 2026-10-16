@@ -47,9 +47,9 @@ export function GroupMembersDialog({ open, onOpenChange, group }: Props) {
   const { data: freeStudents } = useQuery({
     queryKey: ['users', 'students-free'],
     queryFn: async () => {
-      // Hamma studentlar ro'yxati (ko'p emas) — guruhdagilarni filterda chiqaramiz
+      // Hamma faol studentlar ro'yxati — guruhdagilarni filterda chiqaramiz
       const res = await apiClient.get<Paginated<Student>>('/users', {
-        params: { role: 'STUDENT', perPage: 200 },
+        params: { role: 'STUDENT', perPage: 200, isActive: true },
       });
       return res.data.data;
     },

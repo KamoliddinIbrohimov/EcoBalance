@@ -20,6 +20,7 @@ import { ResponseTransformInterceptor } from './common/interceptors/response-tra
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
+    bodyParser: false,
   });
 
   const config = app.get(ConfigService);
@@ -29,12 +30,19 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
+  // Payload hajmi cheklanadi — ulkan so'rov 500 o'rniga 413 (Payload Too Large) qaytarishi uchun
+  const { default: express } = await import('express');
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
   app.use(cookieParser());
   app.use(
     helmet({
+      // Caddy manbaa (CSP, X-Frame, nosniff) — helmet'da takrorlanmasin
       contentSecurityPolicy: false,
       crossOriginResourcePolicy: { policy: 'cross-origin' },
       frameguard: false,
+      noSniff: false,
     }),
   );
 

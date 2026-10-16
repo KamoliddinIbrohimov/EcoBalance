@@ -2,11 +2,12 @@
 
 import type { GroupWithTeacherDto } from '@eco/shared';
 import { PERMISSION } from '@eco/shared';
-import { Loader2, Pencil, Plus, Trash2, Users, UsersRound } from 'lucide-react';
+import { BookOpen, Loader2, Pencil, Plus, Trash2, Users, UsersRound } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { groupsApi } from '@/features/groups/api/groups-api';
+import { GroupContentDialog } from '@/features/groups/components/group-content-dialog';
 import { GroupFormDialog } from '@/features/groups/components/group-form-dialog';
 import { GroupMembersDialog } from '@/features/groups/components/group-members-dialog';
 import { Badge } from '@/shared/components/ui/badge';
@@ -23,6 +24,7 @@ export default function GroupsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<GroupWithTeacherDto | null>(null);
   const [membersTarget, setMembersTarget] = useState<GroupWithTeacherDto | null>(null);
+  const [contentTarget, setContentTarget] = useState<GroupWithTeacherDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GroupWithTeacherDto | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -105,7 +107,7 @@ export default function GroupsPage() {
                   </span>
                   <Badge variant="secondary">{g.memberCount} talaba</Badge>
                 </div>
-                <div className="mt-auto flex items-center gap-2 pt-2">
+                <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
                   <Button
                     size="sm"
                     variant="outline"
@@ -113,6 +115,14 @@ export default function GroupsPage() {
                   >
                     <UsersRound className="h-4 w-4" />
                     Talabalar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setContentTarget(g)}
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    Mazmuni
                   </Button>
                   <Button
                     size="sm"
@@ -149,6 +159,14 @@ export default function GroupsPage() {
           open={!!membersTarget}
           onOpenChange={(v) => !v && setMembersTarget(null)}
           group={membersTarget}
+        />
+      ) : null}
+
+      {contentTarget ? (
+        <GroupContentDialog
+          open={!!contentTarget}
+          onOpenChange={(v) => !v && setContentTarget(null)}
+          group={contentTarget}
         />
       ) : null}
 

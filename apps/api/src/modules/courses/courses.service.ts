@@ -194,6 +194,13 @@ export class CoursesService {
     return toCourseDto(row);
   }
 
+  private async assertEducationLevelExists(slug: string): Promise<void> {
+    const row = await this.prisma.educationLevelItem.findUnique({ where: { slug } });
+    if (!row) {
+      throw new ConflictException(`"${slug}" nomli ta'lim darajasi mavjud emas`);
+    }
+  }
+
   private async assertStudentCanSeeCourse(courseId: string, actorId?: string): Promise<void> {
     if (!actorId) throw new NotFoundException('Kurs topilmadi');
     const member = await this.prisma.groupMember.findUnique({
@@ -212,6 +219,8 @@ export class CoursesService {
     const slug = dto.slug.trim().toLowerCase();
     const clash = await this.prisma.course.findUnique({ where: { slug } });
     if (clash) throw new ConflictException('Bu slug bilan kurs allaqachon mavjud');
+
+    await this.assertEducationLevelExists(dto.educationLevel);
 
     const row = await this.prisma.course.create({
       data: {
@@ -258,6 +267,10 @@ export class CoursesService {
       slug = dto.slug.trim().toLowerCase();
       const clash = await this.prisma.course.findFirst({ where: { slug, NOT: { id } } });
       if (clash) throw new ConflictException('Bu slug bilan kurs allaqachon mavjud');
+    }
+
+    if (dto.educationLevel !== undefined) {
+      await this.assertEducationLevelExists(dto.educationLevel);
     }
 
     const row = await this.prisma.course.update({
@@ -371,9 +384,19 @@ export class CoursesService {
     return { ...toLessonDto(row), course: row.course };
   }
 
-  async createLesson(dto: CreateLessonInput, ctx: RequestContext): Promise<LessonDto> {
+  async createLesson(
+    dto: CreateLessonInput,
+    ctx: RequestContext,
+    actorRoles: string[] = [],
+  ): Promise<LessonDto> {
     const course = await this.prisma.course.findUnique({ where: { id: dto.courseId } });
     if (!course) throw new NotFoundException('Kurs topilmadi');
+
+    // Egalik: faqat SA yoki kurs egasi dars qo'sha oladi
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+    if (!isSuperAdmin && course.ownerId !== ctx.actorId) {
+      throw new ForbiddenException('Faqat o‘z kursingizga dars qo‘sha olasiz');
+    }
 
     const clash = await this.prisma.lesson.findFirst({
       where: { courseId: dto.courseId, orderIndex: dto.orderIndex },
@@ -408,13 +431,31 @@ export class CoursesService {
       userAgent: ctx.userAgent,
     });
 
-    // Barcha faol foydalanuvchilarga yangi dars haqida bildirishnoma
-    await this.notifications.broadcast({
-      type: 'LESSON_CREATED',
-      titleUz: 'Yangi dars qo‘shildi',
-      bodyUz: `"${course.nameUz}" kursida: ${row.titleUz}`,
-      data: { lessonId: row.id, courseId: course.id, courseSlug: course.slug },
-    });
+    // Faqat PUBLISHED kurs darslari uchun bildirishnoma — qoralama darslari tinch tursin
+    if (course.isPublished) {
+      const assignedGroups = await this.prisma.courseGroup.findMany({
+        where: { courseId: course.id },
+        select: { groupId: true },
+      });
+      const groupIds = assignedGroups.map((g) => g.groupId);
+      if (groupIds.length > 0) {
+        const members = await this.prisma.groupMember.findMany({
+          where: { groupId: { in: groupIds } },
+          select: { studentId: true },
+        });
+        if (members.length > 0) {
+          await this.notifications.notifyUsers(
+            members.map((m) => m.studentId),
+            {
+              type: 'LESSON_CREATED',
+              titleUz: 'Yangi dars qo‘shildi',
+              bodyUz: `"${course.nameUz}" kursida: ${row.titleUz}`,
+              data: { lessonId: row.id, courseId: course.id, courseSlug: course.slug },
+            },
+          );
+        }
+      }
+    }
 
     return toLessonDto(row);
   }
@@ -423,9 +464,18 @@ export class CoursesService {
     id: string,
     dto: UpdateLessonInput,
     ctx: RequestContext,
+    actorRoles: string[] = [],
   ): Promise<LessonDto> {
-    const existing = await this.prisma.lesson.findUnique({ where: { id } });
+    const existing = await this.prisma.lesson.findUnique({
+      where: { id },
+      include: { course: { select: { ownerId: true } } },
+    });
     if (!existing) throw new NotFoundException('Dars topilmadi');
+
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+    if (!isSuperAdmin && existing.course.ownerId !== ctx.actorId) {
+      throw new ForbiddenException('Faqat o‘z kursingiz darslarini tahrir qila olasiz');
+    }
 
     if (dto.orderIndex !== undefined && dto.orderIndex !== existing.orderIndex) {
       const clash = await this.prisma.lesson.findFirst({
@@ -475,9 +525,17 @@ export class CoursesService {
     return toLessonDto(row);
   }
 
-  async removeLesson(id: string, ctx: RequestContext) {
-    const existing = await this.prisma.lesson.findUnique({ where: { id } });
+  async removeLesson(id: string, ctx: RequestContext, actorRoles: string[] = []) {
+    const existing = await this.prisma.lesson.findUnique({
+      where: { id },
+      include: { course: { select: { ownerId: true } } },
+    });
     if (!existing) throw new NotFoundException('Dars topilmadi');
+
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+    if (!isSuperAdmin && existing.course.ownerId !== ctx.actorId) {
+      throw new ForbiddenException('Faqat o‘z kursingiz darslarini o‘chira olasiz');
+    }
 
     await this.prisma.lesson.delete({ where: { id } });
 

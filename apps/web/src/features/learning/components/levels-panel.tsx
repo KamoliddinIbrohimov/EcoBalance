@@ -1,6 +1,6 @@
 'use client';
 
-import { PERMISSION, type EducationLevelItemDto } from '@eco/shared';
+import type { EducationLevelItemDto } from '@eco/shared';
 import { Layers, Lock, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -26,10 +26,12 @@ import type { ApiError } from '@/shared/lib/api-client';
 import { useAuthStore } from '@/shared/stores/auth-store';
 
 export function LevelsPanel() {
-  const hasPermission = useAuthStore((s) => s.hasPermission);
-  const canCreate = hasPermission(PERMISSION.COURSES_CREATE);
-  const canUpdate = hasPermission(PERMISSION.COURSES_UPDATE);
-  const canDelete = hasPermission(PERMISSION.COURSES_DELETE);
+  // Ta'lim darajalarini faqat SUPER_ADMIN tahrir qila oladi (ROLES_MANAGE backend'da ham).
+  // TEACHER'da COURSES_CREATE bor, lekin level yaratish uchun yetarli emas — rol bo'yicha tekshiramiz.
+  const isSuperAdmin = useAuthStore((s) => s.user?.roles.includes('SUPER_ADMIN') ?? false);
+  const canCreate = isSuperAdmin;
+  const canUpdate = isSuperAdmin;
+  const canDelete = isSuperAdmin;
 
   const { data, isLoading } = useEducationLevels();
   const remove = useRemoveEducationLevel();

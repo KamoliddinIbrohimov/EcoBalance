@@ -55,4 +55,46 @@ export const groupsApi = {
   async removeMember(id: string, studentId: string): Promise<void> {
     await apiClient.delete(`/groups/${id}/members/${studentId}`);
   },
+
+  async courseBindings(groupId: string): Promise<Array<{
+    courseId: string;
+    groupId: string;
+    course: { id: string; slug: string; nameUz: string; isPublished: boolean };
+  }>> {
+    const { data } = await apiClient.get<Envelope<Array<{
+      courseId: string;
+      groupId: string;
+      course: { id: string; slug: string; nameUz: string; isPublished: boolean };
+    }>>>(`/groups/${groupId}/courses`);
+    return data.data;
+  },
+
+  async bindCourse(groupId: string, courseId: string): Promise<void> {
+    await apiClient.post(`/groups/${groupId}/courses/${courseId}`);
+  },
+
+  async unbindCourse(groupId: string, courseId: string): Promise<void> {
+    await apiClient.delete(`/groups/${groupId}/courses/${courseId}`);
+  },
+
+  async quizBindings(groupId: string): Promise<Array<{
+    quizId: string;
+    groupId: string;
+    quiz: { id: string; titleUz: string; isPublished: boolean; lessonId: string | null };
+  }>> {
+    const { data } = await apiClient.get<Envelope<Array<{
+      quizId: string;
+      groupId: string;
+      quiz: { id: string; titleUz: string; isPublished: boolean; lessonId: string | null };
+    }>>>(`/groups/${groupId}/quizzes`);
+    return data.data;
+  },
+
+  async bindQuiz(groupId: string, quizId: string): Promise<void> {
+    await apiClient.post(`/groups/${groupId}/quizzes/${quizId}`);
+  },
+
+  async unbindQuiz(groupId: string, quizId: string): Promise<void> {
+    await apiClient.delete(`/groups/${groupId}/quizzes/${quizId}`);
+  },
 };

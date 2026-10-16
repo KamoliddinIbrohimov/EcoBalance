@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Ip,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -57,7 +58,7 @@ export class NewsController {
   @Get(':id')
   @RequirePermissions(PERMISSION.NEWS_READ)
   @ApiOperation({ summary: 'Bitta yangilik' })
-  async findById(@Param('id') id: string) {
+  async findById(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.service.findById(id);
   }
 
@@ -95,7 +96,7 @@ export class NewsController {
   @ApiConsumes('multipart/form-data', 'application/json')
   @ApiOperation({ summary: 'Yangilikni tahrirlash / nashr etish' })
   async update(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateNewsDto,
     @UploadedFile() file: Express.Multer.File | undefined,
     @CurrentUser('id') actorId: string,
@@ -113,7 +114,7 @@ export class NewsController {
   @RequirePermissions(PERMISSION.NEWS_MANAGE)
   @ApiOperation({ summary: 'Yangilikni o‘chirish (idempotent)' })
   async remove(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser('id') actorId: string,
     @Req() req: Request,
     @Ip() ip: string,

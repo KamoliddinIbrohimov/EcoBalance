@@ -31,7 +31,7 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
       }),
     }),
     ThrottlerModule.forRoot([
-      { name: 'auth', ttl: 60_000, limit: Number(process.env.RATE_LIMIT_AUTH ?? 10) },
+      { name: 'auth', ttl: 60_000, limit: Number(process.env.RATE_LIMIT_AUTH ?? 20) },
       {
         name: 'forgot',
         ttl: 60 * 60_000,

@@ -46,7 +46,7 @@ export default function MonitoringTestsPage() {
             </h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
               Ekologik savodxonlik va kasbiy diagnostika testlari. Natijalaringiz saqlanadi va
-              topshirgandan so&apos;ng super adminga yetkaziladi.
+              topshirgandan so&apos;ng o&apos;qituvchingizga yetkaziladi.
             </p>
           </div>
         </div>

@@ -119,4 +119,76 @@ export class GroupsController {
   ) {
     await this.groups.removeMember(id, studentId, { id: actor.id, roles: actor.roles });
   }
+
+  // ---- Course bindings ----
+
+  @Get(':id/courses')
+  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
+  @ApiOperation({ summary: 'Guruhga biriktirilgan kurslar' })
+  async listCourseBindings(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.groups.listCourseBindings(id, { id: actor.id, roles: actor.roles });
+  }
+
+  @Post(':id/courses/:courseId')
+  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Guruhga kurs biriktirish' })
+  async bindCourse(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('courseId', new ParseUUIDPipe()) courseId: string,
+  ) {
+    return this.groups.bindCourse(id, courseId, { id: actor.id, roles: actor.roles });
+  }
+
+  @Delete(':id/courses/:courseId')
+  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Guruhdan kursni ajratish' })
+  async unbindCourse(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('courseId', new ParseUUIDPipe()) courseId: string,
+  ) {
+    await this.groups.unbindCourse(id, courseId, { id: actor.id, roles: actor.roles });
+  }
+
+  // ---- Quiz bindings ----
+
+  @Get(':id/quizzes')
+  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
+  @ApiOperation({ summary: 'Guruhga biriktirilgan testlar' })
+  async listQuizBindings(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.groups.listQuizBindings(id, { id: actor.id, roles: actor.roles });
+  }
+
+  @Post(':id/quizzes/:quizId')
+  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Guruhga test biriktirish' })
+  async bindQuiz(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('quizId', new ParseUUIDPipe()) quizId: string,
+  ) {
+    return this.groups.bindQuiz(id, quizId, { id: actor.id, roles: actor.roles });
+  }
+
+  @Delete(':id/quizzes/:quizId')
+  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Guruhdan testni ajratish' })
+  async unbindQuiz(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('quizId', new ParseUUIDPipe()) quizId: string,
+  ) {
+    await this.groups.unbindQuiz(id, quizId, { id: actor.id, roles: actor.roles });
+  }
 }

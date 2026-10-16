@@ -238,6 +238,111 @@ export class GroupsService {
     };
   }
 
+  // -------- Course / Quiz bindings --------
+
+  private async assertGroupOwnership(groupId: string, actor: ActorContext) {
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+      select: { teacherId: true },
+    });
+    if (!group) throw new NotFoundException('Guruh topilmadi');
+    if (!this.isSuperAdmin(actor) && group.teacherId !== actor.id) {
+      throw new ForbiddenException('Bu guruhni boshqarish huquqingiz yo‘q');
+    }
+  }
+
+  async listCourseBindings(groupId: string, actor: ActorContext) {
+    await this.assertGroupOwnership(groupId, actor);
+    const rows = await this.prisma.courseGroup.findMany({
+      where: { groupId },
+      include: {
+        course: {
+          select: { id: true, slug: true, nameUz: true, isPublished: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map((r) => ({
+      courseId: r.courseId,
+      groupId: r.groupId,
+      course: r.course,
+    }));
+  }
+
+  async bindCourse(groupId: string, courseId: string, actor: ActorContext) {
+    await this.assertGroupOwnership(groupId, actor);
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, ownerId: true },
+    });
+    if (!course) throw new NotFoundException('Kurs topilmadi');
+    if (!this.isSuperAdmin(actor) && course.ownerId !== actor.id) {
+      throw new ForbiddenException('Faqat o‘z kursingizni biriktira olasiz');
+    }
+    const existing = await this.prisma.courseGroup.findUnique({
+      where: { courseId_groupId: { courseId, groupId } },
+    });
+    if (existing) throw new ConflictException('Kurs allaqachon biriktirilgan');
+    await this.prisma.courseGroup.create({ data: { courseId, groupId } });
+    return { courseId, groupId };
+  }
+
+  async unbindCourse(groupId: string, courseId: string, actor: ActorContext) {
+    await this.assertGroupOwnership(groupId, actor);
+    const existing = await this.prisma.courseGroup.findUnique({
+      where: { courseId_groupId: { courseId, groupId } },
+    });
+    if (!existing) throw new NotFoundException('Biriktirilma topilmadi');
+    await this.prisma.courseGroup.delete({
+      where: { courseId_groupId: { courseId, groupId } },
+    });
+  }
+
+  async listQuizBindings(groupId: string, actor: ActorContext) {
+    await this.assertGroupOwnership(groupId, actor);
+    const rows = await this.prisma.groupQuiz.findMany({
+      where: { groupId },
+      include: {
+        quiz: { select: { id: true, titleUz: true, isPublished: true, lessonId: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map((r) => ({
+      quizId: r.quizId,
+      groupId: r.groupId,
+      quiz: r.quiz,
+    }));
+  }
+
+  async bindQuiz(groupId: string, quizId: string, actor: ActorContext) {
+    await this.assertGroupOwnership(groupId, actor);
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: { id: true, ownerId: true },
+    });
+    if (!quiz) throw new NotFoundException('Test topilmadi');
+    if (!this.isSuperAdmin(actor) && quiz.ownerId !== actor.id) {
+      throw new ForbiddenException('Faqat o‘z testingizni biriktira olasiz');
+    }
+    const existing = await this.prisma.groupQuiz.findUnique({
+      where: { quizId_groupId: { quizId, groupId } },
+    });
+    if (existing) throw new ConflictException('Test allaqachon biriktirilgan');
+    await this.prisma.groupQuiz.create({ data: { quizId, groupId } });
+    return { quizId, groupId };
+  }
+
+  async unbindQuiz(groupId: string, quizId: string, actor: ActorContext) {
+    await this.assertGroupOwnership(groupId, actor);
+    const existing = await this.prisma.groupQuiz.findUnique({
+      where: { quizId_groupId: { quizId, groupId } },
+    });
+    if (!existing) throw new NotFoundException('Biriktirilma topilmadi');
+    await this.prisma.groupQuiz.delete({
+      where: { quizId_groupId: { quizId, groupId } },
+    });
+  }
+
   async removeMember(groupId: string, studentId: string, actor: ActorContext): Promise<void> {
     const group = await this.prisma.group.findUnique({ where: { id: groupId }, select: { teacherId: true } });
     if (!group) throw new NotFoundException('Guruh topilmadi');

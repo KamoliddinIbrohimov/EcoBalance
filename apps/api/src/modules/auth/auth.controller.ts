@@ -49,7 +49,7 @@ export class AuthController {
   // hisobini faqat SUPER_ADMIN (yoki o'qituvchi talaba uchun) yarata oladi.
 
   @Public()
-  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
+  @Throttle({ auth: { limit: 20, ttl: 60_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Tizimga kirish' })
@@ -117,7 +117,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
+  @Throttle({ auth: { limit: 20, ttl: 60_000 } })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Parolni yangi qiymatga o‘zgartirish' })

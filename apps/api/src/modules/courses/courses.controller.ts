@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Ip,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -57,14 +58,17 @@ export class CoursesController {
   @Get(':id')
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Kurs tafsilotlari (STUDENT faqat published)' })
-  async detail(@Param('id') id: string, @CurrentUser() actor: AuthenticatedUser) {
+  async detail(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
     return this.courses.findCourseById(id, actor.roles, actor.id);
   }
 
   @Get(':id/lessons')
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Kursning barcha darslari (tartib bo‘yicha)' })
-  async lessons(@Param('id') id: string) {
+  async lessons(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.courses.listLessonsByCourse(id);
   }
 
@@ -85,7 +89,7 @@ export class CoursesController {
   @RequirePermissions(PERMISSION.COURSES_UPDATE)
   @ApiOperation({ summary: 'Kursni tahrirlash (TEACHER faqat o‘ziniki)' })
   async update(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateCourseDto,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
@@ -103,7 +107,7 @@ export class CoursesController {
   @RequirePermissions(PERMISSION.COURSES_DELETE)
   @ApiOperation({ summary: 'Kursni o‘chirish (TEACHER faqat o‘ziniki)' })
   async remove(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
     @Ip() ip: string,
@@ -133,7 +137,7 @@ export class LessonsController {
   @Get(':id')
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Dars tafsilotlari (kurs bilan birga)' })
-  async detail(@Param('id') id: string) {
+  async detail(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.courses.findLessonById(id);
   }
 
@@ -143,39 +147,48 @@ export class LessonsController {
   @ApiOperation({ summary: 'Kursga yangi dars qo‘shish' })
   async create(
     @Body() dto: CreateLessonDto,
-    @CurrentUser('id') actorId: string,
+    @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
     @Ip() ip: string,
   ) {
-    return this.courses.createLesson(dto, { actorId, ip, userAgent: req.headers['user-agent'] });
+    return this.courses.createLesson(
+      dto,
+      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
+      actor.roles,
+    );
   }
 
   @Patch(':id')
   @RequirePermissions(PERMISSION.LESSONS_MANAGE)
   @ApiOperation({ summary: 'Darsni tahrirlash' })
   async update(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateLessonDto,
-    @CurrentUser('id') actorId: string,
+    @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
     @Ip() ip: string,
   ) {
-    return this.courses.updateLesson(id, dto, {
-      actorId,
-      ip,
-      userAgent: req.headers['user-agent'],
-    });
+    return this.courses.updateLesson(
+      id,
+      dto,
+      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
+      actor.roles,
+    );
   }
 
   @Delete(':id')
   @RequirePermissions(PERMISSION.LESSONS_MANAGE)
   @ApiOperation({ summary: 'Darsni o‘chirish' })
   async remove(
-    @Param('id') id: string,
-    @CurrentUser('id') actorId: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
     @Ip() ip: string,
   ) {
-    return this.courses.removeLesson(id, { actorId, ip, userAgent: req.headers['user-agent'] });
+    return this.courses.removeLesson(
+      id,
+      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
+      actor.roles,
+    );
   }
 }

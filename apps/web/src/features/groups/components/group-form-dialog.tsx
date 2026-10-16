@@ -80,7 +80,7 @@ export function GroupFormDialog({ open, onOpenChange, group }: Props) {
     queryKey: ['users', 'teachers'],
     queryFn: async () => {
       const res = await apiClient.get<Paginated<TeacherOption>>('/users', {
-        params: { role: 'TEACHER', perPage: 100 },
+        params: { role: 'TEACHER', perPage: 100, isActive: true },
       });
       return res.data.data;
     },

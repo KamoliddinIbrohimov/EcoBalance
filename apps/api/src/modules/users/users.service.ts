@@ -185,6 +185,18 @@ export class UsersService {
           'O‘qituvchi faqat STUDENT (talaba) yarata oladi',
         );
       }
+      // Teacher yaratgan talaba — faqat teacher o'zining tashkilotida (yoki tashkilotsiz)
+      if (dto.organizationId && ctx.actorId) {
+        const self = await this.prisma.user.findUnique({
+          where: { id: ctx.actorId },
+          select: { organizationId: true },
+        });
+        if (self?.organizationId && self.organizationId !== dto.organizationId) {
+          throw new ForbiddenException(
+            "O‘qituvchi faqat o'z tashkilotiga talaba qo‘sha oladi",
+          );
+        }
+      }
     }
     if (dto.roleSlugs.includes('SUPER_ADMIN')) {
       // DB trigger ushlab oladi, lekin aniq xato xabari uchun erta tekshirish

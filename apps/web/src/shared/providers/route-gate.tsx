@@ -20,6 +20,9 @@ const STUDENT_FORBIDDEN_PREFIXES = [
   '/users',
   '/dashboard',
   '/settings/ai',
+  '/teacher',
+  '/groups',
+  '/stats',
 ];
 
 const TEACHER_FORBIDDEN_PREFIXES = ['/users', '/settings/ai'];
@@ -49,7 +52,13 @@ export function RouteGate({ children }: { children: ReactNode }) {
     const isStudent = user.roles.includes('STUDENT') && !isSuperAdmin && !isTeacher;
 
     // 2) Admin-only sahifalar — talaba va o'qituvchi uchun bosh sahifaga
-    if (isStudent && STUDENT_FORBIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    // /stats/me — talabaning o'z natijalari (whitelist), /stats — admin
+    const isStudentAllowedStats = pathname === '/stats/me';
+    const studentBlocked =
+      isStudent &&
+      !isStudentAllowedStats &&
+      STUDENT_FORBIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+    if (studentBlocked) {
       router.replace('/home');
       return;
     }

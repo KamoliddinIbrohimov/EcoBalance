@@ -404,7 +404,6 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           })}
         </ul>
 
-        <ProjectAreaBlock />
       </nav>
 
       <div className="border-t border-sidebar-border p-3">
@@ -439,49 +438,3 @@ function LogoutButton({ onLogout }: { onLogout: () => void }) {
   );
 }
 
-function ProjectAreaBlock() {
-  const t = useTranslations('sidebar');
-  return (
-    <div className="mt-6 rounded-xl bg-secondary/70 p-4">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
-        {t('projectArea')}
-      </p>
-      <ul className="space-y-2.5 text-xs text-sidebar-muted">
-        <li className="flex items-center gap-2">
-          <Building2 className="h-3.5 w-3.5 text-primary" />
-          <span>Chirchiq shahridagi 15-maktab</span>
-        </li>
-        <li className="flex items-center gap-2">
-          <Home className="h-3.5 w-3.5 text-warning" />
-          <span>1 ta bog&apos;cha</span>
-        </li>
-        <li className="flex items-center gap-2">
-          <GraduationCap className="h-3.5 w-3.5 text-[hsl(262_83%_58%)]" />
-          <span>ChDPU</span>
-        </li>
-        <li className="pt-1">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-3.5 w-3.5 text-primary" />
-            <span>2 ta mahalla</span>
-          </div>
-          <ul className="ml-5 mt-2 space-y-2 border-l border-border/60 pl-3 text-[11px]">
-            <li className="flex items-start gap-2">
-              <MapPin className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
-              <span className="leading-snug">
-                Kimyogar mahallasi<br />
-                <span className="text-muted-foreground/80">(Chirchiq shahri)</span>
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <MapPin className="mt-0.5 h-3 w-3 shrink-0 text-destructive" />
-              <span className="leading-snug">
-                Abay mahallasi<br />
-                <span className="text-muted-foreground/80">(Bektemir tumani)</span>
-              </span>
-            </li>
-          </ul>
-        </li>
-      </ul>
-    </div>
-  );
-}

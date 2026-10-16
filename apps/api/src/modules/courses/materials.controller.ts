@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Ip,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
   Req,
@@ -33,7 +34,7 @@ export class MaterialsController {
   @Get('courses/:courseId/materials')
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Kursning darslik fayllari ro‘yxati' })
-  async list(@Param('courseId') courseId: string) {
+  async list(@Param('courseId', new ParseUUIDPipe()) courseId: string) {
     return this.materials.listForCourse(courseId);
   }
 
@@ -50,7 +51,7 @@ export class MaterialsController {
   @ApiOperation({ summary: 'Kursga (yoki uning darsiga) darslik fayl yuklash' })
   @HttpCode(HttpStatus.CREATED)
   async upload(
-    @Param('courseId') courseId: string,
+    @Param('courseId', new ParseUUIDPipe()) courseId: string,
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser('id') actorId: string,
     @Query('lessonId') lessonId: string | undefined,
@@ -70,7 +71,7 @@ export class MaterialsController {
   @Get('materials/:id/download')
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Faylni yuklab olish (short-lived signed URL qaytadi)' })
-  async download(@Param('id') id: string) {
+  async download(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.materials.getDownloadUrl(id);
   }
 
@@ -78,7 +79,7 @@ export class MaterialsController {
   @RequirePermissions(PERMISSION.MATERIALS_MANAGE)
   @ApiOperation({ summary: 'Faylni o‘chirish' })
   async remove(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser('id') actorId: string,
     @Req() req: Request,
     @Ip() ip: string,

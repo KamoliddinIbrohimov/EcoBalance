@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Ip,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Req,
@@ -57,7 +58,7 @@ export class EducationLevelsController {
   @RequirePermissions(PERMISSION.ROLES_MANAGE)
   @ApiOperation({ summary: 'Ta‘lim darajasini tahrirlash' })
   async update(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateEducationLevelItemDto,
     @CurrentUser('id') actorId: string,
     @Req() req: Request,
@@ -70,7 +71,7 @@ export class EducationLevelsController {
   @RequirePermissions(PERMISSION.ROLES_MANAGE)
   @ApiOperation({ summary: 'Ta‘lim darajasini o‘chirish (built-in emas)' })
   async remove(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser('id') actorId: string,
     @Req() req: Request,
     @Ip() ip: string,

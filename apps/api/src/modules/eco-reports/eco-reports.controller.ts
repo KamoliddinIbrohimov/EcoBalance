@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Ip,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -56,7 +57,7 @@ export class EcoReportsController {
   @Get(':id')
   @RequirePermissions(PERMISSION.ECO_REPORTS_READ)
   @ApiOperation({ summary: 'Murojaat tafsilotlari' })
-  async detail(@Param('id') id: string) {
+  async detail(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.service.findById(id);
   }
 
@@ -77,7 +78,7 @@ export class EcoReportsController {
   @RequirePermissions(PERMISSION.ECO_REPORTS_MANAGE)
   @ApiOperation({ summary: 'Murojaat holatini o‘zgartirish' })
   async updateStatus(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateEcoReportStatusDto,
     @CurrentUser('id') actorId: string,
     @Req() req: Request,
@@ -94,7 +95,7 @@ export class EcoReportsController {
   @RequirePermissions(PERMISSION.ECO_REPORTS_MANAGE)
   @ApiOperation({ summary: 'Murojaatni o‘chirish (idempotent)' })
   async remove(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser('id') actorId: string,
     @Req() req: Request,
     @Ip() ip: string,
