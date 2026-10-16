@@ -35,8 +35,11 @@ export class ModulesController {
   @Get('courses/:courseId/modules')
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Kurs modullari ro‘yxati' })
-  async list(@Param('courseId', new ParseUUIDPipe()) courseId: string) {
-    return this.modules.listByCourse(courseId);
+  async list(
+    @Param('courseId', new ParseUUIDPipe()) courseId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.modules.listByCourse(courseId, { id: actor.id, roles: actor.roles });
   }
 
   @Post('modules')

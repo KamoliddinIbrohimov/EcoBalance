@@ -1260,6 +1260,78 @@ export class LmsService {
   // -------------------------------------------------------------
 
   /**
+   * Talaba darsni "ochib ko'rishi" uchun quyidagilar true bo'lishi kerak:
+   *   - kurs isPublished
+   *   - dars isPublished va archivedAt=null
+   *   - talaba FAOL guruh a'zosi
+   *   - kurs CourseGroup orqali shu guruhga biriktirilgan
+   *   - dars yoki modul uchun release OPEN (yoki opensAt kelgan va closesAt o'tmagan)
+   * Aks holda 404 (probe-safe).
+   */
+  private async assertStudentLessonOpen(lessonId: string, studentId: string): Promise<void> {
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+      select: {
+        id: true,
+        courseId: true,
+        moduleId: true,
+        isPublished: true,
+        archivedAt: true,
+        course: { select: { isPublished: true } },
+        module: { select: { isPublished: true } },
+      },
+    });
+    if (!lesson || !lesson.course.isPublished) throw new NotFoundException('Dars topilmadi');
+    if (!lesson.isPublished || lesson.archivedAt) throw new NotFoundException('Dars topilmadi');
+    if (lesson.module && !lesson.module.isPublished) throw new NotFoundException('Dars topilmadi');
+
+    const member = await this.prisma.groupMember.findUnique({
+      where: { studentId },
+      select: { groupId: true, group: { select: { isActive: true } } },
+    });
+    if (!member || !member.group.isActive) throw new NotFoundException('Dars topilmadi');
+    const link = await this.prisma.courseGroup.findUnique({
+      where: { courseId_groupId: { courseId: lesson.courseId, groupId: member.groupId } },
+      select: { courseId: true },
+    });
+    if (!link) throw new NotFoundException('Dars topilmadi');
+
+    // Release (dars yoki modul)
+    const lessonRelease = await this.prisma.groupLessonRelease.findFirst({
+      where: { groupId: member.groupId, lessonId },
+    });
+    if (lessonRelease) {
+      if (!this.isReleaseOpen(lessonRelease)) throw new NotFoundException('Dars hali ochilmagan');
+      return;
+    }
+    if (lesson.moduleId) {
+      const moduleRelease = await this.prisma.groupLessonRelease.findFirst({
+        where: { groupId: member.groupId, moduleId: lesson.moduleId },
+      });
+      if (moduleRelease) {
+        if (!this.isReleaseOpen(moduleRelease)) throw new NotFoundException('Dars hali ochilmagan');
+      }
+    }
+  }
+
+  /**
+   * Release open now? LOCKED har doim yopiq; closesAt o'tgach yopiq;
+   * SCHEDULED opensAt kelmaguncha yopiq.
+   */
+  private isReleaseOpen(release: {
+    status: 'LOCKED' | 'SCHEDULED' | 'OPEN';
+    opensAt: Date | null;
+    closesAt: Date | null;
+  }): boolean {
+    if (release.status === 'LOCKED') return false;
+    const now = Date.now();
+    if (release.closesAt && release.closesAt.getTime() < now) return false;
+    if (release.status === 'OPEN') return true;
+    if (!release.opensAt || release.opensAt.getTime() > now) return false;
+    return true;
+  }
+
+  /**
    * Dars sahifasi faol vaqtda frontend har ~30s da chaqiradi. Server har
    * chaqiruvda ko'pi bilan 60s qo'shadi — soxta vaqt yuborilsa limitlanadi.
    * Studentni darsga kirish huquqi tekshiriladi (progress yozilgan dars bilan
@@ -1280,34 +1352,28 @@ export class LmsService {
       throw new BadRequestException('position 0..100 oralig‘ida bo‘lishi kerak');
     }
 
-    // Dars huquqini tekshirish (updateProgress bilan bir xil)
-    const lesson = await this.prisma.lesson.findUnique({
-      where: { id: lessonId },
-      select: { id: true, courseId: true, course: { select: { isPublished: true } } },
-    });
-    if (!lesson || !lesson.course.isPublished) throw new NotFoundException('Dars topilmadi');
-    const member = await this.prisma.groupMember.findUnique({
-      where: { studentId: actor.id },
-      select: { groupId: true, group: { select: { isActive: true } } },
-    });
-    if (!member || !member.group.isActive) throw new NotFoundException('Dars topilmadi');
-    const link = await this.prisma.courseGroup.findUnique({
-      where: { courseId_groupId: { courseId: lesson.courseId, groupId: member.groupId } },
-      select: { courseId: true },
-    });
-    if (!link) throw new NotFoundException('Dars topilmadi');
+    // Dars huquqini tekshirish — qulflangan darsga heartbeat yoziladi emas
+    await this.assertStudentLessonOpen(lessonId, actor.id);
 
     const now = new Date();
 
-    // N16: tezlik cheklovi — mavjud yozuvdan lastViewedAt ni olib,
-    // qo'shiladigan vaqt = min(activeSeconds, now - lastViewedAt + 5s).
+    // N16: tezlik cheklovi
+    //   - Bitta so'rov eng ko'pi 60s qo'sha oladi (frontend ~30s hartbeat yuboradi)
+    //   - Ikkinchi va keyingi so'rovlar: `min(activeSeconds, sinceLast + 5)`
+    //   - Juda tez (sinceLast < 10s) ketma-ket so'rovlar — 0 qo'shiladi
+    const MAX_PER_REQUEST = 60;
     const current = await this.prisma.lessonProgress.findUnique({
       where: { studentId_lessonId: { studentId: actor.id, lessonId } },
     });
-    let addSeconds = Math.floor(activeSeconds);
+    let addSeconds = Math.min(Math.floor(activeSeconds), MAX_PER_REQUEST);
     if (current?.lastViewedAt) {
       const sinceLast = Math.floor((now.getTime() - current.lastViewedAt.getTime()) / 1000);
-      addSeconds = Math.max(0, Math.min(addSeconds, sinceLast + 5));
+      if (sinceLast < 10) {
+        // Juda tez-tez so'rov — bu urinishni "shubhali" deb hisoblaymiz, vaqt qo'shilmaydi
+        addSeconds = 0;
+      } else {
+        addSeconds = Math.max(0, Math.min(addSeconds, sinceLast + 5));
+      }
     }
 
     // LessonProgress yangilash
@@ -1485,25 +1551,9 @@ export class LmsService {
     if (!this.isStudent(actor)) {
       throw new ForbiddenException('Faqat talaba darsni belgilay oladi');
     }
-    // L2: faqat talabaning FAOL guruhiga biriktirilgan va PUBLISHED kurs
-    // darsiga progress yoziladi. Aks holda 404 (probe-safe).
-    const lesson = await this.prisma.lesson.findUnique({
-      where: { id: lessonId },
-      select: { id: true, courseId: true, course: { select: { isPublished: true } } },
-    });
-    if (!lesson || !lesson.course.isPublished) {
-      throw new NotFoundException('Dars topilmadi');
-    }
-    const member = await this.prisma.groupMember.findUnique({
-      where: { studentId: actor.id },
-      select: { groupId: true, group: { select: { isActive: true } } },
-    });
-    if (!member || !member.group.isActive) throw new NotFoundException('Dars topilmadi');
-    const link = await this.prisma.courseGroup.findUnique({
-      where: { courseId_groupId: { courseId: lesson.courseId, groupId: member.groupId } },
-      select: { courseId: true },
-    });
-    if (!link) throw new NotFoundException('Dars topilmadi');
+    // L2 + release: faqat talabaning FAOL guruhiga biriktirilgan, PUBLISHED va
+    // OCHIQ (release OPEN yoki opensAt kelgan va closesAt o'tmagan) darsga progress.
+    await this.assertStudentLessonOpen(lessonId, actor.id);
 
     const now = new Date();
     const row = await this.prisma.lessonProgress.upsert({

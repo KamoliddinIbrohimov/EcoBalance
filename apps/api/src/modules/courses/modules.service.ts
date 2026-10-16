@@ -56,9 +56,46 @@ export class ModulesService {
     }
   }
 
-  async listByCourse(courseId: string): Promise<ModuleDto[]> {
+  async listByCourse(
+    courseId: string,
+    actor?: { id: string; roles: string[] },
+  ): Promise<ModuleDto[]> {
+    // Kirish tekshiruvi — teacher own/LIBRARY; student guruh orqali.
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { ownerId: true, visibility: true, isPublished: true },
+    });
+    if (!course) throw new NotFoundException('Kurs topilmadi');
+    if (actor) {
+      const isSA = actor.roles.includes('SUPER_ADMIN');
+      const isTeacher = actor.roles.includes('TEACHER') && !isSA;
+      const isStudent = !isSA && !isTeacher;
+      if (isTeacher) {
+        if (course.ownerId !== actor.id && course.visibility !== 'LIBRARY') {
+          throw new NotFoundException('Kurs topilmadi');
+        }
+      } else if (isStudent) {
+        if (!course.isPublished) throw new NotFoundException('Kurs topilmadi');
+        const member = await this.prisma.groupMember.findUnique({
+          where: { studentId: actor.id },
+          select: { groupId: true, group: { select: { isActive: true } } },
+        });
+        if (!member || !member.group.isActive) throw new NotFoundException('Kurs topilmadi');
+        const link = await this.prisma.courseGroup.findUnique({
+          where: { courseId_groupId: { courseId, groupId: member.groupId } },
+          select: { courseId: true },
+        });
+        if (!link) throw new NotFoundException('Kurs topilmadi');
+      }
+    }
     const rows = await this.prisma.module.findMany({
-      where: { courseId },
+      where: {
+        courseId,
+        // STUDENT uchun faqat nashr etilgan modullar
+        ...(actor && !actor.roles.includes('SUPER_ADMIN') && !actor.roles.includes('TEACHER')
+          ? { isPublished: true }
+          : {}),
+      },
       select: MODULE_SELECT,
       orderBy: { orderIndex: 'asc' },
     });
