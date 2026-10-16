@@ -728,7 +728,70 @@ export class QuizzesService {
       this.logger.error({ err, submissionId }, 'Failed to broadcast QUIZ_SUBMITTED');
     });
 
+    // N7: QUESTIONNAIRE kind assignmentlar uchun avtomatik baho.
+    // Shu testga quizId=this bo'lgan va userId guruh a'zosi bo'lgan har qanday
+    // QUESTIONNAIRE topshiriqni avto-baholaymiz (score = scorePercent * maxScore / 100).
+    try {
+      await this.applyScoreToQuestionnaireAssignments(quizId, userId, submission.scorePercent);
+    } catch (err) {
+      this.logger.error(
+        { err, submissionId },
+        'Failed to apply QUESTIONNAIRE auto-score',
+      );
+    }
+
     return toSubmissionDto(submission);
+  }
+
+  /**
+   * N7: QUESTIONNAIRE assignmentlariga avto-baho qo'yish — talaba quiz'ni
+   * topshirgach, shu quiz'ga ulangan QUESTIONNAIRE topshiriqlarining
+   * AssignmentSubmission qatorini score bilan GRADED qiladi.
+   */
+  private async applyScoreToQuestionnaireAssignments(
+    quizId: string,
+    userId: string,
+    scorePercent: number | null,
+  ): Promise<void> {
+    if (scorePercent === null) return;
+    const groupId = await this.resolveStudentGroupId(userId);
+    if (!groupId) return;
+    const assignments = await this.prisma.assignment.findMany({
+      where: {
+        kind: 'QUESTIONNAIRE',
+        quizId,
+        groupId,
+      },
+      select: { id: true, maxScore: true, titleUz: true },
+    });
+    for (const a of assignments) {
+      const score = Math.round((scorePercent / 100) * a.maxScore);
+      const existing = await this.prisma.assignmentSubmission.findUnique({
+        where: { assignmentId_studentId: { assignmentId: a.id, studentId: userId } },
+      });
+      const data = {
+        score,
+        gradedAt: new Date(),
+        status: 'GRADED' as const,
+        submittedAt: new Date(),
+      };
+      if (existing) {
+        await this.prisma.assignmentSubmission.update({
+          where: { id: existing.id },
+          data,
+        });
+      } else {
+        await this.prisma.assignmentSubmission.create({
+          data: {
+            id: uuidv7(),
+            assignmentId: a.id,
+            studentId: userId,
+            attempt: 1,
+            ...data,
+          },
+        });
+      }
+    }
   }
 
   async getSubmissionForUser(
