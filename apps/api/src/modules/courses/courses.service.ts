@@ -171,8 +171,26 @@ export class CoursesService {
       }),
     ]);
 
+    // U8: STUDENT uchun lessonsCount visible darslar bilan teng
+    let data = rows.map(toCourseDto);
+    if (isStudent && rows.length > 0) {
+      const courseIds = rows.map((r) => r.id);
+      const visibleCounts = await this.prisma.lesson.groupBy({
+        by: ['courseId'],
+        where: {
+          courseId: { in: courseIds },
+          isPublished: true,
+          archivedAt: null,
+          OR: [{ moduleId: null }, { module: { isPublished: true } }],
+        },
+        _count: true,
+      });
+      const counts = new Map(visibleCounts.map((v) => [v.courseId, v._count]));
+      data = data.map((c) => ({ ...c, lessonsCount: counts.get(c.id) ?? 0 }));
+    }
+
     return {
-      data: rows.map(toCourseDto),
+      data,
       meta: {
         page,
         perPage,

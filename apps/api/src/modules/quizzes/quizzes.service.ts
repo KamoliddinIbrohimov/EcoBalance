@@ -328,7 +328,17 @@ export class QuizzesService {
     }
   }
 
-  async listPublishedStandalone(studentId?: string): Promise<QuizSummaryDto[]> {
+  async listPublishedStandalone(studentId?: string): Promise<
+    (QuizSummaryDto & {
+      binding?: {
+        opensAt: string | null;
+        closesAt: string | null;
+        maxAttempts: number | null;
+        timeLimitMinutes: number | null;
+        attemptsUsed: number;
+      };
+    })[]
+  > {
     const groupId = await this.resolveStudentGroupId(studentId);
     if (!groupId) return [];
     const rows = await this.prisma.quiz.findMany({
@@ -340,7 +350,36 @@ export class QuizzesService {
       select: QUIZ_SUMMARY_SELECT,
       orderBy: { createdAt: 'desc' },
     });
-    return rows.map(toSummaryDto);
+
+    // U6: binding ma'lumotini va urinishlar sonini ham qaytaramiz
+    if (!studentId) return rows.map((r) => toSummaryDto(r));
+    const quizIds = rows.map((r) => r.id);
+    const bindings = await this.prisma.groupQuiz.findMany({
+      where: { groupId, quizId: { in: quizIds } },
+    });
+    const bindingMap = new Map(bindings.map((b) => [b.quizId, b]));
+    const subs = await this.prisma.quizSubmission.groupBy({
+      by: ['quizId'],
+      where: { userId: studentId, quizId: { in: quizIds }, status: 'SUBMITTED' },
+      _count: true,
+    });
+    const countMap = new Map(subs.map((s) => [s.quizId, s._count]));
+
+    return rows.map((r) => {
+      const b = bindingMap.get(r.id);
+      return {
+        ...toSummaryDto(r),
+        binding: b
+          ? {
+              opensAt: b.opensAt?.toISOString() ?? null,
+              closesAt: b.closesAt?.toISOString() ?? null,
+              maxAttempts: b.maxAttempts,
+              timeLimitMinutes: b.timeLimitMinutes,
+              attemptsUsed: countMap.get(r.id) ?? 0,
+            }
+          : undefined,
+      };
+    });
   }
 
   private async resolveStudentGroupId(studentId?: string): Promise<string | null> {

@@ -4,7 +4,9 @@ import { PERMISSION, type QuizSummaryDto } from '@eco/shared';
 import {
   ClipboardList,
   CheckCircle2,
+  Clock,
   Loader2,
+  Lock,
   Play,
   Settings,
   XCircle,
@@ -79,9 +81,30 @@ export default function MonitoringTestsPage() {
   );
 }
 
-function TestCard({ quiz }: { quiz: QuizSummaryDto }) {
+interface QuizWithBinding extends QuizSummaryDto {
+  binding?: {
+    opensAt: string | null;
+    closesAt: string | null;
+    maxAttempts: number | null;
+    timeLimitMinutes: number | null;
+    attemptsUsed: number;
+  };
+}
+
+function TestCard({ quiz }: { quiz: QuizWithBinding }) {
   const { data: history } = useMyHistory(quiz.id);
   const latest = history?.[0] ?? null;
+
+  const now = Date.now();
+  const binding = quiz.binding;
+  const closed = binding?.closesAt && new Date(binding.closesAt).getTime() < now;
+  const notYet = binding?.opensAt && new Date(binding.opensAt).getTime() > now;
+  const attemptsLeft =
+    binding?.maxAttempts !== null && binding?.maxAttempts !== undefined
+      ? binding.maxAttempts - (binding.attemptsUsed ?? 0)
+      : null;
+  const noAttempts = attemptsLeft !== null && attemptsLeft <= 0;
+  const disabled = closed || notYet || noAttempts;
 
   return (
     <li>
@@ -103,6 +126,23 @@ function TestCard({ quiz }: { quiz: QuizSummaryDto }) {
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
           <Badge variant="secondary">{quiz.questionCount} savol</Badge>
           <span>O&apos;tish: {quiz.passPercent}%</span>
+          {binding?.timeLimitMinutes ? (
+            <Badge variant="outline">
+              <Clock className="h-3 w-3" />
+              {binding.timeLimitMinutes} daq
+            </Badge>
+          ) : null}
+          {attemptsLeft !== null ? (
+            <Badge variant={attemptsLeft > 0 ? 'secondary' : 'destructive'}>
+              Urinish: {binding!.attemptsUsed}/{binding!.maxAttempts}
+            </Badge>
+          ) : null}
+          {binding?.opensAt ? (
+            <span>Ochildi: {new Date(binding.opensAt).toLocaleString('ru-RU')}</span>
+          ) : null}
+          {binding?.closesAt ? (
+            <span>Yopiladi: {new Date(binding.closesAt).toLocaleString('ru-RU')}</span>
+          ) : null}
           {latest ? (
             latest.scorePercent === null ? (
               <Badge variant="outline">So&apos;rovnoma topshirildi</Badge>
@@ -127,11 +167,20 @@ function TestCard({ quiz }: { quiz: QuizSummaryDto }) {
           ) : null}
         </div>
 
-        <div className="mt-auto flex items-center justify-end pt-4">
-          <Button asChild size="sm">
-            <Link href={`/monitoring/tests/${quiz.id}`}>
-              <Play className="h-4 w-4" />
-              {latest ? 'Qayta yechish' : 'Boshlash'}
+        <div className="mt-auto flex items-center justify-between pt-4">
+          <span className="text-[11px] text-muted-foreground">
+            {closed
+              ? 'Yopildi'
+              : notYet
+                ? "Hali ochilmagan"
+                : noAttempts
+                  ? "Urinishlar tugadi"
+                  : null}
+          </span>
+          <Button asChild size="sm" disabled={!!disabled}>
+            <Link href={disabled ? '#' : `/monitoring/tests/${quiz.id}`}>
+              {disabled ? <Lock className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              {latest && !disabled ? 'Qayta yechish' : disabled ? 'Yopiq' : 'Boshlash'}
             </Link>
           </Button>
         </div>

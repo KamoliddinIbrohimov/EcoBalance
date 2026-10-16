@@ -1,6 +1,13 @@
 'use client';
 
-import type { AssignmentDto, AssignmentKind, GroupWithTeacherDto } from '@eco/shared';
+import type {
+  AssignmentDto,
+  AssignmentKind,
+  GroupWithTeacherDto,
+  LessonDto,
+  ModuleDto,
+  QuizSummaryDto,
+} from '@eco/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -18,7 +25,7 @@ import {
 } from '@/shared/components/ui/dialog';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
-import { ApiError } from '@/shared/lib/api-client';
+import { ApiError, apiClient } from '@/shared/lib/api-client';
 
 interface Props {
   open: boolean;
@@ -43,11 +50,56 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [timeLimit, setTimeLimit] = useState('30');
+  // Content binding
+  const [courseId, setCourseId] = useState('');
+  const [moduleId, setModuleId] = useState('');
+  const [lessonId, setLessonId] = useState('');
+  // QUESTIONNAIRE
+  const [quizId, setQuizId] = useState('');
 
   const { data: groups } = useQuery<{ data: GroupWithTeacherDto[]; meta: { total: number } }>({
     queryKey: ['groups', 'list'],
     queryFn: () => groupsApi.list(),
     enabled: open && !isEdit,
+  });
+
+  // U2: tanlagan guruhga biriktirilgan kurslar
+  const { data: boundCourses } = useQuery({
+    queryKey: ['groups', groupId, 'courses'],
+    queryFn: () => groupsApi.courseBindings(groupId),
+    enabled: open && !!groupId,
+  });
+
+  // Tanlagan kursning modullari
+  const { data: modules } = useQuery({
+    queryKey: ['courses', courseId, 'modules'],
+    queryFn: async () => {
+      const r = await apiClient.get<{ data: ModuleDto[] }>(`/courses/${courseId}/modules`);
+      return r.data.data;
+    },
+    enabled: open && !!courseId,
+  });
+
+  // Tanlagan kursning darslari
+  const { data: lessons } = useQuery({
+    queryKey: ['courses', courseId, 'lessons', 'all'],
+    queryFn: async () => {
+      const r = await apiClient.get<{ data: LessonDto[] }>(`/courses/${courseId}/lessons`);
+      return r.data.data;
+    },
+    enabled: open && !!courseId,
+  });
+
+  // QUESTIONNAIRE uchun testlar — teacher own + LIBRARY
+  const { data: quizzes } = useQuery({
+    queryKey: ['quizzes', 'all-for-select'],
+    queryFn: async () => {
+      const r = await apiClient.get<{ data: QuizSummaryDto[] }>('/quizzes', {
+        params: { perPage: 100 },
+      });
+      return r.data.data;
+    },
+    enabled: open && kind === 'QUESTIONNAIRE',
   });
 
   useEffect(() => {
@@ -64,6 +116,10 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
         setStartsAt(assignment.startsAt ? assignment.startsAt.slice(0, 16) : '');
         setEndsAt(assignment.endsAt ? assignment.endsAt.slice(0, 16) : '');
         setTimeLimit(String(assignment.timeLimitMinutes ?? 30));
+        setCourseId(assignment.courseId ?? '');
+        setModuleId(assignment.moduleId ?? '');
+        setLessonId(assignment.lessonId ?? '');
+        setQuizId(assignment.quizId ?? '');
       } else {
         setGroupId('');
         setKind('TASK');
@@ -76,6 +132,10 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
         setStartsAt('');
         setEndsAt('');
         setTimeLimit('30');
+        setCourseId('');
+        setModuleId('');
+        setLessonId('');
+        setQuizId('');
       }
     }
   }, [open, isEdit, assignment]);
@@ -88,6 +148,11 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
       const ends = endsAt ? new Date(endsAt).toISOString() : null;
       const limit = Number(timeLimit);
       const penalty = Number(latePenalty);
+      const bindings = {
+        courseId: courseId || null,
+        moduleId: moduleId || null,
+        lessonId: lessonId || null,
+      };
       if (isEdit && assignment) {
         return assignmentsApi.update(assignment.id, {
           titleUz: titleUz.trim(),
@@ -99,6 +164,8 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
           startsAt: starts as unknown as Date | null,
           endsAt: ends as unknown as Date | null,
           timeLimitMinutes: kind === 'TIMED' ? limit : null,
+          quizId: kind === 'QUESTIONNAIRE' ? quizId || null : null,
+          ...bindings,
         });
       }
       return assignmentsApi.create({
@@ -113,6 +180,8 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
         startsAt: starts as unknown as Date | null,
         endsAt: ends as unknown as Date | null,
         timeLimitMinutes: kind === 'TIMED' ? limit : null,
+        quizId: kind === 'QUESTIONNAIRE' ? quizId || null : null,
+        ...bindings,
       });
     },
     onSuccess: () => {
@@ -200,6 +269,87 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
               onChange={(e) => setDescriptionUz(e.target.value)}
             />
           </div>
+
+          {/* U2: content binding — kurs/modul/dars tanlash */}
+          <div className="grid grid-cols-3 gap-2 rounded-lg border border-border/60 bg-secondary/30 p-3">
+            <div>
+              <Label htmlFor="courseId" className="text-xs">Kurs (ixtiyoriy)</Label>
+              <select
+                id="courseId"
+                className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                value={courseId}
+                onChange={(e) => {
+                  setCourseId(e.target.value);
+                  setModuleId('');
+                  setLessonId('');
+                }}
+                disabled={!groupId}
+              >
+                <option value="">— yo‘q —</option>
+                {(boundCourses ?? []).map((b) => (
+                  <option key={b.courseId} value={b.courseId}>
+                    {b.course.nameUz}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="moduleId" className="text-xs">Modul (ixtiyoriy)</Label>
+              <select
+                id="moduleId"
+                className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                value={moduleId}
+                onChange={(e) => setModuleId(e.target.value)}
+                disabled={!courseId}
+              >
+                <option value="">— yo‘q —</option>
+                {(modules ?? []).map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.titleUz}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="lessonId" className="text-xs">Dars (ixtiyoriy)</Label>
+              <select
+                id="lessonId"
+                className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                value={lessonId}
+                onChange={(e) => setLessonId(e.target.value)}
+                disabled={!courseId}
+              >
+                <option value="">— yo‘q —</option>
+                {(lessons ?? [])
+                  .filter((l) => !moduleId || l.moduleId === moduleId)
+                  .map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.orderIndex + 1}. {l.titleUz}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
+          {kind === 'QUESTIONNAIRE' ? (
+            <div>
+              <Label htmlFor="quizId">Test (majburiy)</Label>
+              <select
+                id="quizId"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                value={quizId}
+                onChange={(e) => setQuizId(e.target.value)}
+                required
+              >
+                <option value="">— tanlang —</option>
+                {(quizzes ?? []).map((q) => (
+                  <option key={q.id} value={q.id}>
+                    {q.titleUz}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -291,7 +441,12 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
             </Button>
             <Button
               type="submit"
-              disabled={mut.isPending || (!isEdit && !groupId) || !titleUz.trim()}
+              disabled={
+                mut.isPending ||
+                (!isEdit && !groupId) ||
+                !titleUz.trim() ||
+                (kind === 'QUESTIONNAIRE' && !quizId)
+              }
             >
               {mut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {isEdit ? 'Saqlash' : 'Yaratish'}

@@ -2,7 +2,7 @@
 
 import type { AssignmentDto } from '@eco/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
+import { Clock, Loader2, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 
 import { assignmentsApi } from '@/features/assignments/api/assignments-api';
@@ -17,7 +17,7 @@ import {
 } from '@/shared/components/ui/dialog';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
-import { ApiError } from '@/shared/lib/api-client';
+import { ApiError, apiClient } from '@/shared/lib/api-client';
 
 interface Props {
   open: boolean;
@@ -36,6 +36,10 @@ export function AssignmentGradeDialog({ open, onOpenChange, assignment }: Props)
   const [editingId, setEditingId] = useState<string | null>(null);
   const [score, setScore] = useState('');
   const [feedback, setFeedback] = useState('');
+  // U2: accommodation inputs
+  const [accStudentId, setAccStudentId] = useState<string | null>(null);
+  const [extraMinutes, setExtraMinutes] = useState('');
+  const [newDueAt, setNewDueAt] = useState('');
 
   const mut = useMutation({
     mutationFn: ({ id, score, feedback }: { id: string; score: number; feedback: string }) =>
@@ -49,7 +53,41 @@ export function AssignmentGradeDialog({ open, onOpenChange, assignment }: Props)
     },
   });
 
-  const err = mut.error instanceof ApiError ? mut.error.problem.title ?? 'Xatolik' : null;
+  const reopenMut = useMutation({
+    mutationFn: (id: string) => assignmentsApi.reopen(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['assignments', assignment.id, 'submissions'] });
+      qc.invalidateQueries({ queryKey: ['assignments'] });
+    },
+  });
+
+  const accMut = useMutation({
+    mutationFn: () => {
+      if (!accStudentId) throw new Error('no student');
+      return apiClient.post(
+        `/assignments/${assignment.id}/accommodations/${accStudentId}`,
+        {
+          extraMinutes: extraMinutes ? Number(extraMinutes) : undefined,
+          newDueAt: newDueAt ? new Date(newDueAt).toISOString() : undefined,
+        },
+      );
+    },
+    onSuccess: () => {
+      setAccStudentId(null);
+      setExtraMinutes('');
+      setNewDueAt('');
+      qc.invalidateQueries({ queryKey: ['assignments', assignment.id, 'submissions'] });
+    },
+  });
+
+  const err =
+    mut.error instanceof ApiError
+      ? mut.error.problem.title ?? 'Xatolik'
+      : reopenMut.error instanceof ApiError
+        ? reopenMut.error.problem.title ?? 'Qayta ochib bo‘lmadi'
+        : accMut.error instanceof ApiError
+          ? accMut.error.problem.title ?? 'Accommodation xatosi'
+          : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -83,13 +121,16 @@ export function AssignmentGradeDialog({ open, onOpenChange, assignment }: Props)
                     </div>
                     <div className="text-xs text-muted-foreground">{s.student.email}</div>
                   </div>
-                  <Badge variant={s.status === 'GRADED' ? 'default' : 'secondary'}>
-                    {s.status === 'GRADED'
-                      ? `Baho: ${s.score}/${assignment.maxScore}`
-                      : s.status === 'RETURNED'
-                        ? 'Qaytarilgan'
-                        : 'Baholanmagan'}
-                  </Badge>
+                  <div className="flex items-center gap-1">
+                    {s.isLate ? <Badge variant="destructive">Kechikkan</Badge> : null}
+                    <Badge variant={s.status === 'GRADED' ? 'default' : 'secondary'}>
+                      {s.status === 'GRADED'
+                        ? `Baho: ${s.score}/${assignment.maxScore}`
+                        : s.status === 'RETURNED'
+                          ? 'Qaytarilgan'
+                          : 'Baholanmagan'}
+                    </Badge>
+                  </div>
                 </div>
 
                 <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">
@@ -137,8 +178,43 @@ export function AssignmentGradeDialog({ open, onOpenChange, assignment }: Props)
                       </Button>
                     </div>
                   </div>
+                ) : accStudentId === s.studentId ? (
+                  <div className="mt-3 grid grid-cols-2 gap-2 rounded-md border border-border/60 bg-secondary/30 p-2">
+                    <div>
+                      <Label htmlFor={`extra-${s.id}`} className="text-xs">+ daqiqa</Label>
+                      <Input
+                        id={`extra-${s.id}`}
+                        type="number"
+                        min={1}
+                        value={extraMinutes}
+                        onChange={(e) => setExtraMinutes(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`due-${s.id}`} className="text-xs">Yangi muddat</Label>
+                      <Input
+                        id={`due-${s.id}`}
+                        type="datetime-local"
+                        value={newDueAt}
+                        onChange={(e) => setNewDueAt(e.target.value)}
+                      />
+                    </div>
+                    <div className="col-span-2 flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => accMut.mutate()}
+                        disabled={accMut.isPending || (!extraMinutes && !newDueAt)}
+                      >
+                        {accMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                        Uzaytirish
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setAccStudentId(null)}>
+                        Bekor
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="mt-2 flex gap-2">
+                  <div className="mt-2 flex flex-wrap gap-2">
                     <Button
                       size="sm"
                       variant="outline"
@@ -149,6 +225,29 @@ export function AssignmentGradeDialog({ open, onOpenChange, assignment }: Props)
                       }}
                     >
                       {s.status === 'GRADED' ? 'Qayta baholash' : 'Baholash'}
+                    </Button>
+                    {s.status === 'GRADED' ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => reopenMut.mutate(s.id)}
+                        disabled={reopenMut.isPending}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Qaytarish
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setAccStudentId(s.studentId);
+                        setExtraMinutes('');
+                        setNewDueAt('');
+                      }}
+                    >
+                      <Clock className="h-4 w-4" />
+                      Vaqt uzaytirish
                     </Button>
                   </div>
                 )}
