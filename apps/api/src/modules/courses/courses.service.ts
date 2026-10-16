@@ -605,25 +605,12 @@ export class CoursesService {
     });
     const byLesson = new Map(releases.filter((r) => r.lessonId).map((r) => [r.lessonId!, r]));
     const byModule = new Map(releases.filter((r) => r.moduleId).map((r) => [r.moduleId!, r]));
-    const now = Date.now();
-
-    const isReleaseOpen = (rel: (typeof releases)[number]): boolean => {
-      if (rel.status === 'LOCKED') return false;
-      if (rel.status === 'OPEN') {
-        if (rel.closesAt && rel.closesAt.getTime() < now) return false;
-        return true;
-      }
-      // SCHEDULED
-      if (!rel.opensAt || rel.opensAt.getTime() > now) return false;
-      if (rel.closesAt && rel.closesAt.getTime() < now) return false;
-      return true;
-    };
 
     return rows.map((row) => {
       const direct = byLesson.get(row.id);
       const parent = row.moduleId ? byModule.get(row.moduleId) : undefined;
       const rel = direct ?? parent;
-      if (!rel || isReleaseOpen(rel)) return toLessonDto(row);
+      if (!rel || this.isReleaseOpenNow(rel)) return toLessonDto(row);
       // Yopiq — matnni kesib tashlaymiz.
       return {
         ...toLessonDto(row),
@@ -696,18 +683,12 @@ export class CoursesService {
       where: { id: lessonId },
       select: { moduleId: true },
     });
-    const now = new Date();
     // Dars uchun release
     const lessonRelease = await this.prisma.groupLessonRelease.findFirst({
       where: { groupId: member.groupId, lessonId },
     });
     if (lessonRelease) {
-      if (
-        lessonRelease.status === 'OPEN' ||
-        (lessonRelease.opensAt && lessonRelease.opensAt.getTime() <= now.getTime())
-      ) {
-        return;
-      }
+      if (this.isReleaseOpenNow(lessonRelease)) return;
       throw new NotFoundException('Dars hali ochilmagan');
     }
     // Modul uchun release
@@ -716,16 +697,29 @@ export class CoursesService {
         where: { groupId: member.groupId, moduleId: lesson.moduleId },
       });
       if (moduleRelease) {
-        if (
-          moduleRelease.status === 'OPEN' ||
-          (moduleRelease.opensAt && moduleRelease.opensAt.getTime() <= now.getTime())
-        ) {
-          return;
-        }
+        if (this.isReleaseOpenNow(moduleRelease)) return;
         throw new NotFoundException('Dars hali ochilmagan');
       }
     }
     // Release yo'q — ochiq, standart oqim
+  }
+
+  /**
+   * N12: `LOCKED` doim yopiq. `SCHEDULED` — opensAt kelmaguncha yopiq;
+   * closesAt o'tgandan keyin yopiq. `OPEN` — closesAt o'tgandan keyin yopiq.
+   */
+  private isReleaseOpenNow(release: {
+    status: 'LOCKED' | 'SCHEDULED' | 'OPEN';
+    opensAt: Date | null;
+    closesAt: Date | null;
+  }): boolean {
+    if (release.status === 'LOCKED') return false;
+    const now = Date.now();
+    if (release.closesAt && release.closesAt.getTime() < now) return false;
+    if (release.status === 'OPEN') return true;
+    // SCHEDULED
+    if (!release.opensAt || release.opensAt.getTime() > now) return false;
+    return true;
   }
 
   /**
@@ -958,12 +952,25 @@ export class CoursesService {
     if (!isSA && course.ownerId !== ctx.actorId) {
       throw new ForbiddenException("Faqat o'z kursingiz darslarini qayta tartiblashingiz mumkin");
     }
-    const lessons = await this.prisma.lesson.findMany({
-      where: { courseId, id: { in: lessonIds } },
+    const allLessons = await this.prisma.lesson.findMany({
+      where: { courseId },
       select: { id: true },
     });
-    if (lessons.length !== lessonIds.length) {
-      throw new BadRequestException("Dars id'lari to'liq emas yoki boshqa kursga tegishli");
+    const providedSet = new Set(lessonIds);
+    const existingSet = new Set(allLessons.map((l) => l.id));
+    // N18: barcha darslar ro'yxatda bo'lishi kerak (to'liq)
+    if (lessonIds.length !== allLessons.length) {
+      throw new BadRequestException(
+        `Kursda ${allLessons.length} ta dars bor, lekin ${lessonIds.length} ta ID yuborildi`,
+      );
+    }
+    for (const id of lessonIds) {
+      if (!existingSet.has(id)) {
+        throw new BadRequestException(`Dars shu kursga tegishli emas: ${id}`);
+      }
+    }
+    if (providedSet.size !== lessonIds.length) {
+      throw new BadRequestException('Takroriy ID lar');
     }
     await this.prisma.$transaction(async (tx) => {
       // Vaqtincha salbiy indekslarga ko'chirish (unikal cheklov buzilmasin uchun)

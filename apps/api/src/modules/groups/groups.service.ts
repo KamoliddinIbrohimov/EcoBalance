@@ -272,6 +272,25 @@ export class GroupsService {
     if (!input.lessonId === !input.moduleId) {
       throw new BadRequestException('lessonId yoki moduleId — birini belgilang');
     }
+    // N12: closesAt < opensAt rad
+    if (input.opensAt && input.closesAt && input.opensAt.getTime() >= input.closesAt.getTime()) {
+      throw new BadRequestException('opensAt closesAt dan oldin bo‘lishi kerak');
+    }
+    // N12: kurs guruhga biriktirilgan bo'lishi
+    const targetCourseId = await this.resolveReleaseCourseId(input);
+    if (targetCourseId) {
+      const link = await this.prisma.courseGroup.findUnique({
+        where: { courseId_groupId: { courseId: targetCourseId, groupId } },
+        select: { courseId: true },
+      });
+      if (!link) {
+        throw new BadRequestException('Kurs bu guruhga biriktirilmagan');
+      }
+    }
+    // N12: SCHEDULED uchun opensAt majburiy
+    if (input.status === 'SCHEDULED' && !input.opensAt) {
+      throw new BadRequestException('SCHEDULED uchun opensAt majburiy');
+    }
     const existing = await this.prisma.groupLessonRelease.findFirst({
       where: {
         groupId,
@@ -331,6 +350,27 @@ export class GroupsService {
     await this.prisma.groupLessonRelease.delete({ where: { id } }).catch(() => {
       throw new NotFoundException('Release topilmadi');
     });
+  }
+
+  private async resolveReleaseCourseId(input: {
+    lessonId?: string;
+    moduleId?: string;
+  }): Promise<string | null> {
+    if (input.lessonId) {
+      const lesson = await this.prisma.lesson.findUnique({
+        where: { id: input.lessonId },
+        select: { courseId: true },
+      });
+      return lesson?.courseId ?? null;
+    }
+    if (input.moduleId) {
+      const mod = await this.prisma.module.findUnique({
+        where: { id: input.moduleId },
+        select: { courseId: true },
+      });
+      return mod?.courseId ?? null;
+    }
+    return null;
   }
 
   /**
@@ -434,10 +474,15 @@ export class GroupsService {
       },
       orderBy: { createdAt: 'asc' },
     });
+    // N10: sozlamalarni ham qaytarish
     return rows.map((r) => ({
       quizId: r.quizId,
       groupId: r.groupId,
       quiz: r.quiz,
+      opensAt: r.opensAt?.toISOString() ?? null,
+      closesAt: r.closesAt?.toISOString() ?? null,
+      maxAttempts: r.maxAttempts,
+      timeLimitMinutes: r.timeLimitMinutes,
     }));
   }
 
@@ -463,6 +508,7 @@ export class GroupsService {
     if (!this.isSuperAdmin(actor) && !isOwner && !isLibrary) {
       throw new ForbiddenException('Bu test sizga ko‘rinmaydi (PRIVATE)');
     }
+    this.validateQuizSettings(settings);
     const existing = await this.prisma.groupQuiz.findUnique({
       where: { quizId_groupId: { quizId, groupId } },
     });
@@ -480,6 +526,10 @@ export class GroupsService {
     return { quizId, groupId };
   }
 
+  /**
+   * N10: PATCH endi partial — faqat kelgan maydonlar yangilanadi,
+   * yuborilmagan maydonlar o'z joyida qoladi (null bo'lmaydi).
+   */
   async updateQuizBindingSettings(
     groupId: string,
     quizId: string,
@@ -496,11 +546,56 @@ export class GroupsService {
       where: { quizId_groupId: { quizId, groupId } },
     });
     if (!link) throw new NotFoundException('Biriktirilma topilmadi');
+
+    // N10: PATCH — yuborilmagan maydonlarni o'zgartirmaslik uchun hasOwnProperty bilan filterlash
+    const data: Record<string, unknown> = {};
+    if ('opensAt' in settings) data.opensAt = settings.opensAt;
+    if ('closesAt' in settings) data.closesAt = settings.closesAt;
+    if ('maxAttempts' in settings) data.maxAttempts = settings.maxAttempts;
+    if ('timeLimitMinutes' in settings) data.timeLimitMinutes = settings.timeLimitMinutes;
+
+    // Yangi effektiv qiymatlarni tekshirish
+    this.validateQuizSettings({
+      opensAt: 'opensAt' in settings ? settings.opensAt : link.opensAt,
+      closesAt: 'closesAt' in settings ? settings.closesAt : link.closesAt,
+      maxAttempts: 'maxAttempts' in settings ? settings.maxAttempts : link.maxAttempts,
+      timeLimitMinutes:
+        'timeLimitMinutes' in settings ? settings.timeLimitMinutes : link.timeLimitMinutes,
+    });
+
     await this.prisma.groupQuiz.update({
       where: { quizId_groupId: { quizId, groupId } },
-      data: settings,
+      data,
     });
-    return { quizId, groupId, ...settings };
+    const refreshed = await this.prisma.groupQuiz.findUnique({
+      where: { quizId_groupId: { quizId, groupId } },
+    });
+    return {
+      quizId,
+      groupId,
+      opensAt: refreshed?.opensAt?.toISOString() ?? null,
+      closesAt: refreshed?.closesAt?.toISOString() ?? null,
+      maxAttempts: refreshed?.maxAttempts ?? null,
+      timeLimitMinutes: refreshed?.timeLimitMinutes ?? null,
+    };
+  }
+
+  private validateQuizSettings(s?: {
+    opensAt?: Date | null;
+    closesAt?: Date | null;
+    maxAttempts?: number | null;
+    timeLimitMinutes?: number | null;
+  }) {
+    if (!s) return;
+    if (s.maxAttempts !== null && s.maxAttempts !== undefined && s.maxAttempts < 1) {
+      throw new BadRequestException('maxAttempts >= 1 bo‘lishi kerak');
+    }
+    if (s.timeLimitMinutes !== null && s.timeLimitMinutes !== undefined && s.timeLimitMinutes < 1) {
+      throw new BadRequestException('timeLimitMinutes >= 1 bo‘lishi kerak');
+    }
+    if (s.opensAt && s.closesAt && s.opensAt.getTime() >= s.closesAt.getTime()) {
+      throw new BadRequestException('opensAt closesAt dan oldin bo‘lishi kerak');
+    }
   }
 
   async unbindQuiz(groupId: string, quizId: string, actor: ActorContext) {

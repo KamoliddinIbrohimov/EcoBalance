@@ -209,7 +209,7 @@ export class GroupsController {
 
   @Patch(':id/quizzes/:quizId')
   @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @ApiOperation({ summary: 'Guruh-test biriktirmasi sozlamalarini yangilash' })
+  @ApiOperation({ summary: 'Guruh-test biriktirmasi sozlamalarini yangilash (partial PATCH)' })
   async updateQuizBinding(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe()) id: string,
@@ -221,12 +221,26 @@ export class GroupsController {
       timeLimitMinutes?: number | null;
     },
   ) {
-    return this.groups.updateQuizBindingSettings(id, quizId, { id: actor.id, roles: actor.roles }, {
-      opensAt: body?.opensAt ? new Date(body.opensAt) : null,
-      closesAt: body?.closesAt ? new Date(body.closesAt) : null,
-      maxAttempts: body?.maxAttempts ?? null,
-      timeLimitMinutes: body?.timeLimitMinutes ?? null,
-    });
+    // N10: PATCH endi FAQAT kelgan maydonlarni uzatadi; yuborilmagan maydonlar o'z joyida
+    const settings: {
+      opensAt?: Date | null;
+      closesAt?: Date | null;
+      maxAttempts?: number | null;
+      timeLimitMinutes?: number | null;
+    } = {};
+    if (body && 'opensAt' in body)
+      settings.opensAt = body.opensAt ? new Date(body.opensAt) : null;
+    if (body && 'closesAt' in body)
+      settings.closesAt = body.closesAt ? new Date(body.closesAt) : null;
+    if (body && 'maxAttempts' in body) settings.maxAttempts = body.maxAttempts ?? null;
+    if (body && 'timeLimitMinutes' in body)
+      settings.timeLimitMinutes = body.timeLimitMinutes ?? null;
+    return this.groups.updateQuizBindingSettings(
+      id,
+      quizId,
+      { id: actor.id, roles: actor.roles },
+      settings,
+    );
   }
 
   @Delete(':id/quizzes/:quizId')

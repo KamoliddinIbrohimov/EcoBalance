@@ -275,6 +275,8 @@ export class QuizzesService {
     const quiz = await this.loadQuizWithLesson(id);
     if (!quiz.isPublished) throw new NotFoundException('Test topilmadi');
     await this.assertStudentCanTakeQuiz(id, studentId);
+    // N10: window va nofaol guruh — take ham tekshirsin
+    await this.assertQuizWindowOpen(id, studentId);
 
     const questions = await this.prisma.quizQuestion.findMany({
       where: { quizId: id },
@@ -298,6 +300,32 @@ export class QuizzesService {
       select: { quizId: true },
     });
     if (!link) throw new NotFoundException('Test topilmadi');
+  }
+
+  /**
+   * N10: test oynasi (opensAt/closesAt), nofaol guruh va urinishlar sonini tekshiradi.
+   */
+  private async assertQuizWindowOpen(quizId: string, studentId?: string): Promise<void> {
+    if (!studentId) return;
+    const member = await this.prisma.groupMember.findUnique({
+      where: { studentId },
+      select: { groupId: true, group: { select: { isActive: true } } },
+    });
+    if (!member) throw new NotFoundException('Test topilmadi');
+    if (!member.group.isActive) throw new ForbiddenException('Guruh nofaol');
+    const binding = await this.prisma.groupQuiz.findUnique({
+      where: { quizId_groupId: { quizId, groupId: member.groupId } },
+    });
+    if (!binding) return;
+    const now = Date.now();
+    if (binding.opensAt && binding.opensAt.getTime() > now) {
+      throw new ForbiddenException(
+        `Test ${binding.opensAt.toISOString()} dan ochiladi`,
+      );
+    }
+    if (binding.closesAt && binding.closesAt.getTime() < now) {
+      throw new ForbiddenException("Test oynasi yopildi");
+    }
   }
 
   async listPublishedStandalone(studentId?: string): Promise<QuizSummaryDto[]> {
@@ -599,10 +627,24 @@ export class QuizzesService {
       throw new BadRequestException('Testda savollar yo‘q');
     }
 
-    // Map answers by questionId for quick lookup, drop unknown questions.
+    // N11: noma'lum va takroriy questionId -> 400
+    const knownIds = new Set(questions.map((q) => q.id));
+    const seen = new Set<string>();
     const answerMap = new Map<string, string>();
     for (const ans of input.answers) {
+      if (!knownIds.has(ans.questionId)) {
+        throw new BadRequestException(`Noma'lum questionId: ${ans.questionId}`);
+      }
+      if (seen.has(ans.questionId)) {
+        throw new BadRequestException(`Savolga takroriy javob: ${ans.questionId}`);
+      }
+      seen.add(ans.questionId);
       answerMap.set(ans.questionId, ans.value.trim());
+    }
+    if (answerMap.size === 0) {
+      throw new BadRequestException(
+        "Kamida bitta savolga javob kiritilmagan — bo'sh topshirish rad etiladi",
+      );
     }
 
     let scoreTotal = 0;

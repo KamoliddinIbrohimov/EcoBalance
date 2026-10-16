@@ -419,21 +419,67 @@ export class LmsService {
       }
     }
 
-    // F4: TIMED tekshiruvlar
+    // F4 + N13: TIMED tekshiruvlar
     if (input.kind === 'TIMED') {
       if (!input.endsAt || !input.timeLimitMinutes) {
         throw new BadRequestException(
           'TIMED turi uchun endsAt va timeLimitMinutes majburiy',
         );
       }
+      if (input.endsAt.getTime() < Date.now()) {
+        throw new BadRequestException('endsAt o‘tmishda bo‘lishi mumkin emas');
+      }
       if (input.startsAt && input.endsAt && input.startsAt.getTime() >= input.endsAt.getTime()) {
         throw new BadRequestException('startsAt endsAt dan oldin bo‘lishi kerak');
       }
+      // N13: timeLimit oynadan uzun bo'lmasin
+      if (input.startsAt) {
+        const windowMin = (input.endsAt.getTime() - input.startsAt.getTime()) / 60_000;
+        if (input.timeLimitMinutes > windowMin) {
+          throw new BadRequestException(
+            `timeLimitMinutes (${input.timeLimitMinutes}) oyna (${Math.floor(windowMin)} daq)dan uzun`,
+          );
+        }
+      }
     }
-    // F4: QUESTIONNAIRE — quizId mavjudligi tekshirilsin
-    if (input.kind === 'QUESTIONNAIRE' && input.quizId) {
-      const quiz = await this.prisma.quiz.findUnique({ where: { id: input.quizId }, select: { id: true } });
+    // N13: TASK startsAt > dueAt bo'lmasin
+    if (input.kind === 'TASK' && input.startsAt && input.dueAt && input.startsAt.getTime() > input.dueAt.getTime()) {
+      throw new BadRequestException('startsAt dueAt dan keyin bo‘lishi mumkin emas');
+    }
+    // F4 + N7: QUESTIONNAIRE uchun quizId majburiy
+    if (input.kind === 'QUESTIONNAIRE') {
+      if (!input.quizId) {
+        throw new BadRequestException('QUESTIONNAIRE turi uchun quizId majburiy');
+      }
+      const quiz = await this.prisma.quiz.findUnique({
+        where: { id: input.quizId },
+        select: { id: true, ownerId: true, visibility: true },
+      });
       if (!quiz) throw new BadRequestException('Test topilmadi');
+      // Faqat o'z yoki LIBRARY testni biriktirish mumkin
+      if (!this.isSuperAdmin(actor) && quiz.ownerId !== actor.id && quiz.visibility !== 'LIBRARY') {
+        throw new BadRequestException("Faqat o'z yoki LIBRARY testlarini biriktira olasiz");
+      }
+    }
+    // N13: moduleId tekshiruvi — courseId'ga tegishli va lesson bilan mos
+    if (input.moduleId) {
+      const mod = await this.prisma.module.findUnique({
+        where: { id: input.moduleId },
+        select: { courseId: true },
+      });
+      if (!mod) throw new BadRequestException('Modul topilmadi');
+      if (courseId && mod.courseId !== courseId) {
+        throw new BadRequestException('Modul ko‘rsatilgan kursga tegishli emas');
+      }
+      if (lessonId) {
+        const lesson = await this.prisma.lesson.findUnique({
+          where: { id: lessonId },
+          select: { moduleId: true },
+        });
+        if (lesson && lesson.moduleId && lesson.moduleId !== input.moduleId) {
+          throw new BadRequestException('Modul darsning moduli bilan mos emas');
+        }
+      }
     }
 
     const row = await this.prisma.assignment.create({
@@ -504,7 +550,7 @@ export class LmsService {
       throw new BadRequestException('Muddat o‘tgan sanaga o‘zgartirilishi mumkin emas');
     }
 
-    // L7(a): maxScore pasaytirilsa va baholangan topshiriqlarda score > new maxScore bo'lsa — 409.
+    // L7(a) + N13: maxScore pasaytirilsa va baholangan topshiriqlarda score > new maxScore -> 409
     if (input.maxScore !== undefined && input.maxScore < existing.maxScore) {
       const highest = await this.prisma.assignmentSubmission.aggregate({
         where: { assignmentId: id, score: { not: null } },
@@ -514,6 +560,23 @@ export class LmsService {
         throw new ConflictException(
           `Baholangan ballar bor (eng yuqori ${highest._max.score}). maxScore'ni ${highest._max.score} dan past qilib bo‘lmaydi`,
         );
+      }
+    }
+    // N13: baholangan javoblar bor bo'lsa kind o'zgarmas (ma'nosi butunlay boshqa)
+    if ((input as unknown as { kind?: string }).kind) {
+      const hasAnswers = await this.prisma.assignmentSubmission.count({
+        where: { assignmentId: id },
+      });
+      if (hasAnswers > 0 && (input as unknown as { kind?: string }).kind !== existing.id) {
+        // Agar frontend aniq bir xil kind yuborayotgan bo'lsa, bu holat tushadi.
+        // Boshqa qiymat bo'lsa — rad etamiz.
+        const existingAssignment = await this.prisma.assignment.findUnique({
+          where: { id },
+          select: { kind: true },
+        });
+        if ((input as unknown as { kind?: string }).kind !== existingAssignment?.kind) {
+          throw new ConflictException("Javoblar bor topshiriqning turini o'zgartirib bo‘lmaydi");
+        }
       }
     }
 
