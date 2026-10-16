@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, CheckCircle2, Loader2 } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { Button } from '@/shared/components/ui/button';
@@ -28,6 +29,39 @@ export function LessonCompleteButton({ lessonId }: { lessonId: string }) {
       !s.user?.roles.includes('TEACHER') &&
       !s.user?.roles.includes('SUPER_ADMIN'),
   );
+
+  // F5 (2.C) heartbeat — tab faol vaqtda har 30s'da serverga yuborish.
+  // visibilitychange da to'xtaydi; server tomondan 60s cap bor.
+  const activeRef = useRef<number>(0);
+  const lastSentRef = useRef<number>(Date.now());
+  useEffect(() => {
+    if (!isStudent) return;
+    let visible = typeof document !== 'undefined' && !document.hidden;
+    const onVisibility = () => {
+      visible = !document.hidden;
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    const tick = setInterval(() => {
+      if (visible) activeRef.current += 1;
+    }, 1000);
+    const flush = setInterval(() => {
+      const seconds = activeRef.current;
+      activeRef.current = 0;
+      lastSentRef.current = Date.now();
+      if (seconds > 0) {
+        apiClient
+          .post(`/lessons/${lessonId}/heartbeat`, { activeSeconds: seconds })
+          .catch(() => {
+            /* ignore transient */
+          });
+      }
+    }, 30_000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      clearInterval(tick);
+      clearInterval(flush);
+    };
+  }, [isStudent, lessonId]);
 
   const { data: progressRows } = useQuery({
     queryKey: ['lessons', 'progress', 'me'],

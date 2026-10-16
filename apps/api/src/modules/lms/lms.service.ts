@@ -1021,6 +1021,214 @@ export class LmsService {
   }
 
   // -------------------------------------------------------------
+  // F5 (2.C): Study tracking — heartbeat, timeline, aggregates
+  // -------------------------------------------------------------
+
+  /**
+   * Dars sahifasi faol vaqtda frontend har ~30s da chaqiradi. Server har
+   * chaqiruvda ko'pi bilan 60s qo'shadi — soxta vaqt yuborilsa limitlanadi.
+   * Studentni darsga kirish huquqi tekshiriladi (progress yozilgan dars bilan
+   * bir xil mantiq).
+   */
+  async heartbeat(
+    lessonId: string,
+    activeSeconds: number,
+    position: number | undefined,
+    actor: Actor,
+  ) {
+    if (!this.isStudent(actor)) throw new ForbiddenException('Faqat talaba');
+    if (!Number.isFinite(activeSeconds) || activeSeconds < 0) {
+      throw new BadRequestException('activeSeconds >= 0 bo‘lishi kerak');
+    }
+    const bounded = Math.min(60, Math.max(0, Math.floor(activeSeconds)));
+
+    // Dars huquqini tekshirish (updateProgress bilan bir xil)
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+      select: { id: true, courseId: true, course: { select: { isPublished: true } } },
+    });
+    if (!lesson || !lesson.course.isPublished) throw new NotFoundException('Dars topilmadi');
+    const member = await this.prisma.groupMember.findUnique({
+      where: { studentId: actor.id },
+      select: { groupId: true, group: { select: { isActive: true } } },
+    });
+    if (!member || !member.group.isActive) throw new NotFoundException('Dars topilmadi');
+    const link = await this.prisma.courseGroup.findUnique({
+      where: { courseId_groupId: { courseId: lesson.courseId, groupId: member.groupId } },
+      select: { courseId: true },
+    });
+    if (!link) throw new NotFoundException('Dars topilmadi');
+
+    const now = new Date();
+
+    // LessonProgress yangilash (viewCount, timeSpentSec, lastPosition)
+    await this.prisma.lessonProgress.upsert({
+      where: { studentId_lessonId: { studentId: actor.id, lessonId } },
+      create: {
+        id: uuidv7(),
+        studentId: actor.id,
+        lessonId,
+        completedAt: null,
+        firstViewedAt: now,
+        lastViewedAt: now,
+        viewCount: 1,
+        timeSpentSec: bounded,
+        lastPosition: position ?? 0,
+      },
+      update: {
+        lastViewedAt: now,
+        timeSpentSec: { increment: bounded },
+        ...(position !== undefined ? { lastPosition: position } : {}),
+      },
+    });
+
+    // StudyEvent (heartbeat)
+    await this.prisma.studyEvent.create({
+      data: {
+        id: uuidv7(),
+        studentId: actor.id,
+        type: 'LESSON_HEARTBEAT',
+        refId: lessonId,
+        meta: { activeSeconds: bounded, position: position ?? null } as Prisma.InputJsonValue,
+        at: now,
+      },
+    });
+
+    return { ok: true, addedSeconds: bounded };
+  }
+
+  /**
+   * Talabaning umumiy ko'rinishi — statistika + so'nggi faollik + xavf belgisi.
+   * L15/L16: lastActivityAt endi lastViewedAt'ni ham hisobga oladi.
+   */
+  async studentOverview(studentId: string, actor: Actor) {
+    const stats = await this.studentStats(studentId, actor);
+    const lastView = await this.prisma.lessonProgress.aggregate({
+      where: { studentId },
+      _max: { lastViewedAt: true },
+    });
+    const totalTime = await this.prisma.lessonProgress.aggregate({
+      where: { studentId },
+      _sum: { timeSpentSec: true },
+    });
+    // So'nggi 7 kun faollik
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
+    const events = await this.prisma.studyEvent.groupBy({
+      by: ['type'],
+      where: { studentId, at: { gte: sevenDaysAgo } },
+      _count: true,
+    });
+    const activityCounts: Record<string, number> = {};
+    for (const e of events) {
+      activityCounts[e.type] = e._count;
+    }
+    const combinedLastActivity = Math.max(
+      lastView._max.lastViewedAt?.getTime() ?? 0,
+      stats.lastActivityAt ? new Date(stats.lastActivityAt).getTime() : 0,
+    );
+    const risks: string[] = [];
+    if (combinedLastActivity && Date.now() - combinedLastActivity > 7 * 86_400_000) {
+      risks.push('inactive_7d');
+    }
+    if (
+      stats.assignmentsAverageScore !== null &&
+      stats.assignmentsAverageScore < 50
+    ) {
+      risks.push('low_avg_score');
+    }
+    const now = Date.now();
+    const overdueCount = await this.prisma.assignment.count({
+      where: {
+        group: { members: { some: { studentId } } },
+        dueAt: { lt: new Date(now) },
+        submissions: { none: { studentId } },
+      },
+    });
+    if (overdueCount >= 2) risks.push('overdue_2plus');
+
+    return {
+      ...stats,
+      totalStudyTimeSec: totalTime._sum.timeSpentSec ?? 0,
+      lastActivityAt: combinedLastActivity ? new Date(combinedLastActivity).toISOString() : null,
+      weeklyActivity: activityCounts,
+      overdueAssignments: overdueCount,
+      risks,
+    };
+  }
+
+  async studentTimeline(studentId: string, actor: Actor, from?: Date, to?: Date) {
+    // Access tekshiruv studentStats bilan bir xil (yangi ichida chaqirmaymiz, tekshirilsin)
+    if (this.isStudent(actor) && actor.id !== studentId) {
+      throw new ForbiddenException('Boshqa talaba timeline’ini ko‘ra olmaysiz');
+    }
+    if (this.isTeacher(actor)) {
+      const member = await this.prisma.groupMember.findUnique({
+        where: { studentId },
+        include: { group: { select: { teacherId: true } } },
+      });
+      const student = await this.prisma.user.findUnique({
+        where: { id: studentId },
+        select: { createdById: true },
+      });
+      const owns =
+        student?.createdById === actor.id || member?.group.teacherId === actor.id;
+      if (!owns) throw new ForbiddenException('Bu talaba sizga tegishli emas');
+    }
+    const rows = await this.prisma.studyEvent.findMany({
+      where: {
+        studentId,
+        ...(from ? { at: { gte: from } } : {}),
+        ...(to ? { at: { lte: to } } : {}),
+      },
+      orderBy: { at: 'desc' },
+      take: 200,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      type: r.type,
+      refId: r.refId,
+      meta: r.meta,
+      at: r.at.toISOString(),
+    }));
+  }
+
+  /**
+   * L15: guruh statistikasi — bitta agregat so'rov; `pendingSubmissions`
+   * faqat shu guruh topshiriqlari bo'yicha; talabalar kesimidagi jadval.
+   */
+  async groupStudents(groupId: string, actor: Actor) {
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+      select: { teacherId: true },
+    });
+    if (!group) throw new NotFoundException('Guruh topilmadi');
+    if (!this.isSuperAdmin(actor) && group.teacherId !== actor.id) {
+      throw new ForbiddenException('Bu guruh statistikasini ko‘ra olmaysiz');
+    }
+    const members = await this.prisma.groupMember.findMany({
+      where: { groupId },
+      include: {
+        student: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+    });
+    const result = [];
+    for (const m of members) {
+      const stats = await this.studentOverview(m.studentId, actor);
+      result.push({
+        student: m.student,
+        progressPercent: stats.progressPercent,
+        quizzesAverageScore: stats.quizzesAverageScore,
+        assignmentsAverageScore: stats.assignmentsAverageScore,
+        lastActivityAt: stats.lastActivityAt,
+        totalStudyTimeSec: stats.totalStudyTimeSec,
+        overdueAssignments: stats.overdueAssignments,
+        risks: stats.risks,
+      });
+    }
+    return result;
+  }
+
+  // -------------------------------------------------------------
   // LessonProgress
   // -------------------------------------------------------------
 
@@ -1197,9 +1405,15 @@ export class LmsService {
             }, 0) / graded.length,
           );
 
+    // L16: dars ko'rishlar (lastViewedAt) ham hisobga olinadi
+    const lastView = await this.prisma.lessonProgress.aggregate({
+      where: { studentId },
+      _max: { lastViewedAt: true },
+    });
     const latestActivity = [
       ...quizSubs.map((q) => q.submittedAt?.getTime() ?? 0),
       ...asSubs.map((a) => (a.gradedAt ?? a.submittedAt)?.getTime() ?? 0),
+      lastView._max.lastViewedAt?.getTime() ?? 0,
     ].reduce((m, t) => Math.max(m, t), 0);
 
     return {
@@ -1249,10 +1463,12 @@ export class LmsService {
     const avgQuizScore =
       scores.length === 0 ? null : Math.round(scores.reduce((s, x) => s + x, 0) / scores.length);
 
+    // L15: faqat SHU guruh topshiriqlari bo'yicha hisoblanadi
     const pendingSubmissions = await this.prisma.assignmentSubmission.count({
       where: {
         studentId: { in: studentIds },
         status: AssignmentSubmissionStatus.SUBMITTED,
+        assignment: { groupId },
       },
     });
 

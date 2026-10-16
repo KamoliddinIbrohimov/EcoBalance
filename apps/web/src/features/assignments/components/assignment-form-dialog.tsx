@@ -74,10 +74,13 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
       }
       return assignmentsApi.create({
         groupId,
+        kind: 'TASK',
         titleUz: titleUz.trim(),
         descriptionUz: descriptionUz.trim() || null,
         dueAt: due as unknown as Date | null,
         maxScore: score,
+        allowLate: false,
+        latePenaltyPercent: 0,
       });
     },
     onSuccess: () => {

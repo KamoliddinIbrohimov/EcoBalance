@@ -237,6 +237,18 @@ export class LessonProgressController {
   async myProgress(@CurrentUser() user: AuthenticatedUser) {
     return this.lms.myProgress(asActor(user));
   }
+
+  @Post(':id/heartbeat')
+  @RequirePermissions(PERMISSION.STATS_READ_OWN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'F5 (2.C): dars sahifasida qolgan vaqtni jo‘natish (max 60s)' })
+  async heartbeat(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) lessonId: string,
+    @Body() body: { activeSeconds: number; position?: number },
+  ) {
+    return this.lms.heartbeat(lessonId, body.activeSeconds, body.position, asActor(user));
+  }
 }
 
 @ApiTags('LMS - Statistics')
@@ -271,5 +283,42 @@ export class StatsController {
     @Param('id', new ParseUUIDPipe()) id: string,
   ) {
     return this.lms.groupStats(id, asActor(user));
+  }
+
+  @Get('groups/:id/students')
+  @RequirePermissions(PERMISSION.STATS_READ_OWN)
+  @ApiOperation({ summary: 'Guruh talabalari kesimida statistika jadvali' })
+  async groupStudents(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.lms.groupStudents(id, asActor(user));
+  }
+
+  @Get('students/:id/overview')
+  @RequirePermissions(PERMISSION.STATS_READ_OWN)
+  @ApiOperation({ summary: 'Talaba to‘liq ko‘rinishi (progress + risk + weekly)' })
+  async studentOverview(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.lms.studentOverview(id, asActor(user));
+  }
+
+  @Get('students/:id/timeline')
+  @RequirePermissions(PERMISSION.STATS_READ_OWN)
+  @ApiOperation({ summary: 'Talaba study events timeline (so‘nggi 200)' })
+  async studentTimeline(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.lms.studentTimeline(
+      id,
+      asActor(user),
+      from ? new Date(from) : undefined,
+      to ? new Date(to) : undefined,
+    );
   }
 }
