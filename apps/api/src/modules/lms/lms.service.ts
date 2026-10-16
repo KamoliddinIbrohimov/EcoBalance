@@ -35,13 +35,22 @@ const ASSIGNMENT_SELECT = {
   id: true,
   courseId: true,
   lessonId: true,
+  moduleId: true,
   groupId: true,
   createdById: true,
+  kind: true,
   titleUz: true,
   descriptionUz: true,
   dueAt: true,
   maxScore: true,
   attachmentKey: true,
+  attachmentFileName: true,
+  allowLate: true,
+  latePenaltyPercent: true,
+  startsAt: true,
+  endsAt: true,
+  timeLimitMinutes: true,
+  quizId: true,
   createdAt: true,
   updatedAt: true,
   _count: { select: { submissions: true } },
@@ -54,13 +63,22 @@ function toAssignmentDto(r: AssignmentRow): AssignmentDto {
     id: r.id,
     courseId: r.courseId,
     lessonId: r.lessonId,
+    moduleId: r.moduleId,
     groupId: r.groupId,
     createdById: r.createdById,
+    kind: r.kind,
     titleUz: r.titleUz,
     descriptionUz: r.descriptionUz,
     dueAt: r.dueAt?.toISOString() ?? null,
     maxScore: r.maxScore,
     attachmentKey: r.attachmentKey,
+    attachmentFileName: r.attachmentFileName,
+    allowLate: r.allowLate,
+    latePenaltyPercent: r.latePenaltyPercent,
+    startsAt: r.startsAt?.toISOString() ?? null,
+    endsAt: r.endsAt?.toISOString() ?? null,
+    timeLimitMinutes: r.timeLimitMinutes,
+    quizId: r.quizId,
     submissionCount: r._count.submissions,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
@@ -80,6 +98,10 @@ const SUBMISSION_SELECT = {
   gradedById: true,
   gradedAt: true,
   status: true,
+  attempt: true,
+  attemptStartedAt: true,
+  attemptDeadline: true,
+  isLate: true,
 } satisfies Prisma.AssignmentSubmissionSelect;
 
 type SubmissionRow = Prisma.AssignmentSubmissionGetPayload<{ select: typeof SUBMISSION_SELECT }>;
@@ -98,6 +120,10 @@ function toSubmissionDto(r: SubmissionRow): AssignmentSubmissionDto {
     gradedById: r.gradedById,
     gradedAt: r.gradedAt?.toISOString() ?? null,
     status: r.status,
+    attempt: r.attempt,
+    attemptStartedAt: r.attemptStartedAt?.toISOString() ?? null,
+    attemptDeadline: r.attemptDeadline?.toISOString() ?? null,
+    isLate: r.isLate,
   };
 }
 
@@ -414,36 +440,77 @@ export class LmsService {
     const text = input.textUz?.trim();
     if (!text) throw new BadRequestException('Matn kiritilmagan (fayl yuklash alohida endpointda)');
 
-    // Mavjud bo'lsa — tahrir ruxsat etiladi FAQAT status=SUBMITTED bo'lsa.
-    // GRADED/RETURNED bo'lsa — qayta topshirishga ruxsat yo'q (ustoz baholab bo'lgan).
+    // L8: holatlar:
+    //  - SUBMITTED  → qayta tahrir ruxsat etiladi (ustoz hali baholamagan)
+    //  - RETURNED   → qayta topshirish RUXSAT etiladi (attempt +1, oldingi revision'ga saqlanadi)
+    //  - GRADED     → rad etiladi (ustoz baholab bo'lgan, qayta ochish uchun UI alohida)
+    //  - PENDING_REVIEW → rad (ustoz tomonidan qayta ko'rib chiqilmoqda)
     const existing = await this.prisma.assignmentSubmission.findUnique({
       where: { assignmentId_studentId: { assignmentId, studentId: actor.id } },
     });
-    if (existing && existing.status !== AssignmentSubmissionStatus.SUBMITTED) {
-      throw new BadRequestException(
-        'Topshiriq baholangandan keyin qayta topshirib bo‘lmaydi',
-      );
+    if (existing && existing.status === AssignmentSubmissionStatus.GRADED) {
+      throw new BadRequestException('Topshiriq baholangandan keyin qayta topshirib bo‘lmaydi');
+    }
+    if (existing && existing.status === AssignmentSubmissionStatus.PENDING_REVIEW) {
+      throw new BadRequestException("Topshiriq o'qituvchi ko'rib chiqishida");
     }
 
-    const row = existing
-      ? await this.prisma.assignmentSubmission.update({
-          where: { id: existing.id },
-          data: {
-            textUz: text,
-            submittedAt: new Date(),
-            status: AssignmentSubmissionStatus.SUBMITTED,
-          },
-          select: SUBMISSION_SELECT,
-        })
-      : await this.prisma.assignmentSubmission.create({
-          data: {
-            id: uuidv7(),
-            assignmentId,
-            studentId: actor.id,
-            textUz: text,
-          },
-          select: SUBMISSION_SELECT,
-        });
+    let row;
+    if (!existing) {
+      row = await this.prisma.assignmentSubmission.create({
+        data: {
+          id: uuidv7(),
+          assignmentId,
+          studentId: actor.id,
+          textUz: text,
+          attempt: 1,
+        },
+        select: SUBMISSION_SELECT,
+      });
+    } else if (existing.status === AssignmentSubmissionStatus.RETURNED) {
+      // Oldingi javobni revision'ga saqlaymiz
+      await this.prisma.assignmentSubmissionRevision.create({
+        data: {
+          id: uuidv7(),
+          submissionId: existing.id,
+          attempt: existing.attempt,
+          textUz: existing.textUz,
+          fileKey: existing.fileKey,
+          fileName: existing.fileName,
+          submittedAt: existing.submittedAt,
+          score: existing.score,
+          feedbackUz: existing.feedbackUz,
+          gradedById: existing.gradedById,
+          gradedAt: existing.gradedAt,
+          status: existing.status,
+        },
+      });
+      row = await this.prisma.assignmentSubmission.update({
+        where: { id: existing.id },
+        data: {
+          textUz: text,
+          submittedAt: new Date(),
+          status: AssignmentSubmissionStatus.SUBMITTED,
+          attempt: existing.attempt + 1,
+          score: null,
+          feedbackUz: null,
+          gradedAt: null,
+          gradedById: null,
+        },
+        select: SUBMISSION_SELECT,
+      });
+    } else {
+      // SUBMITTED — tahrir
+      row = await this.prisma.assignmentSubmission.update({
+        where: { id: existing.id },
+        data: {
+          textUz: text,
+          submittedAt: new Date(),
+          status: AssignmentSubmissionStatus.SUBMITTED,
+        },
+        select: SUBMISSION_SELECT,
+      });
+    }
 
     const teacherId = assignment.group.teacherId;
     const targets = Array.from(
@@ -517,6 +584,49 @@ export class LmsService {
       data: { assignmentId: a.id, submissionId, score: input.score, maxScore: a.maxScore },
     });
 
+    return toSubmissionDto(row);
+  }
+
+  /**
+   * L8: o'qituvchi baholangan topshiriqni "qayta ochadi" — status RETURNED
+   * bo'ladi, talaba qayta topshira oladi (attempt +1 submit paytida).
+   */
+  async reopenSubmission(submissionId: string, feedback: string | undefined, actor: Actor): Promise<AssignmentSubmissionDto> {
+    const existing = await this.prisma.assignmentSubmission.findUnique({
+      where: { id: submissionId },
+      select: {
+        id: true,
+        studentId: true,
+        status: true,
+        assignment: {
+          select: {
+            id: true,
+            titleUz: true,
+            createdById: true,
+            group: { select: { teacherId: true } },
+          },
+        },
+      },
+    });
+    if (!existing) throw new NotFoundException('Topshiriq topilmadi');
+    const a = existing.assignment;
+    if (!this.isSuperAdmin(actor) && a.createdById !== actor.id && a.group.teacherId !== actor.id) {
+      throw new ForbiddenException("Bu topshiriqni qayta ochish huquqingiz yo'q");
+    }
+    const row = await this.prisma.assignmentSubmission.update({
+      where: { id: submissionId },
+      data: {
+        status: AssignmentSubmissionStatus.RETURNED,
+        feedbackUz: feedback?.trim() ?? null,
+      },
+      select: SUBMISSION_SELECT,
+    });
+    await this.notifications.notifyUsers([existing.studentId], {
+      type: 'assignment.reopened',
+      titleUz: 'Topshiriq qaytarildi',
+      bodyUz: `"${a.titleUz}" topshirig‘i qayta ko‘rib chiqish uchun qaytarildi`,
+      data: { assignmentId: a.id, submissionId },
+    });
     return toSubmissionDto(row);
   }
 
@@ -689,10 +799,19 @@ export class LmsService {
         ? 0
         : Math.min(100, Math.round((lessonsCompleted / lessonsTotal) * 100));
 
-    const quizSubs = await this.prisma.quizSubmission.findMany({
+    // L13: noyob testlar bo'yicha (bitta testni 2 marta topshirgan talaba
+    // "1" ko'rinadi); eng oxirgi urinish o'rtacha ballda hisobga olinadi.
+    const allQuizSubs = await this.prisma.quizSubmission.findMany({
       where: { userId: studentId, status: 'SUBMITTED' },
-      select: { scorePercent: true, passed: true, submittedAt: true },
+      select: { quizId: true, scorePercent: true, passed: true, submittedAt: true },
+      orderBy: { submittedAt: 'desc' },
     });
+    // Noyob quizId -> eng oxirgi urinish
+    const latestByQuiz = new Map<string, (typeof allQuizSubs)[number]>();
+    for (const q of allQuizSubs) {
+      if (!latestByQuiz.has(q.quizId)) latestByQuiz.set(q.quizId, q);
+    }
+    const quizSubs = Array.from(latestByQuiz.values());
     const quizzesTaken = quizSubs.length;
     const quizzesPassed = quizSubs.filter((q) => q.passed).length;
     const scored = quizSubs.filter((q) => q.scorePercent !== null);

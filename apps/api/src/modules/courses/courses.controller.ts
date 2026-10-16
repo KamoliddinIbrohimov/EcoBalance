@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -75,6 +76,24 @@ export class CoursesController {
     return this.courses.listLessonsByCourse(id, actor.roles, actor.id);
   }
 
+  @Put(':id/lessons/order')
+  @RequirePermissions(PERMISSION.LESSONS_MANAGE)
+  @ApiOperation({ summary: 'Darslar tartibini bir yo‘la qayta tartiblash' })
+  async reorderLessons(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() body: { lessonIds: string[] },
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() req: Request,
+    @Ip() ip: string,
+  ) {
+    return this.courses.reorderLessons(
+      id,
+      body.lessonIds,
+      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
+      actor.roles,
+    );
+  }
+
   @Post()
   @RequirePermissions(PERMISSION.COURSES_CREATE)
   @HttpCode(HttpStatus.CREATED)
@@ -86,6 +105,23 @@ export class CoursesController {
     @Ip() ip: string,
   ) {
     return this.courses.createCourse(dto, { actorId, ip, userAgent: req.headers['user-agent'] });
+  }
+
+  @Post(':id/clone')
+  @RequirePermissions(PERMISSION.COURSES_CREATE)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Kursni nusxalash (LIBRARY yoki o‘z kurs)' })
+  async clone(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() req: Request,
+    @Ip() ip: string,
+  ) {
+    return this.courses.cloneCourse(
+      id,
+      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
+      actor.roles,
+    );
   }
 
   @Patch(':id')
@@ -184,17 +220,26 @@ export class LessonsController {
 
   @Delete(':id')
   @RequirePermissions(PERMISSION.LESSONS_MANAGE)
-  @ApiOperation({ summary: 'Darsni o‘chirish' })
+  @ApiOperation({ summary: 'Darsni arxivlash (?hard=true bilan to‘liq o‘chirish)' })
   async remove(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
     @Ip() ip: string,
+    @Query('hard') hard?: string,
   ) {
     return this.courses.removeLesson(
       id,
       { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
       actor.roles,
+      hard === 'true',
     );
+  }
+
+  @Get(':id/removal-impact')
+  @RequirePermissions(PERMISSION.LESSONS_MANAGE)
+  @ApiOperation({ summary: 'Darsni o‘chirish ta‘sir hisoboti' })
+  async removalImpact(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.courses.lessonRemovalImpact(id);
   }
 }

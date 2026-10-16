@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -35,6 +36,8 @@ const COURSE_SELECT = {
   descriptionUz: true,
   educationLevel: true,
   isPublished: true,
+  visibility: true,
+  ownerId: true,
   createdAt: true,
   updatedAt: true,
   _count: { select: { lessons: true } },
@@ -50,6 +53,8 @@ function toCourseDto(row: CourseRow): CourseDto {
     descriptionUz: row.descriptionUz,
     educationLevel: row.educationLevel,
     isPublished: row.isPublished,
+    visibility: row.visibility,
+    ownerId: row.ownerId,
     lessonsCount: row._count.lessons,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -59,6 +64,7 @@ function toCourseDto(row: CourseRow): CourseDto {
 const LESSON_SELECT = {
   id: true,
   courseId: true,
+  moduleId: true,
   orderIndex: true,
   lessonType: true,
   titleUz: true,
@@ -66,6 +72,9 @@ const LESSON_SELECT = {
   equipmentUz: true,
   theoryUz: true,
   procedureUz: true,
+  isPublished: true,
+  archivedAt: true,
+  estimatedMinutes: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.LessonSelect;
@@ -79,6 +88,7 @@ function toLessonDto(row: LessonRow): LessonDto {
   return {
     id: row.id,
     courseId: row.courseId,
+    moduleId: row.moduleId,
     orderIndex: row.orderIndex,
     lessonType: row.lessonType,
     titleUz: row.titleUz,
@@ -86,6 +96,9 @@ function toLessonDto(row: LessonRow): LessonDto {
     equipmentUz: row.equipmentUz,
     theoryUz: row.theoryUz,
     procedureUz: procedure,
+    isPublished: row.isPublished,
+    archivedAt: row.archivedAt?.toISOString() ?? null,
+    estimatedMinutes: row.estimatedMinutes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -231,6 +244,7 @@ export class CoursesService {
         descriptionUz: dto.descriptionUz?.trim() ?? null,
         educationLevel: dto.educationLevel,
         isPublished: dto.isPublished ?? false,
+        visibility: dto.visibility ?? 'PRIVATE',
         // 3-rol LMS: kurs egasi = yaratgan user (TEACHER o'ziniki; SA uchun ham egalik beriladi).
         ownerId: ctx.actorId ?? null,
       },
@@ -284,6 +298,7 @@ export class CoursesService {
           : {}),
         ...(dto.educationLevel !== undefined ? { educationLevel: dto.educationLevel } : {}),
         ...(dto.isPublished !== undefined ? { isPublished: dto.isPublished } : {}),
+        ...(dto.visibility !== undefined ? { visibility: dto.visibility } : {}),
       },
       select: COURSE_SELECT,
     });
@@ -299,6 +314,127 @@ export class CoursesService {
     });
 
     return toCourseDto(row);
+  }
+
+  /**
+   * L4: kursni "nusxa olish" — ownerId=actor, visibility=PRIVATE, slug="orig-copy".
+   * Darslar, modullar, materiallar nusxalanadi. Testlar — alohida (ownership).
+   */
+  async cloneCourse(sourceId: string, ctx: RequestContext, actorRoles: string[] = []): Promise<CourseDto> {
+    const src = await this.prisma.course.findUnique({
+      where: { id: sourceId },
+      include: {
+        lessons: true,
+        modules: true,
+        materials: true,
+      },
+    });
+    if (!src) throw new NotFoundException('Kurs topilmadi');
+
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+    const isOwner = src.ownerId === ctx.actorId;
+    const isLibrary = src.visibility === 'LIBRARY';
+    if (!isSuperAdmin && !isOwner && !isLibrary) {
+      throw new ForbiddenException("Faqat o'z yoki kutubxona kursini nusxalashingiz mumkin");
+    }
+
+    // slug unikal: "orig-copy", "orig-copy-2", ...
+    const base = `${src.slug}-copy`;
+    let slug = base;
+    for (let i = 2; ; i++) {
+      const clash = await this.prisma.course.findUnique({ where: { slug } });
+      if (!clash) break;
+      slug = `${base}-${i}`;
+      if (i > 100) throw new ConflictException('Nusxalash uchun slug topilmadi');
+    }
+
+    const newCourseId = uuidv7();
+    const moduleIdMap = new Map<string, string>();
+    const lessonIdMap = new Map<string, string>();
+
+    const newCourse = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.course.create({
+        data: {
+          id: newCourseId,
+          slug,
+          nameUz: `${src.nameUz} (nusxa)`,
+          descriptionUz: src.descriptionUz,
+          educationLevel: src.educationLevel,
+          isPublished: false,
+          visibility: 'PRIVATE',
+          ownerId: ctx.actorId ?? null,
+        },
+        select: COURSE_SELECT,
+      });
+
+      // Modullar
+      for (const m of src.modules) {
+        const newId = uuidv7();
+        moduleIdMap.set(m.id, newId);
+        await tx.module.create({
+          data: {
+            id: newId,
+            courseId: newCourseId,
+            orderIndex: m.orderIndex,
+            titleUz: m.titleUz,
+            descriptionUz: m.descriptionUz,
+            isPublished: m.isPublished,
+          },
+        });
+      }
+      // Darslar
+      for (const l of src.lessons) {
+        const newId = uuidv7();
+        lessonIdMap.set(l.id, newId);
+        await tx.lesson.create({
+          data: {
+            id: newId,
+            courseId: newCourseId,
+            moduleId: l.moduleId ? (moduleIdMap.get(l.moduleId) ?? null) : null,
+            orderIndex: l.orderIndex,
+            lessonType: l.lessonType,
+            titleUz: l.titleUz,
+            objectiveUz: l.objectiveUz,
+            equipmentUz: l.equipmentUz,
+            theoryUz: l.theoryUz,
+            procedureUz: l.procedureUz as Prisma.InputJsonValue,
+            isPublished: l.isPublished,
+            estimatedMinutes: l.estimatedMinutes,
+          },
+        });
+      }
+      // Materiallar — storageKey yangi obyektga nusxalash o'rniga reference qolsa oson.
+      // Hozircha metadata nusxalaymiz (fayl o'zi bir xil manzilda qoladi).
+      for (const mat of src.materials) {
+        await tx.courseMaterial.create({
+          data: {
+            id: uuidv7(),
+            courseId: newCourseId,
+            lessonId: mat.lessonId ? (lessonIdMap.get(mat.lessonId) ?? null) : null,
+            fileName: mat.fileName,
+            storageKey: `${mat.storageKey}#copy-${newCourseId}`,
+            mimeType: mat.mimeType,
+            sizeBytes: mat.sizeBytes,
+            uploadedBy: ctx.actorId ?? null,
+            contentText: mat.contentText,
+          },
+        });
+      }
+
+      return created;
+    });
+
+    await this.audit.record({
+      userId: ctx.actorId,
+      action: AuditAction.CREATE,
+      subjectType: 'Course',
+      subjectId: newCourse.id,
+      changes: { clonedFrom: sourceId } as Prisma.InputJsonValue,
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent,
+    });
+
+    return toCourseDto(newCourse);
   }
 
   async removeCourse(id: string, ctx: RequestContext, actorRoles: string[] = []) {
@@ -351,6 +487,8 @@ export class CoursesService {
         ? { titleUz: { contains: search, mode: 'insensitive' as const } }
         : {}),
       ...(studentCourseIds ? { courseId: { in: studentCourseIds } } : {}),
+      // STUDENT: faqat PUBLISHED va arxivlanmagan darslar
+      ...(isStudent ? { isPublished: true, archivedAt: null } : {}),
     };
 
     const [total, rows] = await this.prisma.$transaction([
@@ -385,7 +523,10 @@ export class CoursesService {
       await this.assertStudentCanSeeCourse(courseId, actorId);
     }
     const rows = await this.prisma.lesson.findMany({
-      where: { courseId },
+      where: {
+        courseId,
+        ...(isStudent ? { isPublished: true, archivedAt: null } : {}),
+      },
       select: LESSON_SELECT,
       orderBy: { orderIndex: 'asc' },
     });
@@ -408,10 +549,62 @@ export class CoursesService {
     const isStudent = !actorRoles.includes('SUPER_ADMIN') && !actorRoles.includes('TEACHER');
     if (isStudent) {
       if (!row.course.isPublished) throw new NotFoundException('Dars topilmadi');
+      if (!row.isPublished || row.archivedAt) throw new NotFoundException('Dars topilmadi');
       await this.assertStudentCanSeeCourse(row.course.id, actorId);
+      // F3 (2.A): dars talaba guruhida ochilgan bo'lishi kerak
+      await this.assertStudentCanAccessLesson(id, actorId);
     }
     const { isPublished: _ignored, ...course } = row.course;
     return { ...toLessonDto(row), course };
+  }
+
+  /**
+   * F3 (2.A): talaba darsni ko'rishi uchun GroupLessonRelease OPEN bo'lishi
+   * yoki opensAt <= now bo'lishi, SCHEDULED bo'lsa. LOCKED — 404.
+   * Dars uchun release yo'q bo'lsa — modul darajasida qidiramiz.
+   * Hech biri bo'lmasa — dars DEFAULT ochiq (asosiy oqim).
+   */
+  private async assertStudentCanAccessLesson(lessonId: string, actorId?: string): Promise<void> {
+    if (!actorId) throw new NotFoundException('Dars topilmadi');
+    const member = await this.prisma.groupMember.findUnique({
+      where: { studentId: actorId },
+      select: { groupId: true },
+    });
+    if (!member) throw new NotFoundException('Dars topilmadi');
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+      select: { moduleId: true },
+    });
+    const now = new Date();
+    // Dars uchun release
+    const lessonRelease = await this.prisma.groupLessonRelease.findFirst({
+      where: { groupId: member.groupId, lessonId },
+    });
+    if (lessonRelease) {
+      if (
+        lessonRelease.status === 'OPEN' ||
+        (lessonRelease.opensAt && lessonRelease.opensAt.getTime() <= now.getTime())
+      ) {
+        return;
+      }
+      throw new NotFoundException('Dars hali ochilmagan');
+    }
+    // Modul uchun release
+    if (lesson?.moduleId) {
+      const moduleRelease = await this.prisma.groupLessonRelease.findFirst({
+        where: { groupId: member.groupId, moduleId: lesson.moduleId },
+      });
+      if (moduleRelease) {
+        if (
+          moduleRelease.status === 'OPEN' ||
+          (moduleRelease.opensAt && moduleRelease.opensAt.getTime() <= now.getTime())
+        ) {
+          return;
+        }
+        throw new NotFoundException('Dars hali ochilmagan');
+      }
+    }
+    // Release yo'q — ochiq, standart oqim
   }
 
   /**
@@ -461,6 +654,7 @@ export class CoursesService {
       data: {
         id: uuidv7(),
         courseId: dto.courseId,
+        moduleId: dto.moduleId ?? null,
         orderIndex: dto.orderIndex,
         lessonType: dto.lessonType,
         titleUz: dto.titleUz.trim(),
@@ -468,6 +662,8 @@ export class CoursesService {
         equipmentUz: dto.equipmentUz?.trim() ?? null,
         theoryUz: dto.theoryUz?.trim() ?? null,
         procedureUz: (dto.procedureUz ?? []) as Prisma.InputJsonValue,
+        isPublished: dto.isPublished ?? true,
+        estimatedMinutes: dto.estimatedMinutes ?? null,
       },
       select: LESSON_SELECT,
     });
@@ -558,6 +754,9 @@ export class CoursesService {
         ...(dto.procedureUz !== undefined
           ? { procedureUz: dto.procedureUz as Prisma.InputJsonValue }
           : {}),
+        ...(dto.moduleId !== undefined ? { moduleId: dto.moduleId ?? null } : {}),
+        ...(dto.isPublished !== undefined ? { isPublished: dto.isPublished } : {}),
+        ...(dto.estimatedMinutes !== undefined ? { estimatedMinutes: dto.estimatedMinutes ?? null } : {}),
       },
       select: LESSON_SELECT,
     });
@@ -575,7 +774,98 @@ export class CoursesService {
     return toLessonDto(row);
   }
 
-  async removeLesson(id: string, ctx: RequestContext, actorRoles: string[] = []) {
+  /**
+   * L11: darsni o'chirish ta'sir hisobotini qaytaradi (talaba progressi,
+   * biriktirilgan topshiriqlar va testlar soni). Haqiqiy o'chirish uchun
+   * removeLesson() chaqiring. UI shu hisobotni ko'rsatib tasdiqlashi kerak.
+   */
+  async lessonRemovalImpact(id: string): Promise<{
+    lessonId: string;
+    completedProgressCount: number;
+    assignmentCount: number;
+    quizCount: number;
+    materialCount: number;
+  }> {
+    const [completed, assignments, quizzes, materials] = await this.prisma.$transaction([
+      this.prisma.lessonProgress.count({
+        where: { lessonId: id, completedAt: { not: null } },
+      }),
+      this.prisma.assignment.count({ where: { lessonId: id } }),
+      this.prisma.quiz.count({ where: { lessonId: id } }),
+      this.prisma.courseMaterial.count({ where: { lessonId: id } }),
+    ]);
+    return {
+      lessonId: id,
+      completedProgressCount: completed,
+      assignmentCount: assignments,
+      quizCount: quizzes,
+      materialCount: materials,
+    };
+  }
+
+  /**
+   * L11: darslarni qayta tartiblash — unikal constraint muammosini chetlab
+   * o'tish uchun bitta tranzaksiyada vaqtincha salbiy indekslarga ko'chirib,
+   * so'ngra yakuniy indekslarga qo'yadi.
+   */
+  async reorderLessons(
+    courseId: string,
+    lessonIds: string[],
+    ctx: RequestContext,
+    actorRoles: string[] = [],
+  ): Promise<LessonDto[]> {
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { ownerId: true },
+    });
+    if (!course) throw new NotFoundException('Kurs topilmadi');
+    const isSA = actorRoles.includes('SUPER_ADMIN');
+    if (!isSA && course.ownerId !== ctx.actorId) {
+      throw new ForbiddenException("Faqat o'z kursingiz darslarini qayta tartiblashingiz mumkin");
+    }
+    const lessons = await this.prisma.lesson.findMany({
+      where: { courseId, id: { in: lessonIds } },
+      select: { id: true },
+    });
+    if (lessons.length !== lessonIds.length) {
+      throw new BadRequestException("Dars id'lari to'liq emas yoki boshqa kursga tegishli");
+    }
+    await this.prisma.$transaction(async (tx) => {
+      // Vaqtincha salbiy indekslarga ko'chirish (unikal cheklov buzilmasin uchun)
+      for (let i = 0; i < lessonIds.length; i++) {
+        await tx.lesson.update({
+          where: { id: lessonIds[i] },
+          data: { orderIndex: -(i + 1) },
+        });
+      }
+      // Yakuniy indekslar
+      for (let i = 0; i < lessonIds.length; i++) {
+        await tx.lesson.update({
+          where: { id: lessonIds[i] },
+          data: { orderIndex: i },
+        });
+      }
+    });
+
+    await this.audit.record({
+      userId: ctx.actorId,
+      action: AuditAction.UPDATE,
+      subjectType: 'Course',
+      subjectId: courseId,
+      changes: { reorder: lessonIds } as Prisma.InputJsonValue,
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent,
+    });
+
+    const rows = await this.prisma.lesson.findMany({
+      where: { courseId },
+      select: LESSON_SELECT,
+      orderBy: { orderIndex: 'asc' },
+    });
+    return rows.map(toLessonDto);
+  }
+
+  async removeLesson(id: string, ctx: RequestContext, actorRoles: string[] = [], hardDelete = false) {
     const existing = await this.prisma.lesson.findUnique({
       where: { id },
       include: { course: { select: { ownerId: true } } },
@@ -585,6 +875,24 @@ export class CoursesService {
     const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
     if (!isSuperAdmin && existing.course.ownerId !== ctx.actorId) {
       throw new ForbiddenException('Faqat o‘z kursingiz darslarini o‘chira olasiz');
+    }
+
+    // L11: default — soft-delete (archivedAt). Haqiqiy o'chirish uchun ?hard=true.
+    if (!hardDelete) {
+      await this.prisma.lesson.update({
+        where: { id },
+        data: { archivedAt: new Date(), isPublished: false },
+      });
+      await this.audit.record({
+        userId: ctx.actorId,
+        action: AuditAction.UPDATE,
+        subjectType: 'Lesson',
+        subjectId: id,
+        changes: { archived: true } as Prisma.InputJsonValue,
+        ipAddress: ctx.ip,
+        userAgent: ctx.userAgent,
+      });
+      return { ok: true, archived: true };
     }
 
     await this.prisma.lesson.delete({ where: { id } });

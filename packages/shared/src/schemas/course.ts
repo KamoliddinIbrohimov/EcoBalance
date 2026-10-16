@@ -98,6 +98,9 @@ const educationLevelSlugField = z
   .max(60)
   .regex(/^[a-z0-9-]+$/, 'Faqat kichik lotin harflari, raqam va tire');
 
+export const CONTENT_VISIBILITY_VALUES = ['PRIVATE', 'LIBRARY'] as const;
+export const contentVisibilitySchema = z.enum(CONTENT_VISIBILITY_VALUES);
+
 export const courseSchema = z.object({
   id: z.string().uuid(),
   slug: z.string(),
@@ -105,6 +108,8 @@ export const courseSchema = z.object({
   descriptionUz: z.string().nullable(),
   educationLevel: z.string(),
   isPublished: z.boolean(),
+  visibility: contentVisibilitySchema,
+  ownerId: z.string().uuid().nullable(),
   lessonsCount: z.number().int().nonnegative(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -126,6 +131,7 @@ export const createCourseSchema = z.object({
   descriptionUz: z.string().max(4000).nullable().optional(),
   educationLevel: educationLevelSlugField,
   isPublished: z.boolean().default(false),
+  visibility: contentVisibilitySchema.default('PRIVATE'),
 });
 export type CreateCourseInput = z.infer<typeof createCourseSchema>;
 
@@ -135,6 +141,7 @@ export const updateCourseSchema = z.object({
   descriptionUz: z.string().max(4000).nullable().optional(),
   educationLevel: educationLevelSlugField.optional(),
   isPublished: z.boolean().optional(),
+  visibility: contentVisibilitySchema.optional(),
 });
 export type UpdateCourseInput = z.infer<typeof updateCourseSchema>;
 
@@ -151,6 +158,7 @@ export type CourseQuery = z.infer<typeof courseQuerySchema>;
 export const lessonSchema = z.object({
   id: z.string().uuid(),
   courseId: z.string().uuid(),
+  moduleId: z.string().uuid().nullable(),
   orderIndex: z.number().int().nonnegative(),
   lessonType: z.nativeEnum(LESSON_TYPE),
   titleUz: z.string(),
@@ -158,6 +166,9 @@ export const lessonSchema = z.object({
   equipmentUz: z.string().nullable(),
   theoryUz: z.string().nullable(),
   procedureUz: z.array(z.string()),
+  isPublished: z.boolean(),
+  archivedAt: z.string().datetime().nullable(),
+  estimatedMinutes: z.number().int().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -174,6 +185,7 @@ export type LessonWithCourseDto = z.infer<typeof lessonWithCourseSchema>;
 
 export const createLessonSchema = z.object({
   courseId: z.string().uuid(),
+  moduleId: z.string().uuid().nullable().optional(),
   orderIndex: z.coerce.number().int().min(0).max(9999),
   lessonType: z.nativeEnum(LESSON_TYPE),
   titleUz: z.string().min(2).max(255),
@@ -181,10 +193,13 @@ export const createLessonSchema = z.object({
   equipmentUz: z.string().max(2000).nullable().optional(),
   theoryUz: z.string().max(50_000).nullable().optional(),
   procedureUz: z.array(z.string().min(1).max(4000)).default([]),
+  isPublished: z.boolean().default(true),
+  estimatedMinutes: z.coerce.number().int().min(1).max(600).nullable().optional(),
 });
 export type CreateLessonInput = z.infer<typeof createLessonSchema>;
 
 export const updateLessonSchema = z.object({
+  moduleId: z.string().uuid().nullable().optional(),
   orderIndex: z.coerce.number().int().min(0).max(9999).optional(),
   lessonType: z.nativeEnum(LESSON_TYPE).optional(),
   titleUz: z.string().min(2).max(255).optional(),
@@ -192,6 +207,8 @@ export const updateLessonSchema = z.object({
   equipmentUz: z.string().max(2000).nullable().optional(),
   theoryUz: z.string().max(50_000).nullable().optional(),
   procedureUz: z.array(z.string().min(1).max(4000)).optional(),
+  isPublished: z.boolean().optional(),
+  estimatedMinutes: z.coerce.number().int().min(1).max(600).nullable().optional(),
 });
 export type UpdateLessonInput = z.infer<typeof updateLessonSchema>;
 

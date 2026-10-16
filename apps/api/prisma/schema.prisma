@@ -26,6 +26,35 @@ enum AssignmentSubmissionStatus {
   SUBMITTED
   GRADED
   RETURNED
+  PENDING_REVIEW
+}
+
+enum AssignmentKind {
+  TASK
+  TIMED
+  QUESTIONNAIRE
+}
+
+enum ContentVisibility {
+  PRIVATE
+  LIBRARY
+}
+
+enum GroupLessonReleaseStatus {
+  LOCKED
+  SCHEDULED
+  OPEN
+}
+
+enum StudyEventType {
+  LESSON_OPEN
+  LESSON_HEARTBEAT
+  LESSON_COMPLETE
+  MATERIAL_OPEN
+  QUIZ_START
+  QUIZ_SUBMIT
+  ASSIGNMENT_OPEN
+  ASSIGNMENT_SUBMIT
 }
 
 enum OrganizationType {
@@ -152,6 +181,9 @@ model User {
   createdAssignments    Assignment[]           @relation("AssignmentCreator")
   assignmentSubmissions AssignmentSubmission[] @relation("SubmissionAuthor")
   gradedSubmissions     AssignmentSubmission[] @relation("SubmissionGrader")
+  accommodations        AssignmentAccommodation[] @relation("AssignmentAccommodation")
+  studySessions         StudySession[]         @relation("StudySessionOwner")
+  studyEvents           StudyEvent[]           @relation("StudyEventOwner")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -397,7 +429,14 @@ model Course {
   ownerId String? @map("owner_id") @db.Uuid
   owner   User?   @relation("CourseOwner", fields: [ownerId], references: [id], onDelete: SetNull)
 
+  /**
+   * L4: kutubxona rejimi. LIBRARY — barcha o'qituvchilar o'z guruhiga biriktirishi
+   * mumkin (tahrir qila olmaydi); PRIVATE — faqat egasi va SA.
+   */
+  visibility ContentVisibility @default(PRIVATE)
+
   lessons     Lesson[]
+  modules     Module[]
   materials   CourseMaterial[]
   groups      CourseGroup[]
   assignments Assignment[]
@@ -408,6 +447,7 @@ model Course {
   @@index([isPublished])
   @@index([educationLevel])
   @@index([ownerId])
+  @@index([visibility])
   @@map("courses")
 }
 
@@ -435,6 +475,10 @@ model Lesson {
   courseId String @map("course_id") @db.Uuid
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
+  /// F3 (2.A): mavzu/bo'lim. Nullable — "Umumiy" modulsiz eski darslar uchun.
+  moduleId String? @map("module_id") @db.Uuid
+  module   Module? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+
   orderIndex  Int        @map("order_index") @db.SmallInt
   lessonType  LessonType @map("lesson_type")
   titleUz     String     @map("title_uz") @db.VarChar(255)
@@ -443,10 +487,19 @@ model Lesson {
   theoryUz    String?    @map("theory_uz") @db.Text
   procedureUz Json       @default("[]") @map("procedure_uz") @db.JsonB
 
+  /// L11: darsni nashr etilgan/qoralama holatida saqlash. true — talabalarga ko'rinadi
+  isPublished      Boolean   @default(true) @map("is_published")
+  /// L11: soft-delete timestamp — progress saqlanadi, lekin ro'yxatlardan yashiriladi
+  archivedAt       DateTime? @map("archived_at")
+  /// F3 (2.A): dars taxminiy davomiyligi (daqiqa) — rejalashtirish uchun
+  estimatedMinutes Int?      @map("estimated_minutes") @db.SmallInt
+
   materials   CourseMaterial[]
   quizzes     Quiz[]
   progress    LessonProgress[]
   assignments Assignment[]
+  releases    GroupLessonRelease[]
+  studySessions StudySession[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -454,7 +507,58 @@ model Lesson {
   @@unique([courseId, orderIndex], map: "lessons_course_order_unique")
   @@index([courseId])
   @@index([lessonType])
+  @@index([moduleId])
+  @@index([archivedAt])
   @@map("lessons")
+}
+
+/// F3 (2.A): kurs bo'limi / mavzusi. Dars shu modulga biriktiriladi.
+model Module {
+  id            String  @id @db.Uuid
+  courseId      String  @map("course_id") @db.Uuid
+  course        Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  orderIndex    Int     @map("order_index") @db.SmallInt
+  titleUz       String  @map("title_uz") @db.VarChar(255)
+  descriptionUz String? @map("description_uz") @db.Text
+  isPublished   Boolean @default(true) @map("is_published")
+
+  lessons  Lesson[]
+  releases GroupLessonRelease[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([courseId, orderIndex], map: "modules_course_order_unique")
+  @@index([courseId])
+  @@map("modules")
+}
+
+/// F3 (2.A): dars/mavzu ochilish rejasi. Dars yoki mavzu guruh uchun qachon
+/// ochiladi — bu yerda belgilanadi. Talaba faqat OPEN (yoki opensAt <= now)
+/// bo'lgan darsni ko'ra oladi.
+model GroupLessonRelease {
+  id       String @id @db.Uuid
+  groupId  String @map("group_id") @db.Uuid
+  group    Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  /// Dars yoki modul — birini belgilash majburiy; moduleId berilsa modul ichidagi
+  /// barcha darslar ta'sir qiladi.
+  lessonId String? @map("lesson_id") @db.Uuid
+  lesson   Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  moduleId String? @map("module_id") @db.Uuid
+  module   Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  opensAt  DateTime?                 @map("opens_at")
+  closesAt DateTime?                 @map("closes_at")
+  status   GroupLessonReleaseStatus  @default(LOCKED)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([groupId, lessonId, moduleId], map: "group_release_unique")
+  @@index([groupId])
+  @@index([lessonId])
+  @@index([moduleId])
+  @@map("group_lesson_releases")
 }
 
 /// Kurs materiallari (docx/pdf) + ularning matn holatida saqlangan indeksi.
@@ -575,15 +679,22 @@ model Quiz {
   ownerId String? @map("owner_id") @db.Uuid
   owner   User?   @relation("QuizOwner", fields: [ownerId], references: [id], onDelete: SetNull)
 
+  /// L4: kutubxona rejimi (LIBRARY/PRIVATE) — Course bilan bir xil mantiq.
+  visibility ContentVisibility @default(PRIVATE)
+  /// L12: taymer (daqiqa) — barcha guruhlar uchun default; GroupQuiz override.
+  timeLimitMinutes Int? @map("time_limit_minutes") @db.SmallInt
+
   questions   QuizQuestion[]
   submissions QuizSubmission[]
   groups      GroupQuiz[]
+  assignments Assignment[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([lessonId])
   @@index([isPublished])
+  @@index([visibility])
   @@map("quizzes")
 }
 
@@ -687,6 +798,7 @@ model Group {
   courses     CourseGroup[]
   quizzes     GroupQuiz[]
   assignments Assignment[]
+  releases    GroupLessonRelease[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -723,6 +835,8 @@ model CourseGroup {
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
   groupId  String @map("group_id") @db.Uuid
   group    Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  /// F3: sequential — oldingi dars tugatilmaguncha keyingisi yopiq.
+  sequential Boolean @default(false)
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -743,6 +857,8 @@ model GroupQuiz {
   opensAt     DateTime? @map("opens_at")
   closesAt    DateTime? @map("closes_at")
   maxAttempts Int?      @map("max_attempts") @db.SmallInt
+  /// L12: taymer override (daqiqa) — null bo'lsa Quiz.timeLimitMinutes qo'llanadi.
+  timeLimitMinutes Int? @map("time_limit_minutes") @db.SmallInt
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -762,13 +878,53 @@ model LessonProgress {
   lessonId  String @map("lesson_id") @db.Uuid
   lesson    Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
-  completedAt  DateTime? @map("completed_at")
-  lastViewedAt DateTime  @default(now()) @map("last_viewed_at")
+  completedAt   DateTime? @map("completed_at")
+  lastViewedAt  DateTime  @default(now()) @map("last_viewed_at")
+  /// F5 (2.C): yangi ko'rish/vaqt kuzatish maydonlari.
+  firstViewedAt DateTime? @map("first_viewed_at")
+  viewCount     Int       @default(0) @map("view_count")
+  timeSpentSec  Int       @default(0) @map("time_spent_sec")
+  /// 0..100 — vizual pozitsiya; dars ichida qancha o'qilgan.
+  lastPosition  Int       @default(0) @map("last_position") @db.SmallInt
 
   @@unique([studentId, lessonId], map: "lesson_progress_student_lesson_unique")
   @@index([studentId])
   @@index([lessonId])
   @@map("lesson_progress")
+}
+
+/// F5 (2.C): talabaning o'qish seanslari. Ochish-yopish orasidagi faol
+/// soniyalar. Heartbeat orqali yangilanadi.
+model StudySession {
+  id          String   @id @db.Uuid
+  studentId   String   @map("student_id") @db.Uuid
+  student     User     @relation("StudySessionOwner", fields: [studentId], references: [id], onDelete: Cascade)
+  lessonId    String?  @map("lesson_id") @db.Uuid
+  lesson      Lesson?  @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+
+  startedAt     DateTime @default(now()) @map("started_at")
+  endedAt       DateTime? @map("ended_at")
+  activeSeconds Int      @default(0) @map("active_seconds")
+
+  @@index([studentId])
+  @@index([lessonId])
+  @@index([startedAt(sort: Desc)])
+  @@map("study_sessions")
+}
+
+/// F5 (2.C): yengil hodisa jurnali. Timeline va analytics uchun.
+model StudyEvent {
+  id        String         @id @db.Uuid
+  studentId String         @map("student_id") @db.Uuid
+  student   User           @relation("StudyEventOwner", fields: [studentId], references: [id], onDelete: Cascade)
+  type      StudyEventType
+  refId     String?        @map("ref_id") @db.Uuid
+  meta      Json?          @db.JsonB
+  at        DateTime       @default(now())
+
+  @@index([studentId, at(sort: Desc)])
+  @@index([type])
+  @@map("study_events")
 }
 
 // ---------------------------------------------------------------
@@ -781,10 +937,15 @@ model Assignment {
   course      Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
   lessonId    String? @map("lesson_id") @db.Uuid
   lesson      Lesson? @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  /// F3: topshiriqni mavzuga biriktirish — guruh sahifasida ko'rinish uchun
+  moduleId    String? @map("module_id") @db.Uuid
   groupId     String  @map("group_id") @db.Uuid
   group       Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdById String  @map("created_by_id") @db.Uuid
   createdBy   User    @relation("AssignmentCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  /// F4 (2.B): topshiriq turi.
+  kind AssignmentKind @default(TASK)
 
   titleUz       String    @map("title_uz") @db.VarChar(255)
   descriptionUz String?   @map("description_uz") @db.Text
@@ -794,8 +955,23 @@ model Assignment {
    * Ixtiyoriy biriktirilgan fayl (masalan topshiriq shabloni).
    */
   attachmentKey String?   @map("attachment_key") @db.VarChar(512)
+  attachmentFileName String? @map("attachment_file_name") @db.VarChar(255)
 
-  submissions AssignmentSubmission[]
+  /// F4: TASK — kechikish siyosati.
+  allowLate         Boolean @default(false) @map("allow_late")
+  latePenaltyPercent Int   @default(0) @map("late_penalty_percent") @db.SmallInt
+
+  /// F4: TIMED — oyna va taymer.
+  startsAt         DateTime? @map("starts_at")
+  endsAt           DateTime? @map("ends_at")
+  timeLimitMinutes Int?      @map("time_limit_minutes") @db.SmallInt
+
+  /// F4: QUESTIONNAIRE — mavjud quiz dvigateliga biriktirish.
+  quizId String? @map("quiz_id") @db.Uuid
+  quiz   Quiz?   @relation(fields: [quizId], references: [id], onDelete: SetNull)
+
+  submissions   AssignmentSubmission[]
+  accommodations AssignmentAccommodation[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -803,8 +979,27 @@ model Assignment {
   @@index([groupId])
   @@index([createdById])
   @@index([courseId])
+  @@index([moduleId])
   @@index([dueAt])
+  @@index([kind])
   @@map("assignments")
+}
+
+/// F4: alohida talabaga vaqt uzaytirish (TIMED/TASK).
+model AssignmentAccommodation {
+  id           String     @id @db.Uuid
+  assignmentId String     @map("assignment_id") @db.Uuid
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId    String     @map("student_id") @db.Uuid
+  student      User       @relation("AssignmentAccommodation", fields: [studentId], references: [id], onDelete: Cascade)
+  extraMinutes Int?       @map("extra_minutes") @db.SmallInt
+  newDueAt     DateTime?  @map("new_due_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([assignmentId, studentId], map: "accommodation_assignment_student_unique")
+  @@index([studentId])
+  @@map("assignment_accommodations")
 }
 
 model AssignmentSubmission {
@@ -831,8 +1026,42 @@ model AssignmentSubmission {
 
   status AssignmentSubmissionStatus @default(SUBMITTED)
 
+  /// L8: urinish hisoblagichi (RETURNED bo'lsa talaba qayta topshira oladi).
+  attempt Int @default(1) @db.SmallInt
+  /// F4 TIMED: urinish boshlangan va deadline vaqtlari.
+  attemptStartedAt DateTime? @map("attempt_started_at")
+  attemptDeadline  DateTime? @map("attempt_deadline")
+  /// F4 TASK: kechikkan topshiriq belgisi.
+  isLate Boolean @default(false) @map("is_late")
+
+  revisions AssignmentSubmissionRevision[]
+
   @@unique([assignmentId, studentId], map: "assignment_submissions_assignment_student_unique")
   @@index([studentId])
   @@index([status])
   @@map("assignment_submissions")
+}
+
+/// L8: har bir SUBMITTED->RETURNED tarixi — talaba qayta topshirsa oldingi
+/// javob va baholash arxivda saqlanadi.
+model AssignmentSubmissionRevision {
+  id           String               @id @db.Uuid
+  submissionId String               @map("submission_id") @db.Uuid
+  submission   AssignmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  attempt      Int                  @db.SmallInt
+  textUz       String?              @map("text_uz") @db.Text
+  fileKey      String?              @map("file_key") @db.VarChar(512)
+  fileName     String?              @map("file_name") @db.VarChar(255)
+  submittedAt  DateTime             @map("submitted_at")
+  score        Int?
+  feedbackUz   String?              @map("feedback_uz") @db.Text
+  gradedById   String?              @map("graded_by_id") @db.Uuid
+  gradedAt     DateTime?            @map("graded_at")
+  status       AssignmentSubmissionStatus
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([submissionId])
+  @@map("assignment_submission_revisions")
 }

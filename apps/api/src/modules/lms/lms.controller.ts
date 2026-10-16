@@ -116,6 +116,17 @@ export class AssignmentsController {
   ) {
     return this.lms.gradeSubmission(submissionId, dto, asActor(user));
   }
+
+  @Post('submissions/:submissionId/reopen')
+  @RequirePermissions(PERMISSION.ASSIGNMENTS_MANAGE)
+  @ApiOperation({ summary: 'Topshiriqni qayta ochish (RETURNED) — talaba qayta topshira oladi' })
+  async reopen(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('submissionId', new ParseUUIDPipe()) submissionId: string,
+    @Body() body: { feedbackUz?: string },
+  ) {
+    return this.lms.reopenSubmission(submissionId, body?.feedbackUz, asActor(user));
+  }
 }
 
 @ApiTags('LMS - Lesson Progress')

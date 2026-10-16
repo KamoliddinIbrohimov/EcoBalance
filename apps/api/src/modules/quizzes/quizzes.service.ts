@@ -508,6 +508,35 @@ export class QuizzesService {
     // Guruh orqali ulanmagan bo'lsa — 404 (probe-safe).
     await this.assertStudentCanTakeQuiz(quizId, userId);
 
+    // L12: GroupQuiz sozlamalari (opensAt / closesAt / maxAttempts) tekshirish
+    const groupId = await this.resolveStudentGroupId(userId);
+    if (groupId) {
+      const binding = await this.prisma.groupQuiz.findUnique({
+        where: { quizId_groupId: { quizId, groupId } },
+      });
+      if (binding) {
+        const now = Date.now();
+        if (binding.opensAt && binding.opensAt.getTime() > now) {
+          throw new BadRequestException(
+            `Test ${binding.opensAt.toISOString()} dan ochiladi`,
+          );
+        }
+        if (binding.closesAt && binding.closesAt.getTime() < now) {
+          throw new BadRequestException("Test topshirish muddati o'tdi");
+        }
+        if (binding.maxAttempts) {
+          const taken = await this.prisma.quizSubmission.count({
+            where: { quizId, userId, status: 'SUBMITTED' },
+          });
+          if (taken >= binding.maxAttempts) {
+            throw new BadRequestException(
+              `Urinishlar soni to'ldi (${binding.maxAttempts})`,
+            );
+          }
+        }
+      }
+    }
+
     const questions = await this.prisma.quizQuestion.findMany({
       where: { quizId },
       select: { id: true, type: true, options: true },
@@ -718,6 +747,22 @@ export class QuizzesService {
       bodyParts.push(`Natija: ${submission.scorePercent}% (${submission.scoreTotal}/${submission.scoreMax}).`);
     }
 
+    // L13: SA + talabaning guruh o'qituvchisi + test egasi
+    const groupId = await this.resolveStudentGroupId(submission.userId);
+    const extraTargets: string[] = [];
+    if (groupId) {
+      const group = await this.prisma.group.findUnique({
+        where: { id: groupId },
+        select: { teacherId: true },
+      });
+      if (group) extraTargets.push(group.teacherId);
+    }
+    const quizOwner = await this.prisma.quiz.findUnique({
+      where: { id: submission.quizId },
+      select: { ownerId: true },
+    });
+    if (quizOwner?.ownerId) extraTargets.push(quizOwner.ownerId);
+
     await this.notifications.broadcast({
       type: 'QUIZ_SUBMITTED',
       titleUz: 'Yangi test topshirildi',
@@ -730,5 +775,19 @@ export class QuizzesService {
       },
       toRoles: [ROLE.SUPER_ADMIN],
     });
+
+    if (extraTargets.length > 0) {
+      await this.notifications.notifyUsers(extraTargets, {
+        type: 'QUIZ_SUBMITTED',
+        titleUz: 'Guruhingiz talabasi test topshirdi',
+        bodyUz: bodyParts.join(' '),
+        data: {
+          submissionId: submission.id,
+          quizId: submission.quizId,
+          userId: submission.userId,
+          scorePercent: submission.scorePercent,
+        },
+      });
+    }
   }
 }

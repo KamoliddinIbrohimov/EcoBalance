@@ -273,11 +273,14 @@ export class GroupsService {
     await this.assertGroupOwnership(groupId, actor);
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
-      select: { id: true, ownerId: true },
+      select: { id: true, ownerId: true, visibility: true },
     });
     if (!course) throw new NotFoundException('Kurs topilmadi');
-    if (!this.isSuperAdmin(actor) && course.ownerId !== actor.id) {
-      throw new ForbiddenException('Faqat o‘z kursingizni biriktira olasiz');
+    // L4: egalik yoki LIBRARY ko'rinishida — barcha o'qituvchilar biriktira oladi
+    const isOwner = course.ownerId === actor.id;
+    const isLibrary = course.visibility === 'LIBRARY';
+    if (!this.isSuperAdmin(actor) && !isOwner && !isLibrary) {
+      throw new ForbiddenException('Bu kurs sizga ko‘rinmaydi (PRIVATE)');
     }
     const existing = await this.prisma.courseGroup.findUnique({
       where: { courseId_groupId: { courseId, groupId } },
@@ -314,22 +317,66 @@ export class GroupsService {
     }));
   }
 
-  async bindQuiz(groupId: string, quizId: string, actor: ActorContext) {
+  async bindQuiz(
+    groupId: string,
+    quizId: string,
+    actor: ActorContext,
+    settings?: {
+      opensAt?: Date | null;
+      closesAt?: Date | null;
+      maxAttempts?: number | null;
+      timeLimitMinutes?: number | null;
+    },
+  ) {
     await this.assertGroupOwnership(groupId, actor);
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: quizId },
-      select: { id: true, ownerId: true },
+      select: { id: true, ownerId: true, visibility: true },
     });
     if (!quiz) throw new NotFoundException('Test topilmadi');
-    if (!this.isSuperAdmin(actor) && quiz.ownerId !== actor.id) {
-      throw new ForbiddenException('Faqat o‘z testingizni biriktira olasiz');
+    const isOwner = quiz.ownerId === actor.id;
+    const isLibrary = quiz.visibility === 'LIBRARY';
+    if (!this.isSuperAdmin(actor) && !isOwner && !isLibrary) {
+      throw new ForbiddenException('Bu test sizga ko‘rinmaydi (PRIVATE)');
     }
     const existing = await this.prisma.groupQuiz.findUnique({
       where: { quizId_groupId: { quizId, groupId } },
     });
     if (existing) throw new ConflictException('Test allaqachon biriktirilgan');
-    await this.prisma.groupQuiz.create({ data: { quizId, groupId } });
+    await this.prisma.groupQuiz.create({
+      data: {
+        quizId,
+        groupId,
+        opensAt: settings?.opensAt ?? null,
+        closesAt: settings?.closesAt ?? null,
+        maxAttempts: settings?.maxAttempts ?? null,
+        timeLimitMinutes: settings?.timeLimitMinutes ?? null,
+      },
+    });
     return { quizId, groupId };
+  }
+
+  async updateQuizBindingSettings(
+    groupId: string,
+    quizId: string,
+    actor: ActorContext,
+    settings: {
+      opensAt?: Date | null;
+      closesAt?: Date | null;
+      maxAttempts?: number | null;
+      timeLimitMinutes?: number | null;
+    },
+  ) {
+    await this.assertGroupOwnership(groupId, actor);
+    const link = await this.prisma.groupQuiz.findUnique({
+      where: { quizId_groupId: { quizId, groupId } },
+    });
+    if (!link) throw new NotFoundException('Biriktirilma topilmadi');
+    await this.prisma.groupQuiz.update({
+      where: { quizId_groupId: { quizId, groupId } },
+      data: settings,
+    });
+    return { quizId, groupId, ...settings };
   }
 
   async unbindQuiz(groupId: string, quizId: string, actor: ActorContext) {
@@ -341,6 +388,36 @@ export class GroupsService {
     await this.prisma.groupQuiz.delete({
       where: { quizId_groupId: { quizId, groupId } },
     });
+  }
+
+  /**
+   * L10: talaba bir guruhdan boshqasiga ko'chirish — bitta tranzaksiya.
+   * Oldingi topshiriqlar/baholar tarixda qoladi; "joriy guruh" statistikasi
+   * yangilanadi (talaba endi faqat yangi guruh kontentini ko'radi).
+   */
+  async transferMember(
+    sourceGroupId: string,
+    studentId: string,
+    toGroupId: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    await this.assertGroupOwnership(sourceGroupId, actor);
+    await this.assertGroupOwnership(toGroupId, actor);
+    if (sourceGroupId === toGroupId) {
+      throw new BadRequestException("Guruh o'ziga ko'chirish mumkin emas");
+    }
+    const member = await this.prisma.groupMember.findUnique({ where: { studentId } });
+    if (!member || member.groupId !== sourceGroupId) {
+      throw new NotFoundException('Talaba manba guruhida topilmadi');
+    }
+    await this.prisma.$transaction([
+      this.prisma.groupMember.delete({
+        where: { groupId_studentId: { groupId: sourceGroupId, studentId } },
+      }),
+      this.prisma.groupMember.create({
+        data: { groupId: toGroupId, studentId },
+      }),
+    ]);
   }
 
   async removeMember(groupId: string, studentId: string, actor: ActorContext): Promise<void> {

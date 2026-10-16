@@ -120,6 +120,22 @@ export class GroupsController {
     await this.groups.removeMember(id, studentId, { id: actor.id, roles: actor.roles });
   }
 
+  @Post(':id/members/:studentId/transfer')
+  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Talabani boshqa guruhga ko‘chirish' })
+  async transferMember(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('studentId', new ParseUUIDPipe()) studentId: string,
+    @Body() body: { toGroupId: string },
+  ) {
+    await this.groups.transferMember(id, studentId, body.toGroupId, {
+      id: actor.id,
+      roles: actor.roles,
+    });
+  }
+
   // ---- Course bindings ----
 
   @Get(':id/courses')
@@ -171,13 +187,46 @@ export class GroupsController {
   @Post(':id/quizzes/:quizId')
   @RequirePermissions(PERMISSION.GROUPS_MANAGE)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Guruhga test biriktirish' })
+  @ApiOperation({ summary: 'Guruhga test biriktirish (ochilish/maxAttempts/timeLimit sozlamalari bilan)' })
   async bindQuiz(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe()) id: string,
     @Param('quizId', new ParseUUIDPipe()) quizId: string,
+    @Body() body: {
+      opensAt?: string | null;
+      closesAt?: string | null;
+      maxAttempts?: number | null;
+      timeLimitMinutes?: number | null;
+    },
   ) {
-    return this.groups.bindQuiz(id, quizId, { id: actor.id, roles: actor.roles });
+    return this.groups.bindQuiz(id, quizId, { id: actor.id, roles: actor.roles }, {
+      opensAt: body?.opensAt ? new Date(body.opensAt) : null,
+      closesAt: body?.closesAt ? new Date(body.closesAt) : null,
+      maxAttempts: body?.maxAttempts ?? null,
+      timeLimitMinutes: body?.timeLimitMinutes ?? null,
+    });
+  }
+
+  @Patch(':id/quizzes/:quizId')
+  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
+  @ApiOperation({ summary: 'Guruh-test biriktirmasi sozlamalarini yangilash' })
+  async updateQuizBinding(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('quizId', new ParseUUIDPipe()) quizId: string,
+    @Body() body: {
+      opensAt?: string | null;
+      closesAt?: string | null;
+      maxAttempts?: number | null;
+      timeLimitMinutes?: number | null;
+    },
+  ) {
+    return this.groups.updateQuizBindingSettings(id, quizId, { id: actor.id, roles: actor.roles }, {
+      opensAt: body?.opensAt ? new Date(body.opensAt) : null,
+      closesAt: body?.closesAt ? new Date(body.closesAt) : null,
+      maxAttempts: body?.maxAttempts ?? null,
+      timeLimitMinutes: body?.timeLimitMinutes ?? null,
+    });
   }
 
   @Delete(':id/quizzes/:quizId')
