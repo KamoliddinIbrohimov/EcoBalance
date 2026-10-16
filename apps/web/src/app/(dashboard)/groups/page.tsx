@@ -2,7 +2,7 @@
 
 import type { GroupWithTeacherDto } from '@eco/shared';
 import { PERMISSION } from '@eco/shared';
-import { BookOpen, Loader2, Pencil, Plus, Trash2, Users, UsersRound } from 'lucide-react';
+import { BookOpen, CalendarClock, Loader2, Pencil, Plus, Trash2, Users, UsersRound } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -10,6 +10,7 @@ import { groupsApi } from '@/features/groups/api/groups-api';
 import { GroupContentDialog } from '@/features/groups/components/group-content-dialog';
 import { GroupFormDialog } from '@/features/groups/components/group-form-dialog';
 import { GroupMembersDialog } from '@/features/groups/components/group-members-dialog';
+import { GroupReleaseDialog } from '@/features/groups/components/group-release-dialog';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
@@ -25,6 +26,7 @@ export default function GroupsPage() {
   const [editTarget, setEditTarget] = useState<GroupWithTeacherDto | null>(null);
   const [membersTarget, setMembersTarget] = useState<GroupWithTeacherDto | null>(null);
   const [contentTarget, setContentTarget] = useState<GroupWithTeacherDto | null>(null);
+  const [releaseTarget, setReleaseTarget] = useState<GroupWithTeacherDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GroupWithTeacherDto | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -126,6 +128,14 @@ export default function GroupsPage() {
                   </Button>
                   <Button
                     size="sm"
+                    variant="outline"
+                    onClick={() => setReleaseTarget(g)}
+                  >
+                    <CalendarClock className="h-4 w-4" />
+                    Rejalashtirish
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="ghost"
                     onClick={() => {
                       setEditTarget(g);
@@ -167,6 +177,14 @@ export default function GroupsPage() {
           open={!!contentTarget}
           onOpenChange={(v) => !v && setContentTarget(null)}
           group={contentTarget}
+        />
+      ) : null}
+
+      {releaseTarget ? (
+        <GroupReleaseDialog
+          open={!!releaseTarget}
+          onOpenChange={(v) => !v && setReleaseTarget(null)}
+          group={releaseTarget}
         />
       ) : null}
 

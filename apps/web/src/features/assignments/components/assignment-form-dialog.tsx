@@ -1,6 +1,6 @@
 'use client';
 
-import type { AssignmentDto, GroupWithTeacherDto } from '@eco/shared';
+import type { AssignmentDto, AssignmentKind, GroupWithTeacherDto } from '@eco/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -30,11 +30,19 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
   const qc = useQueryClient();
   const isEdit = !!assignment;
 
-  const [groupId, setGroupId] = useState<string>('');
+  const [groupId, setGroupId] = useState('');
+  const [kind, setKind] = useState<AssignmentKind>('TASK');
   const [titleUz, setTitleUz] = useState('');
   const [descriptionUz, setDescriptionUz] = useState('');
   const [dueAt, setDueAt] = useState('');
   const [maxScore, setMaxScore] = useState('100');
+  // TASK
+  const [allowLate, setAllowLate] = useState(false);
+  const [latePenalty, setLatePenalty] = useState('0');
+  // TIMED
+  const [startsAt, setStartsAt] = useState('');
+  const [endsAt, setEndsAt] = useState('');
+  const [timeLimit, setTimeLimit] = useState('30');
 
   const { data: groups } = useQuery<{ data: GroupWithTeacherDto[]; meta: { total: number } }>({
     queryKey: ['groups', 'list'],
@@ -46,16 +54,28 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
     if (open) {
       if (isEdit && assignment) {
         setGroupId(assignment.groupId);
+        setKind(assignment.kind);
         setTitleUz(assignment.titleUz);
         setDescriptionUz(assignment.descriptionUz ?? '');
         setDueAt(assignment.dueAt ? assignment.dueAt.slice(0, 16) : '');
         setMaxScore(String(assignment.maxScore));
+        setAllowLate(assignment.allowLate);
+        setLatePenalty(String(assignment.latePenaltyPercent));
+        setStartsAt(assignment.startsAt ? assignment.startsAt.slice(0, 16) : '');
+        setEndsAt(assignment.endsAt ? assignment.endsAt.slice(0, 16) : '');
+        setTimeLimit(String(assignment.timeLimitMinutes ?? 30));
       } else {
         setGroupId('');
+        setKind('TASK');
         setTitleUz('');
         setDescriptionUz('');
         setDueAt('');
         setMaxScore('100');
+        setAllowLate(false);
+        setLatePenalty('0');
+        setStartsAt('');
+        setEndsAt('');
+        setTimeLimit('30');
       }
     }
   }, [open, isEdit, assignment]);
@@ -64,23 +84,35 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
     mutationFn: async () => {
       const score = Number(maxScore);
       const due = dueAt ? new Date(dueAt).toISOString() : null;
+      const starts = startsAt ? new Date(startsAt).toISOString() : null;
+      const ends = endsAt ? new Date(endsAt).toISOString() : null;
+      const limit = Number(timeLimit);
+      const penalty = Number(latePenalty);
       if (isEdit && assignment) {
         return assignmentsApi.update(assignment.id, {
           titleUz: titleUz.trim(),
           descriptionUz: descriptionUz.trim() || null,
           dueAt: due as unknown as Date | null,
           maxScore: score,
+          allowLate,
+          latePenaltyPercent: penalty,
+          startsAt: starts as unknown as Date | null,
+          endsAt: ends as unknown as Date | null,
+          timeLimitMinutes: kind === 'TIMED' ? limit : null,
         });
       }
       return assignmentsApi.create({
         groupId,
-        kind: 'TASK',
+        kind,
         titleUz: titleUz.trim(),
         descriptionUz: descriptionUz.trim() || null,
         dueAt: due as unknown as Date | null,
         maxScore: score,
-        allowLate: false,
-        latePenaltyPercent: 0,
+        allowLate,
+        latePenaltyPercent: penalty,
+        startsAt: starts as unknown as Date | null,
+        endsAt: ends as unknown as Date | null,
+        timeLimitMinutes: kind === 'TIMED' ? limit : null,
       });
     },
     onSuccess: () => {
@@ -114,23 +146,38 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
           noValidate
         >
           {!isEdit ? (
-            <div>
-              <Label htmlFor="groupId">Guruh</Label>
-              <select
-                id="groupId"
-                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                value={groupId}
-                onChange={(e) => setGroupId(e.target.value)}
-                required
-              >
-                <option value="">— tanlang —</option>
-                {(groups?.data ?? []).map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.nameUz}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <>
+              <div>
+                <Label htmlFor="groupId">Guruh</Label>
+                <select
+                  id="groupId"
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  value={groupId}
+                  onChange={(e) => setGroupId(e.target.value)}
+                  required
+                >
+                  <option value="">— tanlang —</option>
+                  {(groups?.data ?? []).map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.nameUz}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="kind">Topshiriq turi</Label>
+                <select
+                  id="kind"
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  value={kind}
+                  onChange={(e) => setKind(e.target.value as AssignmentKind)}
+                >
+                  <option value="TASK">Topshiriq (TASK) — fayl/matn javob</option>
+                  <option value="TIMED">Taymerli (TIMED) — vaqt bilan oyna</option>
+                  <option value="QUESTIONNAIRE">So‘rovnoma (QUESTIONNAIRE) — test</option>
+                </select>
+              </div>
+            </>
           ) : null}
 
           <div>
@@ -165,7 +212,7 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
               />
             </div>
             <div>
-              <Label htmlFor="maxScore">Maksimal ball</Label>
+              <Label htmlFor="maxScore">Maks ball</Label>
               <Input
                 id="maxScore"
                 type="number"
@@ -177,11 +224,75 @@ export function AssignmentFormDialog({ open, onOpenChange, assignment }: Props) 
             </div>
           </div>
 
+          {kind === 'TASK' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={allowLate}
+                  onChange={(e) => setAllowLate(e.target.checked)}
+                />
+                Kechikishga ruxsat
+              </label>
+              <div>
+                <Label htmlFor="penalty">Kechikish jarimasi (%)</Label>
+                <Input
+                  id="penalty"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={latePenalty}
+                  onChange={(e) => setLatePenalty(e.target.value)}
+                  disabled={!allowLate}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {kind === 'TIMED' ? (
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label htmlFor="startsAt">Boshlanish</Label>
+                <Input
+                  id="startsAt"
+                  type="datetime-local"
+                  value={startsAt}
+                  onChange={(e) => setStartsAt(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="endsAt">Yopilish</Label>
+                <Input
+                  id="endsAt"
+                  type="datetime-local"
+                  value={endsAt}
+                  onChange={(e) => setEndsAt(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="timeLimit">Taymer (daq)</Label>
+                <Input
+                  id="timeLimit"
+                  type="number"
+                  min={1}
+                  max={480}
+                  value={timeLimit}
+                  onChange={(e) => setTimeLimit(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+          ) : null}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Bekor qilish
             </Button>
-            <Button type="submit" disabled={mut.isPending || (!isEdit && !groupId) || !titleUz.trim()}>
+            <Button
+              type="submit"
+              disabled={mut.isPending || (!isEdit && !groupId) || !titleUz.trim()}
+            >
               {mut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {isEdit ? 'Saqlash' : 'Yaratish'}
             </Button>

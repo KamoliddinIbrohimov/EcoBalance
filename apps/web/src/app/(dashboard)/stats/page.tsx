@@ -113,12 +113,20 @@ function GroupStatCard({ group }: { group: GroupWithTeacherDto }) {
           </div>
         ) : null}
 
-        <Link
-          href={`/groups`}
-          className="mt-auto flex items-center justify-end gap-1 text-xs font-medium text-primary hover:underline"
-        >
-          Guruhga o&apos;tish <ChevronRight className="h-3 w-3" />
-        </Link>
+        <div className="mt-auto flex items-center justify-between gap-2">
+          <Link
+            href={`/stats/groups/${group.id}`}
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            Talabalar jadvali →
+          </Link>
+          <Link
+            href="/groups"
+            className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            Guruhga o&apos;tish <ChevronRight className="h-3 w-3" />
+          </Link>
+        </div>
       </Card>
     </li>
   );

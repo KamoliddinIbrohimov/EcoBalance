@@ -1,26 +1,49 @@
 'use client';
 
-import type { StudentStatsDto } from '@eco/shared';
-import { Award, BookOpen, ClipboardList, Loader2 } from 'lucide-react';
+import { AlertTriangle, Award, BookOpen, ClipboardList, Clock, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
+import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { Card } from '@/shared/components/ui/card';
 import { UnderDevelopment } from '@/shared/components/layout/under-development';
 import { apiClient } from '@/shared/lib/api-client';
 import { formatDateTime } from '@/shared/lib/format-date';
 import { useAuthStore } from '@/shared/stores/auth-store';
 
+interface Overview {
+  lessonsTotal: number;
+  lessonsCompleted: number;
+  progressPercent: number;
+  quizzesTaken: number;
+  quizzesPassed: number;
+  quizzesAverageScore: number | null;
+  assignmentsSubmitted: number;
+  assignmentsGraded: number;
+  assignmentsAverageScore: number | null;
+  totalStudyTimeSec: number;
+  lastActivityAt: string | null;
+  overdueAssignments: number;
+  risks: string[];
+}
+
+const RISK_LABEL: Record<string, string> = {
+  inactive_7d: '7+ kun faolsiz',
+  low_avg_score: "O'rtacha ball 50% dan past",
+  overdue_2plus: '2+ muddati o‘tgan topshiriq',
+};
+
 export default function MyStatsPage() {
   const user = useAuthStore((s) => s.user);
   const isStudent = user?.roles?.includes('STUDENT');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['stats', 'me'],
+    queryKey: ['stats', 'me', 'overview'],
     queryFn: async () => {
-      const res = await apiClient.get<{ data: StudentStatsDto | null }>('/stats/me');
+      if (!user?.id) return null;
+      const res = await apiClient.get<{ data: Overview }>(`/stats/students/${user.id}/overview`);
       return res.data.data;
     },
-    enabled: !!isStudent,
+    enabled: !!isStudent && !!user?.id,
   });
 
   if (!isStudent) {
@@ -52,7 +75,25 @@ export default function MyStatsPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      {data.risks.length > 0 ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <div className="font-semibold">E&apos;tibor kerak:</div>
+                <ul className="mt-1 list-disc pl-5 text-sm">
+                  {data.risks.map((r) => (
+                    <li key={r}>{RISK_LABEL[r] ?? r}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      <div className="grid gap-3 md:grid-cols-4">
         <StatCard
           icon={<BookOpen className="h-5 w-5" />}
           label="Darslar"
@@ -71,15 +112,33 @@ export default function MyStatsPage() {
           value={`${data.assignmentsGraded}/${data.assignmentsSubmitted}`}
           sub={data.assignmentsAverageScore !== null ? `o'rtacha ${data.assignmentsAverageScore}%` : '—'}
         />
+        <StatCard
+          icon={<Clock className="h-5 w-5" />}
+          label="O'qish vaqti"
+          value={formatStudyTime(data.totalStudyTimeSec)}
+          sub={
+            data.lastActivityAt
+              ? `oxirgi: ${formatDateTime(new Date(data.lastActivityAt))}`
+              : 'yo‘q'
+          }
+        />
       </div>
 
-      {data.lastActivityAt ? (
-        <Card className="p-4 text-xs text-muted-foreground">
-          Oxirgi faollik: {formatDateTime(new Date(data.lastActivityAt))}
+      {data.overdueAssignments > 0 ? (
+        <Card className="p-4 text-sm">
+          <span className="font-semibold text-destructive">{data.overdueAssignments}</span>{' '}
+          muddati o&apos;tgan topshiriq
         </Card>
       ) : null}
     </div>
   );
+}
+
+function formatStudyTime(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h > 0) return `${h} s ${m} daq`;
+  return `${m} daq`;
 }
 
 function StatCard({

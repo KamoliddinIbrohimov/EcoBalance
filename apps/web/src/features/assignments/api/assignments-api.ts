@@ -70,4 +70,56 @@ export const assignmentsApi = {
     );
     return data.data;
   },
+
+  async startTimed(id: string): Promise<AssignmentSubmissionDto> {
+    const { data } = await apiClient.post<Envelope<AssignmentSubmissionDto>>(
+      `/assignments/${id}/start`,
+      {},
+    );
+    return data.data;
+  },
+
+  async reopen(submissionId: string, feedbackUz?: string): Promise<AssignmentSubmissionDto> {
+    const { data } = await apiClient.post<Envelope<AssignmentSubmissionDto>>(
+      `/assignments/submissions/${submissionId}/reopen`,
+      { feedbackUz },
+    );
+    return data.data;
+  },
+
+  async uploadAttachment(id: string, file: File): Promise<{ key: string; fileName: string }> {
+    const fd = new FormData();
+    fd.append('file', file);
+    const { data } = await apiClient.post<Envelope<{ key: string; fileName: string }>>(
+      `/assignments/${id}/attachment`,
+      fd,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return data.data;
+  },
+
+  async attachmentUrl(id: string): Promise<{ url: string }> {
+    const { data } = await apiClient.get<Envelope<{ url: string }>>(
+      `/assignments/${id}/attachment-url`,
+    );
+    return data.data;
+  },
+
+  async submitFile(id: string, file: File): Promise<AssignmentSubmissionDto> {
+    const fd = new FormData();
+    fd.append('file', file);
+    const { data } = await apiClient.post<Envelope<AssignmentSubmissionDto>>(
+      `/assignments/${id}/submissions/file`,
+      fd,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return data.data;
+  },
+
+  async submissionFileUrl(submissionId: string): Promise<{ url: string }> {
+    const { data } = await apiClient.get<Envelope<{ url: string }>>(
+      `/assignments/submissions/${submissionId}/file-url`,
+    );
+    return data.data;
+  },
 };

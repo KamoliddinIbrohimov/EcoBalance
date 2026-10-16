@@ -97,4 +97,46 @@ export const groupsApi = {
   async unbindQuiz(groupId: string, quizId: string): Promise<void> {
     await apiClient.delete(`/groups/${groupId}/quizzes/${quizId}`);
   },
+
+  async listReleases(groupId: string): Promise<Array<{
+    id: string;
+    groupId: string;
+    lessonId: string | null;
+    moduleId: string | null;
+    opensAt: string | null;
+    closesAt: string | null;
+    status: 'LOCKED' | 'SCHEDULED' | 'OPEN';
+  }>> {
+    const { data } = await apiClient.get<Envelope<Array<{
+      id: string;
+      groupId: string;
+      lessonId: string | null;
+      moduleId: string | null;
+      opensAt: string | null;
+      closesAt: string | null;
+      status: 'LOCKED' | 'SCHEDULED' | 'OPEN';
+    }>>>(`/groups/${groupId}/releases`);
+    return data.data;
+  },
+
+  async upsertRelease(
+    groupId: string,
+    input: {
+      lessonId?: string;
+      moduleId?: string;
+      opensAt?: string | null;
+      closesAt?: string | null;
+      status: 'LOCKED' | 'SCHEDULED' | 'OPEN';
+    },
+  ): Promise<void> {
+    await apiClient.post(`/groups/${groupId}/releases`, input);
+  },
+
+  async removeRelease(groupId: string, releaseId: string): Promise<void> {
+    await apiClient.delete(`/groups/${groupId}/releases/${releaseId}`);
+  },
+
+  async transferMember(fromGroupId: string, studentId: string, toGroupId: string): Promise<void> {
+    await apiClient.post(`/groups/${fromGroupId}/members/${studentId}/transfer`, { toGroupId });
+  },
 };
