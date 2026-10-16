@@ -124,6 +124,16 @@ export class CoursesController {
     );
   }
 
+  @Get(':id/removal-impact')
+  @RequirePermissions(PERMISSION.COURSES_DELETE)
+  @ApiOperation({ summary: 'Kursni o‘chirish ta‘sir hisoboti' })
+  async courseRemovalImpact(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.courses.courseRemovalImpact(id, actor.roles, actor.id);
+  }
+
   @Patch(':id')
   @RequirePermissions(PERMISSION.COURSES_UPDATE)
   @ApiOperation({ summary: 'Kursni tahrirlash (TEACHER faqat o‘ziniki)' })

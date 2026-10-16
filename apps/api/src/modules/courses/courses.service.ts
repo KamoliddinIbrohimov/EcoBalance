@@ -455,6 +455,51 @@ export class CoursesService {
     return toCourseDto(newCourse);
   }
 
+  /**
+   * N18: kursni o'chirishdan oldin ta'sir hisoboti.
+   * Guruhga biriktirilgan, darslar/topshiriqlar/progress bor-yo'qligini ko'rsatadi.
+   */
+  async courseRemovalImpact(
+    id: string,
+    actorRoles: string[] = [],
+    actorId?: string,
+  ): Promise<{
+    courseId: string;
+    boundGroupsCount: number;
+    lessonsCount: number;
+    materialsCount: number;
+    assignmentsCount: number;
+    completedProgressCount: number;
+  }> {
+    const course = await this.prisma.course.findUnique({
+      where: { id },
+      select: { ownerId: true },
+    });
+    if (!course) throw new NotFoundException('Kurs topilmadi');
+    const isSA = actorRoles.includes('SUPER_ADMIN');
+    if (!isSA && course.ownerId !== actorId) {
+      throw new NotFoundException('Kurs topilmadi');
+    }
+    const [groups, lessons, materials, assignments, completedProgress] =
+      await this.prisma.$transaction([
+        this.prisma.courseGroup.count({ where: { courseId: id } }),
+        this.prisma.lesson.count({ where: { courseId: id } }),
+        this.prisma.courseMaterial.count({ where: { courseId: id } }),
+        this.prisma.assignment.count({ where: { courseId: id } }),
+        this.prisma.lessonProgress.count({
+          where: { lesson: { courseId: id }, completedAt: { not: null } },
+        }),
+      ]);
+    return {
+      courseId: id,
+      boundGroupsCount: groups,
+      lessonsCount: lessons,
+      materialsCount: materials,
+      assignmentsCount: assignments,
+      completedProgressCount: completedProgress,
+    };
+  }
+
   async removeCourse(id: string, ctx: RequestContext, actorRoles: string[] = []) {
     const existing = await this.prisma.course.findUnique({
       where: { id },

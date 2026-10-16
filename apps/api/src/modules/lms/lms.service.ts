@@ -462,6 +462,11 @@ export class LmsService {
         return { data: [], meta: { page, perPage, total: 0, totalPages: 1 } };
       }
       where.groupId = membership.groupId;
+      // N18: nashrdan olingan kurs topshiriqlari talabaga ko'rinmaydi
+      where.OR = [
+        { courseId: null },
+        { course: { isPublished: true } },
+      ];
     }
 
     const [total, rows] = await this.prisma.$transaction([
@@ -1572,7 +1577,9 @@ export class LmsService {
       select: { groupId: true },
     });
 
-    // Darslar — talaba guruhida biriktirilgan va PUBLISHED kurslar bo'yicha
+    // Darslar — talaba guruhida biriktirilgan, PUBLISHED kurs, arxivlanmagan,
+    // nashr etilgan va nashr etilgan modulga tegishli bo'lgan darslar.
+    // N12 + N14: `lessonsTotal` haqiqatan ko'rinadigan darslar bilan teng bo'ladi.
     let lessonsTotal = 0;
     let visibleLessonIds: string[] = [];
     if (member) {
@@ -1583,7 +1590,12 @@ export class LmsService {
       const courseIds = courseGroups.map((c) => c.courseId);
       if (courseIds.length > 0) {
         const lessons = await this.prisma.lesson.findMany({
-          where: { courseId: { in: courseIds } },
+          where: {
+            courseId: { in: courseIds },
+            isPublished: true,
+            archivedAt: null,
+            OR: [{ moduleId: null }, { module: { isPublished: true } }],
+          },
           select: { id: true },
         });
         visibleLessonIds = lessons.map((l) => l.id);
