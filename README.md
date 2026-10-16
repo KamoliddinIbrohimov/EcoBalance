@@ -36,7 +36,7 @@ Eco-Balance/
 
 ```bash
 cp .env.example .env
-make up              # boots Postgres, Redis, MinIO, Mailpit, api, web, nginx
+make up              # boots Postgres, Redis, MinIO, Mailpit, api, web, caddy
 make install         # pnpm install at the root
 make migrate         # Prisma migrate + seed
 ```
@@ -69,21 +69,39 @@ Default super admin (from Prisma seed):
 | `make sh-web` | Shell into the Web container |
 | `make logs` | Tail all container logs |
 
+## O'zgartirishdan keyin qayta build
+
+Dev stack `nest start --watch` + Next.js Turbopack bilan ishlaydi, lekin
+TypeScript turlari o'zgarsa yoki Prisma schema tahrirlansa, konteynerni
+qayta ishga tushurish kerak:
+
+```bash
+docker restart eco-api              # API hot-reload: src/ dan dist/ ga qayta kompil
+docker restart eco-web              # Web Turbopack rebuild
+# Prisma schema o'zgarsa:
+docker exec -w /workspace/apps/api eco-api sh -c "pnpm exec prisma db push"
+docker exec -w /workspace/apps/api eco-api sh -c "pnpm exec prisma generate"
+```
+
+Lokal typecheck:
+
+```bash
+docker exec -w /workspace/apps/api eco-api sh -c "pnpm exec tsc --noEmit"
+docker exec -w /workspace/apps/web eco-web sh -c "pnpm exec tsc --noEmit"
+```
+
 ## Delivery phases
 
 | Phase | Scope |
 |---|---|
-| **0** | **Foundation** — monorepo, Docker, Auth, RBAC, shell (this release) |
-| 1 | Users & Organizations CRUD |
-| 2 | Notifications (real-time WebSocket + email + audit) |
-| 3 | Dashboard content (KPI, charts, map) |
-| 4 | Environmental monitoring (IoT ingest + PostGIS) |
-| 5 | Education (E-learning, courses, tests, certificates) |
-| 6 | Gamification (points, badges, missions) |
-| 7 | AI Chatbot + predictive analytics |
-| 8 | Reports & exports (PDF/CSV/PNG) |
-| 9 | News & Events |
-| 10 | Hardening (perf, caching, load test, security audit) |
+| **0** | **Foundation** — monorepo, Docker, Auth, RBAC, shell |
+| LMS 3-rol | SUPER_ADMIN/TEACHER/STUDENT, Groups, CourseGroup/GroupQuiz bindings |
+| F1 | Lessons egalik, progress + L1-L9 xavfsizlik |
+| F2 | Visibility+clone, RETURNED oqimi, transfer, lesson reorder/archive, quiz release settings |
+| F3 | Module (bo'limlar) + GroupLessonRelease (dars/mavzu ochilish rejasi) |
+| F4 | Assignment turlari (TASK/TIMED/QUESTIONNAIRE) + fayl upload (L14) |
+| F5 | Study tracking (heartbeat, timeline, aggregates) |
+| F6 | L18 anonymization, pagination unify, README update |
 
 ## Reference materials
 

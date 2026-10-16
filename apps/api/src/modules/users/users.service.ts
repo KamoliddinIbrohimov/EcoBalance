@@ -88,7 +88,9 @@ export class UsersService {
   }
 
   async list(query: UserQuery, actorRoles: string[] = [], actorId?: string) {
-    const { page, perPage, search, organizationId, role, isActive } = query;
+    const { page, search, organizationId, role, isActive } = query;
+    // L18: `limit` alias — perPage default 20, lekin `limit` berilgan bo'lsa shunga ustunlik
+    const perPage = (query as { limit?: number }).limit ?? query.perPage;
     const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
 
     const where: Prisma.UserWhereInput = {
@@ -370,7 +372,17 @@ export class UsersService {
       throw new ForbiddenException('SUPER_ADMIN hisobini bloklab bo‘lmaydi');
     }
 
-    await this.prisma.user.update({ where: { id }, data: { isActive: false } });
+    // L18: foydalanuvchini anonimlashtiramiz — emaili bo'shaydi va yangi userda
+    // qayta ishlatish mumkin bo'ladi. Audit tarixi saqlanib qoladi (SetNull).
+    const anonymizedEmail = `deleted-${id}@invalid.local`;
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        isActive: false,
+        email: anonymizedEmail,
+        phone: null,
+      },
+    });
 
     await this.audit.record({
       userId: ctx.actorId,
