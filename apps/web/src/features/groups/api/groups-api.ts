@@ -90,8 +90,30 @@ export const groupsApi = {
     return data.data;
   },
 
-  async bindQuiz(groupId: string, quizId: string): Promise<void> {
-    await apiClient.post(`/groups/${groupId}/quizzes/${quizId}`);
+  async bindQuiz(
+    groupId: string,
+    quizId: string,
+    settings?: {
+      opensAt?: string | null;
+      closesAt?: string | null;
+      maxAttempts?: number | null;
+      timeLimitMinutes?: number | null;
+    },
+  ): Promise<void> {
+    await apiClient.post(`/groups/${groupId}/quizzes/${quizId}`, settings ?? {});
+  },
+
+  async updateQuizBinding(
+    groupId: string,
+    quizId: string,
+    settings: {
+      opensAt?: string | null;
+      closesAt?: string | null;
+      maxAttempts?: number | null;
+      timeLimitMinutes?: number | null;
+    },
+  ): Promise<void> {
+    await apiClient.patch(`/groups/${groupId}/quizzes/${quizId}`, settings);
   },
 
   async unbindQuiz(groupId: string, quizId: string): Promise<void> {

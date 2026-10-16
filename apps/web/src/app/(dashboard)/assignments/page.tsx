@@ -1,9 +1,10 @@
 'use client';
 
-import type { AssignmentDto } from '@eco/shared';
+import type { AssignmentDto, AssignmentSubmissionDto } from '@eco/shared';
 import { PERMISSION } from '@eco/shared';
 import {
   ClipboardList,
+  Clock,
   GraduationCap,
   Loader2,
   Pencil,
@@ -11,7 +12,7 @@ import {
   Send,
   Trash2,
 } from 'lucide-react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { assignmentsApi } from '@/features/assignments/api/assignments-api';
@@ -43,6 +44,54 @@ export default function AssignmentsPage() {
     queryKey: ['assignments', 'list'],
     queryFn: () => assignmentsApi.list(),
   });
+
+  // U3: STUDENT uchun har topshiriqning my-submission statusini olib keltiramiz
+  const mySubsQueries = useQueries({
+    queries: (data?.data ?? []).map((a) => ({
+      queryKey: ['assignments', a.id, 'my-submission'],
+      queryFn: () => assignmentsApi.mySubmission(a.id),
+      enabled: !isTeacherOrSA,
+    })),
+  });
+  const mySubByAssignment = new Map<string, AssignmentSubmissionDto | null>();
+  if (data?.data) {
+    data.data.forEach((a, i) => {
+      mySubByAssignment.set(a.id, mySubsQueries[i]?.data ?? null);
+    });
+  }
+
+  function statusBadge(a: AssignmentDto) {
+    const sub = mySubByAssignment.get(a.id);
+    const now = Date.now();
+    const dueMs = a.dueAt ? new Date(a.dueAt).getTime() : null;
+    const overdue = dueMs !== null && dueMs < now && (!sub || sub.status === 'RETURNED');
+    if (!sub && overdue) {
+      return <Badge variant="destructive">Muddati o&apos;tgan</Badge>;
+    }
+    if (!sub) return <Badge variant="outline">Topshirilmagan</Badge>;
+    if (sub.status === 'GRADED')
+      return (
+        <Badge>
+          Baholandi: {sub.score}/{a.maxScore}
+        </Badge>
+      );
+    if (sub.status === 'RETURNED') return <Badge variant="secondary">Qaytarilgan</Badge>;
+    if (sub.isLate) return <Badge variant="destructive">Kechikkan</Badge>;
+    return <Badge variant="secondary">Topshirilgan</Badge>;
+  }
+
+  function remainingTimeBadge(a: AssignmentDto) {
+    const dueAt = a.endsAt ?? a.dueAt;
+    if (!dueAt) return null;
+    const diffMs = new Date(dueAt).getTime() - Date.now();
+    if (diffMs <= 0) return null;
+    const mins = Math.floor(diffMs / 60_000);
+    if (mins < 60) return <Badge variant="outline"><Clock className="h-3 w-3" />{mins} daq</Badge>;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return <Badge variant="outline"><Clock className="h-3 w-3" />{hours} s</Badge>;
+    const days = Math.floor(hours / 24);
+    return <Badge variant="outline"><Clock className="h-3 w-3" />{days} kun</Badge>;
+  }
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => assignmentsApi.remove(id),
@@ -104,6 +153,9 @@ export default function AssignmentsPage() {
                     </p>
                   ) : null}
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    <Badge variant="outline">{a.kind}</Badge>
+                    {!isTeacherOrSA ? statusBadge(a) : null}
+                    {!isTeacherOrSA ? remainingTimeBadge(a) : null}
                     {a.dueAt ? (
                       <Badge variant="outline">
                         Muddat: {formatDateTime(new Date(a.dueAt))}
@@ -118,10 +170,10 @@ export default function AssignmentsPage() {
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
-                  {canSubmit && !isTeacherOrSA ? (
+                  {canSubmit && !isTeacherOrSA && mySubByAssignment.get(a.id)?.status !== 'GRADED' ? (
                     <Button size="sm" onClick={() => setSubmitTarget(a)}>
                       <Send className="h-4 w-4" />
-                      Topshirish
+                      {mySubByAssignment.get(a.id) ? 'Yangilash' : 'Topshirish'}
                     </Button>
                   ) : null}
                   {canManage ? (

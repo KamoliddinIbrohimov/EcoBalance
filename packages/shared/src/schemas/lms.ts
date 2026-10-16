@@ -197,6 +197,7 @@ export const assignmentQuerySchema = paginationQuerySchema.extend({
   groupId: z.string().uuid().optional(),
   courseId: z.string().uuid().optional(),
   lessonId: z.string().uuid().optional(),
+  moduleId: z.string().uuid().optional(),
 });
 export type AssignmentQuery = z.infer<typeof assignmentQuerySchema>;
 

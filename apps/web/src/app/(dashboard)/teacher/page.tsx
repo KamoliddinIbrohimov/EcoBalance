@@ -16,6 +16,16 @@ interface GroupMini {
   isActive: boolean;
 }
 
+interface AssignmentMini {
+  id: string;
+  status?: string;
+}
+
+interface SubmissionMini {
+  id: string;
+  status: 'SUBMITTED' | 'GRADED' | 'RETURNED' | 'PENDING_REVIEW';
+}
+
 export default function TeacherHomePage() {
   const user = useAuthStore((s) => s.user);
   const isTeacher = user?.roles?.includes('TEACHER') && !user?.roles?.includes('SUPER_ADMIN');
@@ -27,6 +37,32 @@ export default function TeacherHomePage() {
         params: { page: 1, perPage: 10 },
       });
       return groupsRes.data;
+    },
+    enabled: !!isTeacher,
+  });
+
+  // U7: tekshirilmagan topshiriqlar soni — har bir topshiriqning submissions'ini
+  // yig'ib SUBMITTED/PENDING_REVIEW holatidagilarini sanaymiz.
+  const { data: pendingCount } = useQuery({
+    queryKey: ['teacher-home', 'pending-submissions'],
+    queryFn: async () => {
+      const list = await apiClient.get<{ data: AssignmentMini[] }>('/assignments', {
+        params: { page: 1, perPage: 100 },
+      });
+      let count = 0;
+      for (const a of list.data.data) {
+        try {
+          const subs = await apiClient.get<{ data: SubmissionMini[] }>(
+            `/assignments/${a.id}/submissions`,
+          );
+          for (const s of subs.data.data) {
+            if (s.status === 'SUBMITTED' || s.status === 'PENDING_REVIEW') count++;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      return count;
     },
     enabled: !!isTeacher,
   });
@@ -69,8 +105,8 @@ export default function TeacherHomePage() {
           />
           <StatCard
             icon={<ClipboardList className="h-5 w-5" />}
-            label="Topshiriqlar"
-            value="Barchasi"
+            label="Tekshirilmagan"
+            value={String(pendingCount ?? 0)}
             href="/assignments"
           />
         </div>

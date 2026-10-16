@@ -32,6 +32,10 @@ export function GroupContentDialog({ open, onOpenChange, group }: Props) {
   const [tab, setTab] = useState<'courses' | 'quizzes'>('courses');
   const [courseId, setCourseId] = useState('');
   const [quizId, setQuizId] = useState('');
+  const [opensAt, setOpensAt] = useState('');
+  const [closesAt, setClosesAt] = useState('');
+  const [maxAttempts, setMaxAttempts] = useState('');
+  const [timeLimit, setTimeLimit] = useState('');
 
   const { data: boundCourses } = useQuery({
     queryKey: ['groups', group.id, 'courses'],
@@ -76,9 +80,19 @@ export function GroupContentDialog({ open, onOpenChange, group }: Props) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['groups', group.id, 'courses'] }),
   });
   const bindQuizMut = useMutation({
-    mutationFn: () => groupsApi.bindQuiz(group.id, quizId),
+    mutationFn: () =>
+      groupsApi.bindQuiz(group.id, quizId, {
+        opensAt: opensAt ? new Date(opensAt).toISOString() : null,
+        closesAt: closesAt ? new Date(closesAt).toISOString() : null,
+        maxAttempts: maxAttempts ? Number(maxAttempts) : null,
+        timeLimitMinutes: timeLimit ? Number(timeLimit) : null,
+      }),
     onSuccess: () => {
       setQuizId('');
+      setOpensAt('');
+      setClosesAt('');
+      setMaxAttempts('');
+      setTimeLimit('');
       qc.invalidateQueries({ queryKey: ['groups', group.id, 'quizzes'] });
     },
   });
@@ -183,8 +197,8 @@ export function GroupContentDialog({ open, onOpenChange, group }: Props) {
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
+            <div className="space-y-2 rounded-lg border border-border/60 bg-secondary/30 p-3">
+              <div>
                 <label className="mb-1 block text-xs text-muted-foreground">Test tanlang</label>
                 <select
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
@@ -198,6 +212,46 @@ export function GroupContentDialog({ open, onOpenChange, group }: Props) {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-[11px] text-muted-foreground">Ochilish sanasi</label>
+                  <input
+                    type="datetime-local"
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                    value={opensAt}
+                    onChange={(e) => setOpensAt(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] text-muted-foreground">Yopilish sanasi</label>
+                  <input
+                    type="datetime-local"
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                    value={closesAt}
+                    onChange={(e) => setClosesAt(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] text-muted-foreground">Urinishlar soni</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                    value={maxAttempts}
+                    onChange={(e) => setMaxAttempts(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] text-muted-foreground">Taymer (daq)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                    value={timeLimit}
+                    onChange={(e) => setTimeLimit(e.target.value)}
+                  />
+                </div>
               </div>
               <Button
                 disabled={!quizId || bindQuizMut.isPending}
@@ -216,11 +270,27 @@ export function GroupContentDialog({ open, onOpenChange, group }: Props) {
               ) : (
                 (boundQuizzes ?? []).map((b) => (
                   <li key={b.quizId} className="flex items-center justify-between gap-2 p-3">
-                    <div className="truncate text-sm">
-                      {b.quiz.titleUz}
-                      {!b.quiz.isPublished ? (
-                        <span className="ml-2 text-xs text-muted-foreground">(qoralama)</span>
-                      ) : null}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm">
+                        {b.quiz.titleUz}
+                        {!b.quiz.isPublished ? (
+                          <span className="ml-2 text-xs text-muted-foreground">(qoralama)</span>
+                        ) : null}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                        {(b as unknown as { opensAt: string | null }).opensAt ? (
+                          <span>Ochilish: {new Date((b as unknown as { opensAt: string }).opensAt).toLocaleString('ru-RU')}</span>
+                        ) : null}
+                        {(b as unknown as { closesAt: string | null }).closesAt ? (
+                          <span>Yopilish: {new Date((b as unknown as { closesAt: string }).closesAt).toLocaleString('ru-RU')}</span>
+                        ) : null}
+                        {(b as unknown as { maxAttempts: number | null }).maxAttempts ? (
+                          <span>Urinish: {(b as unknown as { maxAttempts: number }).maxAttempts}</span>
+                        ) : null}
+                        {(b as unknown as { timeLimitMinutes: number | null }).timeLimitMinutes ? (
+                          <span>Taymer: {(b as unknown as { timeLimitMinutes: number }).timeLimitMinutes} daq</span>
+                        ) : null}
+                      </div>
                     </div>
                     <Button
                       variant="ghost"

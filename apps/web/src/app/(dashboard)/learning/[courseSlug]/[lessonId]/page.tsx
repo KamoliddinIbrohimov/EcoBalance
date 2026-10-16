@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
 import { LessonCompleteButton } from '@/features/learning/components/lesson-complete-button';
+import { LessonRelatedContent } from '@/features/learning/components/lesson-related-content';
 import { MaterialsPanel } from '@/features/learning/components/materials-panel';
 import { useLesson } from '@/features/learning/hooks/use-learning';
 import { Badge } from '@/shared/components/ui/badge';
@@ -128,6 +129,8 @@ export default function LessonDetailPage() {
         title={t('lessonMaterialsLabel')}
         viewOnly
       />
+
+      <LessonRelatedContent lessonId={lesson.id} moduleId={lesson.moduleId} />
 
       <LessonCompleteButton lessonId={lesson.id} />
     </div>

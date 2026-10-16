@@ -438,11 +438,13 @@ export class LmsService {
 
   async listAssignments(query: AssignmentQuery, actor: Actor) {
     const { page, perPage, search, groupId, courseId, lessonId } = query;
+    const moduleId = (query as unknown as { moduleId?: string }).moduleId;
 
     const where: Prisma.AssignmentWhereInput = {
       ...(groupId ? { groupId } : {}),
       ...(courseId ? { courseId } : {}),
       ...(lessonId ? { lessonId } : {}),
+      ...(moduleId ? { moduleId } : {}),
       ...(search ? { titleUz: { contains: search, mode: 'insensitive' } } : {}),
     };
 
