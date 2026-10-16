@@ -22,6 +22,7 @@ import type { Request } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PermissionsGuard } from '../auth/authorization/permissions.guard';
 import { RequirePermissions } from '../auth/authorization/permissions.decorator';
+import type { AuthenticatedUser } from '../auth/strategies/jwt-access.strategy';
 import { MaterialsService } from './materials.service';
 
 @ApiTags('Course Materials')
@@ -34,8 +35,11 @@ export class MaterialsController {
   @Get('courses/:courseId/materials')
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Kursning darslik fayllari ro‘yxati' })
-  async list(@Param('courseId', new ParseUUIDPipe()) courseId: string) {
-    return this.materials.listForCourse(courseId);
+  async list(
+    @Param('courseId', new ParseUUIDPipe()) courseId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.materials.listForCourse(courseId, { id: actor.id, roles: actor.roles });
   }
 
   @Post('courses/:courseId/materials')
@@ -53,7 +57,7 @@ export class MaterialsController {
   async upload(
     @Param('courseId', new ParseUUIDPipe()) courseId: string,
     @UploadedFile() file: Express.Multer.File,
-    @CurrentUser('id') actorId: string,
+    @CurrentUser() actor: AuthenticatedUser,
     @Query('lessonId') lessonId: string | undefined,
     @Req() req: Request,
     @Ip() ip: string,
@@ -62,7 +66,8 @@ export class MaterialsController {
       courseId,
       lessonId,
       file,
-      actorId,
+      actorId: actor.id,
+      actorRoles: actor.roles,
       ip,
       userAgent: req.headers['user-agent'],
     });
@@ -71,8 +76,11 @@ export class MaterialsController {
   @Get('materials/:id/download')
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Faylni yuklab olish (short-lived signed URL qaytadi)' })
-  async download(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.materials.getDownloadUrl(id);
+  async download(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.materials.getDownloadUrl(id, { id: actor.id, roles: actor.roles });
   }
 
   @Delete('materials/:id')
@@ -80,10 +88,15 @@ export class MaterialsController {
   @ApiOperation({ summary: 'Faylni o‘chirish' })
   async remove(
     @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser('id') actorId: string,
+    @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
     @Ip() ip: string,
   ) {
-    return this.materials.remove(id, { actorId, ip, userAgent: req.headers['user-agent'] });
+    return this.materials.remove(id, {
+      actorId: actor.id,
+      actorRoles: actor.roles,
+      ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 }

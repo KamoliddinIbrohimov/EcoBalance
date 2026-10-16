@@ -193,14 +193,21 @@ export class QuizzesService {
   // Quiz CRUD (admin)
   // -------------------------------------------------------------
 
-  async list(query: QuizQuery) {
+  async list(query: QuizQuery, actor?: { id: string; roles: string[] }) {
     const { page, perPage, search, lessonId, standaloneOnly, isPublished } = query;
+
+    const isSA = actor?.roles.includes('SUPER_ADMIN') ?? false;
+    const isTeacher = (actor?.roles.includes('TEACHER') ?? false) && !isSA;
 
     const where: Prisma.QuizWhereInput = {
       ...(lessonId ? { lessonId } : {}),
       ...(standaloneOnly ? { lessonId: null } : {}),
       ...(typeof isPublished === 'boolean' ? { isPublished } : {}),
       ...(search ? { titleUz: { contains: search, mode: 'insensitive' as const } } : {}),
+      // N3: TEACHER faqat o'z + LIBRARY testlarini ko'radi
+      ...(isTeacher && actor
+        ? { OR: [{ ownerId: actor.id }, { visibility: 'LIBRARY' as const }] }
+        : {}),
     };
 
     const [total, rows] = await this.prisma.$transaction([
@@ -240,8 +247,18 @@ export class QuizzesService {
     return rows.map(toSummaryDto);
   }
 
-  async getAdminDetail(id: string): Promise<QuizAdminDetailDto> {
+  async getAdminDetail(
+    id: string,
+    actor?: { id: string; roles: string[] },
+  ): Promise<QuizAdminDetailDto> {
     const quiz = await this.loadQuizWithLesson(id);
+    // N2: egalik tekshiruvi — LIBRARY'ni javob kaliti bilan ko'rsatish mumkin emas
+    if (actor) {
+      const isSA = actor.roles.includes('SUPER_ADMIN');
+      if (!isSA && quiz.ownerId !== actor.id) {
+        throw new NotFoundException('Test topilmadi');
+      }
+    }
     const questions = await this.prisma.quizQuestion.findMany({
       where: { quizId: id },
       orderBy: { orderIndex: 'asc' },
@@ -375,9 +392,19 @@ export class QuizzesService {
   // Question CRUD (admin)
   // -------------------------------------------------------------
 
-  async addQuestion(quizId: string, input: CreateQuestionInput): Promise<QuizQuestionAdminDto> {
-    const quiz = await this.prisma.quiz.findUnique({ where: { id: quizId }, select: { id: true } });
+  async addQuestion(
+    quizId: string,
+    input: CreateQuestionInput,
+    actor?: { id: string; roles: string[] },
+  ): Promise<QuizQuestionAdminDto> {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: { id: true, ownerId: true },
+    });
     if (!quiz) throw new NotFoundException('Test topilmadi');
+    if (actor && !actor.roles.includes('SUPER_ADMIN') && quiz.ownerId !== actor.id) {
+      throw new ForbiddenException("Faqat o'z testingizga savol qo'sha olasiz");
+    }
 
     const orderIndex =
       input.orderIndex ??
@@ -410,12 +437,19 @@ export class QuizzesService {
     }
   }
 
-  async updateQuestion(questionId: string, input: UpdateQuestionInput): Promise<QuizQuestionAdminDto> {
+  async updateQuestion(
+    questionId: string,
+    input: UpdateQuestionInput,
+    actor?: { id: string; roles: string[] },
+  ): Promise<QuizQuestionAdminDto> {
     const existing = await this.prisma.quizQuestion.findUnique({
       where: { id: questionId },
-      select: { id: true, type: true, quizId: true },
+      select: { id: true, type: true, quizId: true, quiz: { select: { ownerId: true } } },
     });
     if (!existing) throw new NotFoundException('Savol topilmadi');
+    if (actor && !actor.roles.includes('SUPER_ADMIN') && existing.quiz.ownerId !== actor.id) {
+      throw new NotFoundException('Savol topilmadi');
+    }
 
     const data: Prisma.QuizQuestionUpdateInput = {};
     if (input.textUz !== undefined) data.textUz = input.textUz.trim();
@@ -447,16 +481,36 @@ export class QuizzesService {
     }
   }
 
-  async removeQuestion(questionId: string): Promise<void> {
+  async removeQuestion(
+    questionId: string,
+    actor?: { id: string; roles: string[] },
+  ): Promise<void> {
     const existing = await this.prisma.quizQuestion.findUnique({
       where: { id: questionId },
-      select: { id: true },
+      select: { id: true, quiz: { select: { ownerId: true } } },
     });
     if (!existing) throw new NotFoundException('Savol topilmadi');
+    if (actor && !actor.roles.includes('SUPER_ADMIN') && existing.quiz.ownerId !== actor.id) {
+      throw new NotFoundException('Savol topilmadi');
+    }
     await this.prisma.quizQuestion.delete({ where: { id: questionId } });
   }
 
-  async reorderQuestions(quizId: string, input: ReorderQuestionsInput): Promise<void> {
+  async reorderQuestions(
+    quizId: string,
+    input: ReorderQuestionsInput,
+    actor?: { id: string; roles: string[] },
+  ): Promise<void> {
+    if (actor) {
+      const quiz = await this.prisma.quiz.findUnique({
+        where: { id: quizId },
+        select: { ownerId: true },
+      });
+      if (!quiz) throw new NotFoundException('Test topilmadi');
+      if (!actor.roles.includes('SUPER_ADMIN') && quiz.ownerId !== actor.id) {
+        throw new ForbiddenException("Faqat o'z testingiz savollarini qayta tartiblashingiz mumkin");
+      }
+    }
     const questions = await this.prisma.quizQuestion.findMany({
       where: { quizId },
       select: { id: true },

@@ -239,7 +239,10 @@ export class LessonsController {
   @Get(':id/removal-impact')
   @RequirePermissions(PERMISSION.LESSONS_MANAGE)
   @ApiOperation({ summary: 'Darsni o‘chirish ta‘sir hisoboti' })
-  async removalImpact(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.courses.lessonRemovalImpact(id);
+  async removalImpact(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.courses.lessonRemovalImpact(id, actor.roles, actor.id);
   }
 }

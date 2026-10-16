@@ -40,15 +40,18 @@ export class QuizzesAdminController {
   @Get()
   @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
   @ApiOperation({ summary: 'Testlar ro‘yxati (sahifalash, filtr: lessonId/isPublished)' })
-  async list(@Query() query: QueryQuizDto) {
-    return this.quizzes.list(query);
+  async list(@Query() query: QueryQuizDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.quizzes.list(query, { id: actor.id, roles: actor.roles });
   }
 
   @Get(':id')
   @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
   @ApiOperation({ summary: 'Testning to‘liq tahrirlanishi (savollar + to‘g‘ri javoblar bilan)' })
-  async detail(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.quizzes.getAdminDetail(id);
+  async detail(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.quizzes.getAdminDetail(id, { id: actor.id, roles: actor.roles });
   }
 
   @Post()
@@ -90,8 +93,9 @@ export class QuizzesAdminController {
   async addQuestion(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: CreateQuestionDto,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.quizzes.addQuestion(id, dto);
+    return this.quizzes.addQuestion(id, dto, { id: actor.id, roles: actor.roles });
   }
 
   @Patch(':id/questions/reorder')
@@ -100,8 +104,9 @@ export class QuizzesAdminController {
   async reorderQuestions(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: ReorderQuestionsDto,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
-    await this.quizzes.reorderQuestions(id, dto);
+    await this.quizzes.reorderQuestions(id, dto, { id: actor.id, roles: actor.roles });
     return { ok: true };
   }
 
@@ -111,16 +116,20 @@ export class QuizzesAdminController {
   async updateQuestion(
     @Param('questionId', new ParseUUIDPipe()) questionId: string,
     @Body() dto: UpdateQuestionDto,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.quizzes.updateQuestion(questionId, dto);
+    return this.quizzes.updateQuestion(questionId, dto, { id: actor.id, roles: actor.roles });
   }
 
   @Delete('questions/:questionId')
   @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Savolni o‘chirish' })
-  async removeQuestion(@Param('questionId', new ParseUUIDPipe()) questionId: string) {
-    await this.quizzes.removeQuestion(questionId);
+  async removeQuestion(
+    @Param('questionId', new ParseUUIDPipe()) questionId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    await this.quizzes.removeQuestion(questionId, { id: actor.id, roles: actor.roles });
   }
 
   // -------- Submissions (admin view) --------

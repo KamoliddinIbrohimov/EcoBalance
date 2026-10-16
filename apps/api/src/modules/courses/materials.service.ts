@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -94,7 +95,40 @@ export class MaterialsService {
     }
   }
 
-  async listForCourse(courseId: string): Promise<MaterialDto[]> {
+  async listForCourse(
+    courseId: string,
+    actor?: { id: string; roles: string[] },
+  ): Promise<MaterialDto[]> {
+    // N1: faqat egalikka ega yoki guruhidagi talaba ko'ra oladi.
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, ownerId: true, visibility: true, isPublished: true },
+    });
+    if (!course) throw new NotFoundException('Kurs topilmadi');
+
+    if (actor) {
+      const isSA = actor.roles.includes('SUPER_ADMIN');
+      const isTeacher = actor.roles.includes('TEACHER') && !isSA;
+      const isStudent = !isSA && !isTeacher;
+      if (isTeacher) {
+        if (course.ownerId !== actor.id && course.visibility !== 'LIBRARY') {
+          throw new NotFoundException('Kurs topilmadi');
+        }
+      } else if (isStudent) {
+        if (!course.isPublished) throw new NotFoundException('Kurs topilmadi');
+        const member = await this.prisma.groupMember.findUnique({
+          where: { studentId: actor.id },
+          select: { groupId: true, group: { select: { isActive: true } } },
+        });
+        if (!member || !member.group.isActive) throw new NotFoundException('Kurs topilmadi');
+        const link = await this.prisma.courseGroup.findUnique({
+          where: { courseId_groupId: { courseId, groupId: member.groupId } },
+          select: { courseId: true },
+        });
+        if (!link) throw new NotFoundException('Kurs topilmadi');
+      }
+    }
+
     const rows = await this.prisma.courseMaterial.findMany({
       where: { courseId },
       orderBy: { createdAt: 'desc' },
@@ -116,13 +150,20 @@ export class MaterialsService {
     lessonId?: string;
     file: Express.Multer.File;
     actorId?: string;
+    actorRoles?: string[];
     ip?: string;
     userAgent?: string;
   }): Promise<MaterialDto> {
-    const { courseId, lessonId, file, actorId, ip, userAgent } = params;
+    const { courseId, lessonId, file, actorId, actorRoles = [], ip, userAgent } = params;
 
     const course = await this.prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new NotFoundException('Kurs topilmadi');
+
+    // N1: faqat SA yoki kurs egasi fayl yuklashi mumkin
+    const isSA = actorRoles.includes('SUPER_ADMIN');
+    if (!isSA && course.ownerId !== actorId) {
+      throw new ForbiddenException("Faqat o'z kursingizga fayl yuklay olasiz");
+    }
 
     if (lessonId) {
       const lesson = await this.prisma.lesson.findFirst({ where: { id: lessonId, courseId } });
@@ -188,16 +229,78 @@ export class MaterialsService {
     };
   }
 
-  async getDownloadUrl(id: string): Promise<{ url: string; fileName: string }> {
-    const row = await this.prisma.courseMaterial.findUnique({ where: { id } });
+  async getDownloadUrl(
+    id: string,
+    actor?: { id: string; roles: string[] },
+  ): Promise<{ url: string; fileName: string }> {
+    const row = await this.prisma.courseMaterial.findUnique({
+      where: { id },
+      include: {
+        course: { select: { id: true, ownerId: true, visibility: true, isPublished: true } },
+        lesson: { select: { isPublished: true, archivedAt: true } },
+      },
+    });
     if (!row) throw new NotFoundException('Fayl topilmadi');
+
+    if (actor) {
+      const isSA = actor.roles.includes('SUPER_ADMIN');
+      const isTeacher = actor.roles.includes('TEACHER') && !isSA;
+      const isStudent = !isSA && !isTeacher;
+      if (isTeacher) {
+        if (row.course.ownerId !== actor.id && row.course.visibility !== 'LIBRARY') {
+          throw new NotFoundException('Fayl topilmadi');
+        }
+      } else if (isStudent) {
+        if (!row.course.isPublished) throw new NotFoundException('Fayl topilmadi');
+        if (row.lesson && (!row.lesson.isPublished || row.lesson.archivedAt)) {
+          throw new NotFoundException('Fayl topilmadi');
+        }
+        const member = await this.prisma.groupMember.findUnique({
+          where: { studentId: actor.id },
+          select: { groupId: true, group: { select: { isActive: true } } },
+        });
+        if (!member || !member.group.isActive) throw new NotFoundException('Fayl topilmadi');
+        const link = await this.prisma.courseGroup.findUnique({
+          where: { courseId_groupId: { courseId: row.courseId, groupId: member.groupId } },
+          select: { courseId: true },
+        });
+        if (!link) throw new NotFoundException('Fayl topilmadi');
+        // Agar lesson bo'lsa — release tekshiradi
+        if (row.lessonId) {
+          const lessonRelease = await this.prisma.groupLessonRelease.findFirst({
+            where: { groupId: member.groupId, lessonId: row.lessonId },
+          });
+          if (lessonRelease) {
+            const now = Date.now();
+            const open =
+              lessonRelease.status === 'OPEN' ||
+              (lessonRelease.status === 'SCHEDULED' &&
+                lessonRelease.opensAt &&
+                lessonRelease.opensAt.getTime() <= now);
+            if (!open) throw new NotFoundException('Fayl topilmadi');
+          }
+        }
+      }
+    }
+
     const url = await this.storage.getDownloadUrl(row.storageKey, row.fileName);
     return { url, fileName: row.fileName };
   }
 
-  async remove(id: string, ctx: { actorId?: string; ip?: string; userAgent?: string }) {
-    const row = await this.prisma.courseMaterial.findUnique({ where: { id } });
+  async remove(
+    id: string,
+    ctx: { actorId?: string; actorRoles?: string[]; ip?: string; userAgent?: string },
+  ) {
+    const row = await this.prisma.courseMaterial.findUnique({
+      where: { id },
+      include: { course: { select: { ownerId: true } } },
+    });
     if (!row) throw new NotFoundException('Fayl topilmadi');
+
+    const isSA = (ctx.actorRoles ?? []).includes('SUPER_ADMIN');
+    if (!isSA && row.course.ownerId !== ctx.actorId) {
+      throw new ForbiddenException("Faqat o'z kursingiz faylini o'chira olasiz");
+    }
 
     try {
       await this.storage.delete(row.storageKey);

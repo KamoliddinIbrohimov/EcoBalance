@@ -460,6 +460,7 @@ async function main() {
         descriptionUz: QUIZ_DESCRIPTION,
         passPercent: 60,
         isPublished: true,
+        visibility: 'LIBRARY',
       },
     });
     console.log(`[pdv-quiz] existing quiz ${quizId} — savollar qayta yoziladi (lessonId=${lessonId ?? 'null — standalone'})`);
@@ -472,6 +473,7 @@ async function main() {
         descriptionUz: QUIZ_DESCRIPTION,
         passPercent: 60,
         isPublished: true,
+        visibility: 'LIBRARY',
       },
     });
     console.log(`[pdv-quiz] new quiz ${quizId} — ${QUIZ_TITLE} (lessonId=${lessonId ?? 'null — standalone'})`);

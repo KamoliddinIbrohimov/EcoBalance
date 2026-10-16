@@ -307,10 +307,11 @@ async function seedPDVCourse(superAdminId: string): Promise<void> {
 
   const existing = await prisma.course.findUnique({ where: { slug: SLUG } });
   if (existing) {
-    if (!existing.ownerId) {
-      await prisma.course.update({ where: { id: existing.id }, data: { ownerId: superAdminId } });
-    }
-    console.log(`  ✓ PDV kursi mavjud: ${SLUG}`);
+    // N5: seed kurs LIBRARY bo'lsin — har qanday o'qituvchi guruhiga biriktira oladi
+    const patch: Record<string, unknown> = { visibility: 'LIBRARY' };
+    if (!existing.ownerId) patch.ownerId = superAdminId;
+    await prisma.course.update({ where: { id: existing.id }, data: patch });
+    console.log(`  ✓ PDV kursi mavjud (LIBRARY): ${SLUG}`);
     return;
   }
 
@@ -324,6 +325,7 @@ async function seedPDVCourse(superAdminId: string): Promise<void> {
         "LMS platformalarini o'rgatuvchi kurs. 15 ma'ruza + 7 amaliy mashg'ulot.",
       educationLevel: 'oliy-talim',
       isPublished: true,
+      visibility: 'LIBRARY',
       ownerId: superAdminId,
     },
   });
@@ -432,7 +434,31 @@ async function main(): Promise<void> {
   console.log('  ✓ ta\'lim darajalari');
   await seedPDVCourse(superAdminId);
   await seedDemoUsers(roleIds, superAdminId);
+  // N5: SA tomonidan yaratilgan boshqa seed kurslar/testlar ham LIBRARY bo'lsin
+  await flipSeedCoursesToLibrary(superAdminId);
   console.log('🌱 Seed complete.');
+}
+
+/**
+ * N5: ownerId=SA bo'lgan va visibility=PRIVATE qolgan barcha seed-level kurs/testlarni
+ * LIBRARY ga aylantiradi. Teacher yaratganlariga tegilmaydi.
+ */
+async function flipSeedCoursesToLibrary(superAdminId: string): Promise<void> {
+  const courses = await prisma.course.updateMany({
+    where: {
+      visibility: 'PRIVATE',
+      OR: [{ ownerId: superAdminId }, { ownerId: null }],
+    },
+    data: { visibility: 'LIBRARY', ownerId: superAdminId },
+  });
+  const quizzes = await prisma.quiz.updateMany({
+    where: {
+      visibility: 'PRIVATE',
+      OR: [{ ownerId: superAdminId }, { ownerId: null }],
+    },
+    data: { visibility: 'LIBRARY', ownerId: superAdminId },
+  });
+  console.log(`  ✓ LIBRARY ko'chirildi: ${courses.count} kurs, ${quizzes.count} test`);
 }
 
 main()

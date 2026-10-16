@@ -192,6 +192,13 @@ export class LmsService {
       },
     });
     if (!a || !a.attachmentKey) throw new NotFoundException('Fayl topilmadi');
+
+    // N3: TEACHER faqat o'z yaratgan / o'z guruhi topshirig'ini ko'ra oladi
+    if (this.isTeacher(actor)) {
+      if (a.createdById !== actor.id && a.group.teacherId !== actor.id) {
+        throw new NotFoundException('Fayl topilmadi');
+      }
+    }
     // Student: faqat o'z guruhi topshirig'i uchun
     if (this.isStudent(actor)) {
       const member = await this.prisma.groupMember.findUnique({
