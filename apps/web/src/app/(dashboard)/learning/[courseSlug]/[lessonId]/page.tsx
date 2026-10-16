@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
+import { LessonCompleteButton } from '@/features/learning/components/lesson-complete-button';
 import { MaterialsPanel } from '@/features/learning/components/materials-panel';
 import { useLesson } from '@/features/learning/hooks/use-learning';
 import { Badge } from '@/shared/components/ui/badge';
@@ -127,6 +128,8 @@ export default function LessonDetailPage() {
         title={t('lessonMaterialsLabel')}
         viewOnly
       />
+
+      <LessonCompleteButton lessonId={lesson.id} />
     </div>
   );
 }

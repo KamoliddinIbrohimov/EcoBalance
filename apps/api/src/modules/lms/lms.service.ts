@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -138,12 +139,14 @@ export class LmsService {
         { group: { teacherId: actor.id } },
       ];
     } else if (this.isStudent(actor)) {
-      // Student faqat o'z guruhidagi topshiriqlar
+      // Student faqat o'z FAOL guruhidagi topshiriqlar (L9).
       const membership = await this.prisma.groupMember.findUnique({
         where: { studentId: actor.id },
-        select: { groupId: true },
+        select: { groupId: true, group: { select: { isActive: true } } },
       });
-      if (!membership) return { data: [], meta: { page, perPage, total: 0, totalPages: 1 } };
+      if (!membership || !membership.group.isActive) {
+        return { data: [], meta: { page, perPage, total: 0, totalPages: 1 } };
+      }
       where.groupId = membership.groupId;
     }
 
@@ -175,19 +178,50 @@ export class LmsService {
 
     const group = await this.prisma.group.findUnique({
       where: { id: input.groupId },
-      select: { teacherId: true },
+      select: { teacherId: true, isActive: true },
     });
     if (!group) throw new NotFoundException('Guruh topilmadi');
+    // L9: nofaol guruhda yangi topshiriq yaratib bo'lmaydi
+    if (!group.isActive) {
+      throw new ConflictException('Nofaol guruhga topshiriq yaratib bo‘lmaydi');
+    }
     if (!this.isSuperAdmin(actor) && group.teacherId !== actor.id) {
       throw new ForbiddenException('Faqat o‘z guruhlaringizga topshiriq yaratishingiz mumkin');
+    }
+
+    // L5: lesson/course bog'lamlari izchil bo'lsin
+    //  - lessonId berilsa, uning courseId'si CourseGroup orqali SHU guruhga biriktirilgan
+    //    bo'lishi kerak; agar courseId ham berilgan bo'lsa, mos kelishi kerak.
+    //  - courseId berilsa (lesson'siz) — shu kurs guruhga biriktirilgan bo'lsin.
+    let courseId: string | null = input.courseId ?? null;
+    let lessonId: string | null = input.lessonId ?? null;
+    if (lessonId) {
+      const lesson = await this.prisma.lesson.findUnique({
+        where: { id: lessonId },
+        select: { id: true, courseId: true },
+      });
+      if (!lesson) throw new BadRequestException('Dars topilmadi');
+      if (courseId && courseId !== lesson.courseId) {
+        throw new BadRequestException('Dars ko‘rsatilgan kursga tegishli emas');
+      }
+      courseId = lesson.courseId;
+    }
+    if (courseId) {
+      const link = await this.prisma.courseGroup.findUnique({
+        where: { courseId_groupId: { courseId, groupId: input.groupId } },
+        select: { courseId: true },
+      });
+      if (!link) {
+        throw new BadRequestException('Kurs bu guruhga biriktirilmagan');
+      }
     }
 
     const row = await this.prisma.assignment.create({
       data: {
         id: uuidv7(),
         groupId: input.groupId,
-        courseId: input.courseId ?? null,
-        lessonId: input.lessonId ?? null,
+        courseId,
+        lessonId,
         createdById: actor.id,
         titleUz: input.titleUz.trim(),
         descriptionUz: input.descriptionUz?.trim() ?? null,
@@ -219,11 +253,68 @@ export class LmsService {
   async updateAssignment(id: string, input: UpdateAssignmentInput, actor: Actor): Promise<AssignmentDto> {
     const existing = await this.prisma.assignment.findUnique({
       where: { id },
-      select: { createdById: true, group: { select: { teacherId: true } } },
+      select: {
+        id: true,
+        createdById: true,
+        titleUz: true,
+        descriptionUz: true,
+        dueAt: true,
+        maxScore: true,
+        groupId: true,
+        courseId: true,
+        lessonId: true,
+        group: { select: { teacherId: true } },
+      },
     });
     if (!existing) throw new NotFoundException('Topshiriq topilmadi');
     if (!this.isSuperAdmin(actor) && existing.createdById !== actor.id && existing.group.teacherId !== actor.id) {
       throw new ForbiddenException('Bu topshiriqni tahrirlash huquqingiz yo‘q');
+    }
+
+    // L7(b): dueAt o'tgan sanaga qo'yish taqiqlangan (hatto tahrirda ham).
+    if (input.dueAt !== undefined && input.dueAt && input.dueAt.getTime() < Date.now()) {
+      throw new BadRequestException('Muddat o‘tgan sanaga o‘zgartirilishi mumkin emas');
+    }
+
+    // L7(a): maxScore pasaytirilsa va baholangan topshiriqlarda score > new maxScore bo'lsa — 409.
+    if (input.maxScore !== undefined && input.maxScore < existing.maxScore) {
+      const highest = await this.prisma.assignmentSubmission.aggregate({
+        where: { assignmentId: id, score: { not: null } },
+        _max: { score: true },
+      });
+      if ((highest._max.score ?? 0) > input.maxScore) {
+        throw new ConflictException(
+          `Baholangan ballar bor (eng yuqori ${highest._max.score}). maxScore'ni ${highest._max.score} dan past qilib bo‘lmaydi`,
+        );
+      }
+    }
+
+    // L5: lesson/course consistency tahrirda ham tekshiriladi
+    let courseId = existing.courseId;
+    let lessonId = existing.lessonId;
+    if (input.lessonId !== undefined) {
+      lessonId = input.lessonId ?? null;
+    }
+    if (input.courseId !== undefined) {
+      courseId = input.courseId ?? null;
+    }
+    if (lessonId) {
+      const lesson = await this.prisma.lesson.findUnique({
+        where: { id: lessonId },
+        select: { courseId: true },
+      });
+      if (!lesson) throw new BadRequestException('Dars topilmadi');
+      if (courseId && courseId !== lesson.courseId) {
+        throw new BadRequestException('Dars ko‘rsatilgan kursga tegishli emas');
+      }
+      courseId = lesson.courseId;
+    }
+    if (courseId) {
+      const link = await this.prisma.courseGroup.findUnique({
+        where: { courseId_groupId: { courseId, groupId: existing.groupId } },
+        select: { courseId: true },
+      });
+      if (!link) throw new BadRequestException('Kurs bu guruhga biriktirilmagan');
     }
 
     const row = await this.prisma.assignment.update({
@@ -235,11 +326,35 @@ export class LmsService {
           : {}),
         ...(input.dueAt !== undefined ? { dueAt: input.dueAt ?? null } : {}),
         ...(input.maxScore !== undefined ? { maxScore: input.maxScore } : {}),
-        ...(input.courseId !== undefined ? { courseId: input.courseId ?? null } : {}),
-        ...(input.lessonId !== undefined ? { lessonId: input.lessonId ?? null } : {}),
+        ...(input.courseId !== undefined || input.lessonId !== undefined ? { courseId, lessonId } : {}),
       },
       select: ASSIGNMENT_SELECT,
     });
+
+    // L7(c): muddat, maxScore yoki tavsif o'zgarsa — guruh talabalariga bildirishnoma
+    const notableChange =
+      (input.dueAt !== undefined && (input.dueAt?.getTime() ?? null) !== (existing.dueAt?.getTime() ?? null)) ||
+      (input.maxScore !== undefined && input.maxScore !== existing.maxScore) ||
+      (input.descriptionUz !== undefined && (input.descriptionUz ?? null) !== existing.descriptionUz) ||
+      (input.titleUz !== undefined && input.titleUz !== existing.titleUz);
+    if (notableChange) {
+      const members = await this.prisma.groupMember.findMany({
+        where: { groupId: existing.groupId },
+        select: { studentId: true },
+      });
+      if (members.length > 0) {
+        await this.notifications.notifyUsers(
+          members.map((m) => m.studentId),
+          {
+            type: 'assignment.updated',
+            titleUz: 'Topshiriq yangilandi',
+            bodyUz: `"${row.titleUz}" topshirig‘i ma'lumotlari o‘zgardi. Qayta ko‘rib chiqing.`,
+            data: { assignmentId: row.id, groupId: row.groupId },
+          },
+        );
+      }
+    }
+
     return toAssignmentDto(row);
   }
 
@@ -272,10 +387,15 @@ export class LmsService {
         dueAt: true,
         titleUz: true,
         createdById: true,
-        group: { select: { teacherId: true } },
+        group: { select: { teacherId: true, isActive: true } },
       },
     });
     if (!assignment) throw new NotFoundException('Topshiriq topilmadi');
+
+    // L9: nofaol guruh — talaba yangi javob topshira olmaydi (arxiv-faqat)
+    if (!assignment.group.isActive) {
+      throw new ConflictException('Guruh nofaol — topshirishga ruxsat yo‘q');
+    }
 
     // Muddati o'tgan bo'lsa — topshirish mumkin emas
     if (assignment.dueAt && assignment.dueAt.getTime() < Date.now()) {
@@ -444,8 +564,25 @@ export class LmsService {
     if (!this.isStudent(actor)) {
       throw new ForbiddenException('Faqat talaba darsni belgilay oladi');
     }
-    const lesson = await this.prisma.lesson.findUnique({ where: { id: lessonId }, select: { id: true } });
-    if (!lesson) throw new NotFoundException('Dars topilmadi');
+    // L2: faqat talabaning FAOL guruhiga biriktirilgan va PUBLISHED kurs
+    // darsiga progress yoziladi. Aks holda 404 (probe-safe).
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+      select: { id: true, courseId: true, course: { select: { isPublished: true } } },
+    });
+    if (!lesson || !lesson.course.isPublished) {
+      throw new NotFoundException('Dars topilmadi');
+    }
+    const member = await this.prisma.groupMember.findUnique({
+      where: { studentId: actor.id },
+      select: { groupId: true, group: { select: { isActive: true } } },
+    });
+    if (!member || !member.group.isActive) throw new NotFoundException('Dars topilmadi');
+    const link = await this.prisma.courseGroup.findUnique({
+      where: { courseId_groupId: { courseId: lesson.courseId, groupId: member.groupId } },
+      select: { courseId: true },
+    });
+    if (!link) throw new NotFoundException('Dars topilmadi');
 
     const now = new Date();
     const row = await this.prisma.lessonProgress.upsert({
@@ -516,26 +653,41 @@ export class LmsService {
       select: { groupId: true },
     });
 
-    // Darslar — talaba guruhida biriktirilgan kurslar bo'yicha
+    // Darslar — talaba guruhida biriktirilgan va PUBLISHED kurslar bo'yicha
     let lessonsTotal = 0;
+    let visibleLessonIds: string[] = [];
     if (member) {
       const courseGroups = await this.prisma.courseGroup.findMany({
-        where: { groupId: member.groupId },
+        where: { groupId: member.groupId, course: { isPublished: true } },
         select: { courseId: true },
       });
       const courseIds = courseGroups.map((c) => c.courseId);
       if (courseIds.length > 0) {
-        lessonsTotal = await this.prisma.lesson.count({
+        const lessons = await this.prisma.lesson.findMany({
           where: { courseId: { in: courseIds } },
+          select: { id: true },
         });
+        visibleLessonIds = lessons.map((l) => l.id);
+        lessonsTotal = visibleLessonIds.length;
       }
     }
-    const lessonsCompleted = await this.prisma.lessonProgress.count({
-      where: { studentId, completedAt: { not: null } },
-    });
+    // L2: faqat ko'rinadigan darslar progressi hisobga olinadi, aks holda
+    // "yashirin" progress 100%+ chiqishi mumkin.
+    const lessonsCompleted =
+      visibleLessonIds.length === 0
+        ? 0
+        : await this.prisma.lessonProgress.count({
+            where: {
+              studentId,
+              completedAt: { not: null },
+              lessonId: { in: visibleLessonIds },
+            },
+          });
 
     const progressPercent =
-      lessonsTotal === 0 ? 0 : Math.round((lessonsCompleted / lessonsTotal) * 100);
+      lessonsTotal === 0
+        ? 0
+        : Math.min(100, Math.round((lessonsCompleted / lessonsTotal) * 100));
 
     const quizSubs = await this.prisma.quizSubmission.findMany({
       where: { userId: studentId, status: 'SUBMITTED' },
@@ -547,15 +699,30 @@ export class LmsService {
     const quizzesAverageScore =
       scored.length === 0 ? null : Math.round(scored.reduce((s, q) => s + (q.scorePercent ?? 0), 0) / scored.length);
 
+    // L6: baho o'rtachasini FOIZ bilan hisoblash (score/maxScore*100), xom
+    // ball emas. Agar maxScore=0 (nazariy chekka) bo'lsa 0 deb olinadi.
     const asSubs = await this.prisma.assignmentSubmission.findMany({
       where: { studentId },
-      select: { score: true, status: true, submittedAt: true, gradedAt: true },
+      select: {
+        score: true,
+        status: true,
+        submittedAt: true,
+        gradedAt: true,
+        assignment: { select: { maxScore: true } },
+      },
     });
     const assignmentsSubmitted = asSubs.length;
     const graded = asSubs.filter((a) => a.score !== null);
     const assignmentsGraded = graded.length;
     const assignmentsAverageScore =
-      graded.length === 0 ? null : Math.round(graded.reduce((s, g) => s + (g.score ?? 0), 0) / graded.length);
+      graded.length === 0
+        ? null
+        : Math.round(
+            graded.reduce((s, g) => {
+              const max = g.assignment?.maxScore ?? 100;
+              return s + (max > 0 ? ((g.score ?? 0) / max) * 100 : 0);
+            }, 0) / graded.length,
+          );
 
     const latestActivity = [
       ...quizSubs.map((q) => q.submittedAt?.getTime() ?? 0),

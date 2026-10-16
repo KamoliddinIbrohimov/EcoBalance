@@ -86,6 +86,28 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       };
     }
 
+    // Body-parser xatolari (payload katta, noto'g'ri JSON) — raw object .status
+    // bilan keladi, HttpException emas. Masalan express.json limit oshsa:
+    //   { type: 'entity.too.large', status: 413, expose: true }
+    if (typeof exception === 'object' && exception !== null) {
+      const e = exception as { status?: unknown; statusCode?: unknown; type?: unknown; message?: unknown };
+      const raw = typeof e.status === 'number' ? e.status : typeof e.statusCode === 'number' ? e.statusCode : undefined;
+      if (typeof raw === 'number' && raw >= 400 && raw < 600) {
+        const titleMap: Record<string, string> = {
+          'entity.too.large': 'So‘rov tanasi juda katta',
+          'entity.parse.failed': 'JSON noto‘g‘ri formatda',
+        };
+        const key = typeof e.type === 'string' ? e.type : '';
+        return {
+          type: `https://eco-balance.uz/errors/${raw}`,
+          title: titleMap[key] ?? (typeof e.message === 'string' ? e.message : 'Xatolik'),
+          status: raw,
+          instance,
+          traceId,
+        };
+      }
+    }
+
     // Noma'lum xato (Prisma, dastur ichidagi) — mutlaqo hech narsa sizmaslik.
     return {
       type: 'https://eco-balance.uz/errors/internal',

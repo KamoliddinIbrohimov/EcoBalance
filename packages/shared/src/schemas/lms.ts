@@ -189,7 +189,8 @@ export const studentStatsSchema = z.object({
   quizzesAverageScore: z.number().min(0).max(100).nullable(),
   assignmentsSubmitted: z.number().int().nonnegative(),
   assignmentsGraded: z.number().int().nonnegative(),
-  assignmentsAverageScore: z.number().min(0).nullable(),
+  /** O'rtacha ball — 0..100 foiz (score/maxScore). Xom ball emas. */
+  assignmentsAverageScore: z.number().min(0).max(100).nullable(),
   lastActivityAt: z.string().datetime().nullable(),
 });
 export type StudentStatsDto = z.infer<typeof studentStatsSchema>;

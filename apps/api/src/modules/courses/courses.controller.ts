@@ -68,8 +68,11 @@ export class CoursesController {
   @Get(':id/lessons')
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Kursning barcha darslari (tartib bo‘yicha)' })
-  async lessons(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.courses.listLessonsByCourse(id);
+  async lessons(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.courses.listLessonsByCourse(id, actor.roles, actor.id);
   }
 
   @Post()
@@ -130,15 +133,18 @@ export class LessonsController {
   @Get()
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Darslar ro‘yxati (kurs / tur bo‘yicha filtr)' })
-  async list(@Query() query: QueryLessonDto) {
-    return this.courses.listLessons(query);
+  async list(@Query() query: QueryLessonDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.courses.listLessons(query, actor.roles, actor.id);
   }
 
   @Get(':id')
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Dars tafsilotlari (kurs bilan birga)' })
-  async detail(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.courses.findLessonById(id);
+  async detail(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.courses.findLessonById(id, actor.roles, actor.id);
   }
 
   @Post()

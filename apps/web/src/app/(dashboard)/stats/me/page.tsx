@@ -69,7 +69,7 @@ export default function MyStatsPage() {
           icon={<Award className="h-5 w-5" />}
           label="Topshiriqlar"
           value={`${data.assignmentsGraded}/${data.assignmentsSubmitted}`}
-          sub={data.assignmentsAverageScore !== null ? `o'rtacha ball ${data.assignmentsAverageScore}` : '—'}
+          sub={data.assignmentsAverageScore !== null ? `o'rtacha ${data.assignmentsAverageScore}%` : '—'}
         />
       </div>
 
