@@ -10,9 +10,12 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PERMISSION } from '@eco/shared';
 
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -86,6 +89,38 @@ export class AssignmentsController {
     return this.lms.submitAssignment(id, dto, asActor(user));
   }
 
+  @Post(':id/start')
+  @RequirePermissions(PERMISSION.ASSIGNMENTS_SUBMIT)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'F4 TIMED: urinishni boshlash (server-side taymer)' })
+  async startTimed(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.lms.startTimedAttempt(id, asActor(user));
+  }
+
+  @Post(':id/accommodations/:studentId')
+  @RequirePermissions(PERMISSION.ASSIGNMENTS_MANAGE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'F4: alohida talabaga vaqt uzaytirish' })
+  async upsertAccommodation(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('studentId', new ParseUUIDPipe()) studentId: string,
+    @Body() body: { extraMinutes?: number; newDueAt?: string },
+  ) {
+    return this.lms.upsertAccommodation(
+      id,
+      studentId,
+      {
+        extraMinutes: body?.extraMinutes,
+        newDueAt: body?.newDueAt ? new Date(body.newDueAt) : undefined,
+      },
+      asActor(user),
+    );
+  }
+
   @Get(':id/submissions')
   @RequirePermissions(PERMISSION.ASSIGNMENTS_MANAGE)
   @ApiOperation({ summary: 'Topshiriqning barcha javoblari (TEACHER/SA)' })
@@ -126,6 +161,54 @@ export class AssignmentsController {
     @Body() body: { feedbackUz?: string },
   ) {
     return this.lms.reopenSubmission(submissionId, body?.feedbackUz, asActor(user));
+  }
+
+  // -------- File upload (L14) --------
+
+  @Post(':id/attachment')
+  @RequirePermissions(PERMISSION.ASSIGNMENTS_MANAGE)
+  @HttpCode(HttpStatus.OK)
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Topshiriqqa fayl biriktirish (shablon)' })
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAttachment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.lms.uploadAssignmentAttachment(id, file, asActor(user));
+  }
+
+  @Get(':id/attachment-url')
+  @ApiOperation({ summary: 'Topshiriq shablon faylini yuklab olish URL (presigned)' })
+  async attachmentUrl(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.lms.getAssignmentAttachmentUrl(id, asActor(user));
+  }
+
+  @Post(':id/submissions/file')
+  @RequirePermissions(PERMISSION.ASSIGNMENTS_SUBMIT)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Talaba fayl bilan topshiradi' })
+  @UseInterceptors(FileInterceptor('file'))
+  async submitFile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.lms.uploadSubmissionFile(id, file, asActor(user));
+  }
+
+  @Get('submissions/:submissionId/file-url')
+  @ApiOperation({ summary: 'Topshirilgan faylni yuklab olish URL (presigned)' })
+  async submissionFileUrl(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('submissionId', new ParseUUIDPipe()) submissionId: string,
+  ) {
+    return this.lms.getSubmissionFileUrl(submissionId, asActor(user));
   }
 }
 

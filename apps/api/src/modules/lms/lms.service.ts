@@ -25,6 +25,7 @@ import { v7 as uuidv7 } from 'uuid';
 
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 
 export interface Actor {
   id: string;
@@ -132,7 +133,176 @@ export class LmsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly storage: StorageService,
   ) {}
+
+  // -------- F4 (L14) File upload / download --------
+
+  private static readonly ALLOWED_MIME = new Set([
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain',
+  ]);
+  private static readonly MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+  async uploadAssignmentAttachment(
+    assignmentId: string,
+    file: Express.Multer.File | undefined,
+    actor: Actor,
+  ) {
+    if (!file) throw new BadRequestException('Fayl yuborilmagan');
+    if (file.size > LmsService.MAX_FILE_BYTES) {
+      throw new BadRequestException('Fayl 10 MB dan oshmasligi kerak');
+    }
+    if (!LmsService.ALLOWED_MIME.has(file.mimetype)) {
+      throw new BadRequestException(`Mumkin bo‘lmagan fayl turi: ${file.mimetype}`);
+    }
+    const a = await this.prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: { createdById: true, group: { select: { teacherId: true } } },
+    });
+    if (!a) throw new NotFoundException('Topshiriq topilmadi');
+    if (!this.isSuperAdmin(actor) && a.createdById !== actor.id && a.group.teacherId !== actor.id) {
+      throw new ForbiddenException("Faqat o'z topshirig'ingizga fayl biriktira olasiz");
+    }
+    const key = `assignments/${assignmentId}/attachment-${uuidv7()}-${file.originalname}`;
+    await this.storage.upload(key, file.buffer, file.mimetype);
+    await this.prisma.assignment.update({
+      where: { id: assignmentId },
+      data: { attachmentKey: key, attachmentFileName: file.originalname },
+    });
+    return { key, fileName: file.originalname };
+  }
+
+  async getAssignmentAttachmentUrl(assignmentId: string, actor: Actor): Promise<{ url: string }> {
+    const a = await this.prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: {
+        attachmentKey: true,
+        attachmentFileName: true,
+        groupId: true,
+        createdById: true,
+        group: { select: { teacherId: true } },
+      },
+    });
+    if (!a || !a.attachmentKey) throw new NotFoundException('Fayl topilmadi');
+    // Student: faqat o'z guruhi topshirig'i uchun
+    if (this.isStudent(actor)) {
+      const member = await this.prisma.groupMember.findUnique({
+        where: { studentId: actor.id },
+        select: { groupId: true },
+      });
+      if (!member || member.groupId !== a.groupId) {
+        throw new NotFoundException('Fayl topilmadi');
+      }
+    }
+    const url = await this.storage.getDownloadUrl(a.attachmentKey, a.attachmentFileName ?? 'attachment');
+    return { url };
+  }
+
+  async uploadSubmissionFile(
+    assignmentId: string,
+    file: Express.Multer.File | undefined,
+    actor: Actor,
+  ): Promise<AssignmentSubmissionDto> {
+    if (!this.isStudent(actor)) throw new ForbiddenException('Faqat talaba');
+    if (!file) throw new BadRequestException('Fayl yuborilmagan');
+    if (file.size > LmsService.MAX_FILE_BYTES) {
+      throw new BadRequestException('Fayl 10 MB dan oshmasligi kerak');
+    }
+    if (!LmsService.ALLOWED_MIME.has(file.mimetype)) {
+      throw new BadRequestException(`Mumkin bo‘lmagan fayl turi: ${file.mimetype}`);
+    }
+    const assignment = await this.prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: {
+        groupId: true,
+        dueAt: true,
+        allowLate: true,
+        group: { select: { isActive: true } },
+      },
+    });
+    if (!assignment) throw new NotFoundException('Topshiriq topilmadi');
+    if (!assignment.group.isActive) {
+      throw new ConflictException('Guruh nofaol');
+    }
+    const member = await this.prisma.groupMember.findUnique({
+      where: { studentId: actor.id },
+      select: { groupId: true },
+    });
+    if (!member || member.groupId !== assignment.groupId) {
+      throw new ForbiddenException('Bu topshiriq sizning guruhingizga tegishli emas');
+    }
+    const now = Date.now();
+    let isLate = false;
+    if (assignment.dueAt && assignment.dueAt.getTime() < now) {
+      if (!assignment.allowLate) throw new BadRequestException('Topshiriq muddati o‘tdi');
+      isLate = true;
+    }
+    const existing = await this.prisma.assignmentSubmission.findUnique({
+      where: { assignmentId_studentId: { assignmentId, studentId: actor.id } },
+    });
+    if (existing && existing.status === AssignmentSubmissionStatus.GRADED) {
+      throw new BadRequestException('Baholangan topshiriqga fayl qo‘shib bo‘lmaydi');
+    }
+    const key = `submissions/${assignmentId}/${actor.id}/${uuidv7()}-${file.originalname}`;
+    await this.storage.upload(key, file.buffer, file.mimetype);
+
+    const row = existing
+      ? await this.prisma.assignmentSubmission.update({
+          where: { id: existing.id },
+          data: {
+            fileKey: key,
+            fileName: file.originalname,
+            submittedAt: new Date(),
+            status: AssignmentSubmissionStatus.SUBMITTED,
+            isLate,
+          },
+          select: SUBMISSION_SELECT,
+        })
+      : await this.prisma.assignmentSubmission.create({
+          data: {
+            id: uuidv7(),
+            assignmentId,
+            studentId: actor.id,
+            fileKey: key,
+            fileName: file.originalname,
+            attempt: 1,
+            isLate,
+          },
+          select: SUBMISSION_SELECT,
+        });
+    return toSubmissionDto(row);
+  }
+
+  async getSubmissionFileUrl(submissionId: string, actor: Actor): Promise<{ url: string }> {
+    const sub = await this.prisma.assignmentSubmission.findUnique({
+      where: { id: submissionId },
+      select: {
+        fileKey: true,
+        fileName: true,
+        studentId: true,
+        assignment: {
+          select: { createdById: true, group: { select: { teacherId: true } } },
+        },
+      },
+    });
+    if (!sub || !sub.fileKey) throw new NotFoundException('Fayl topilmadi');
+    const isOwner = sub.studentId === actor.id;
+    const canGrade =
+      this.isSuperAdmin(actor) ||
+      sub.assignment.createdById === actor.id ||
+      sub.assignment.group.teacherId === actor.id;
+    if (!isOwner && !canGrade) throw new ForbiddenException('Ko‘rish huquqingiz yo‘q');
+    const url = await this.storage.getDownloadUrl(sub.fileKey, sub.fileName ?? 'file');
+    return { url };
+  }
 
   private isSuperAdmin(actor: Actor) {
     return actor.roles.includes('SUPER_ADMIN');
@@ -242,17 +412,42 @@ export class LmsService {
       }
     }
 
+    // F4: TIMED tekshiruvlar
+    if (input.kind === 'TIMED') {
+      if (!input.endsAt || !input.timeLimitMinutes) {
+        throw new BadRequestException(
+          'TIMED turi uchun endsAt va timeLimitMinutes majburiy',
+        );
+      }
+      if (input.startsAt && input.endsAt && input.startsAt.getTime() >= input.endsAt.getTime()) {
+        throw new BadRequestException('startsAt endsAt dan oldin bo‘lishi kerak');
+      }
+    }
+    // F4: QUESTIONNAIRE — quizId mavjudligi tekshirilsin
+    if (input.kind === 'QUESTIONNAIRE' && input.quizId) {
+      const quiz = await this.prisma.quiz.findUnique({ where: { id: input.quizId }, select: { id: true } });
+      if (!quiz) throw new BadRequestException('Test topilmadi');
+    }
+
     const row = await this.prisma.assignment.create({
       data: {
         id: uuidv7(),
         groupId: input.groupId,
         courseId,
         lessonId,
+        moduleId: input.moduleId ?? null,
         createdById: actor.id,
+        kind: input.kind ?? 'TASK',
         titleUz: input.titleUz.trim(),
         descriptionUz: input.descriptionUz?.trim() ?? null,
         dueAt: input.dueAt ?? null,
         maxScore: input.maxScore ?? 100,
+        allowLate: input.allowLate ?? false,
+        latePenaltyPercent: input.latePenaltyPercent ?? 0,
+        startsAt: input.startsAt ?? null,
+        endsAt: input.endsAt ?? null,
+        timeLimitMinutes: input.timeLimitMinutes ?? null,
+        quizId: input.quizId ?? null,
       },
       select: ASSIGNMENT_SELECT,
     });
@@ -396,6 +591,134 @@ export class LmsService {
     await this.prisma.assignment.delete({ where: { id } });
   }
 
+  /**
+   * F4 TIMED: talaba urinishni boshlaydi. Server attemptStartedAt va
+   * attemptDeadline = min(now + timeLimit, endsAt) ni yozadi. Sahifa
+   * yangilansa shu qiymatlar qaytariladi (taymer serverdan tiklanadi).
+   */
+  async startTimedAttempt(assignmentId: string, actor: Actor): Promise<AssignmentSubmissionDto> {
+    if (!this.isStudent(actor)) throw new ForbiddenException('Faqat talaba');
+    const a = await this.prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: {
+        kind: true,
+        startsAt: true,
+        endsAt: true,
+        timeLimitMinutes: true,
+        groupId: true,
+        group: { select: { isActive: true } },
+      },
+    });
+    if (!a) throw new NotFoundException('Topshiriq topilmadi');
+    if (!a.group.isActive) throw new ConflictException('Guruh nofaol');
+    if (a.kind !== 'TIMED') throw new BadRequestException('Faqat TIMED topshiriq uchun');
+    if (!a.endsAt || !a.timeLimitMinutes) {
+      throw new BadRequestException('TIMED sozlamalari to‘liq emas');
+    }
+    const member = await this.prisma.groupMember.findUnique({
+      where: { studentId: actor.id },
+      select: { groupId: true },
+    });
+    if (!member || member.groupId !== a.groupId) {
+      throw new ForbiddenException('Bu topshiriq sizning guruhingizga tegishli emas');
+    }
+    const now = new Date();
+    if (a.startsAt && a.startsAt.getTime() > now.getTime()) {
+      throw new BadRequestException(`Boshlanish: ${a.startsAt.toISOString()}`);
+    }
+    if (a.endsAt.getTime() < now.getTime()) {
+      throw new BadRequestException('Test oynasi yopildi');
+    }
+    // Alohida uzaytirish
+    const acc = await this.prisma.assignmentAccommodation.findUnique({
+      where: { assignmentId_studentId: { assignmentId, studentId: actor.id } },
+    });
+    const extra = acc?.extraMinutes ?? 0;
+    const limitMs = (a.timeLimitMinutes + extra) * 60_000;
+    const deadline = new Date(Math.min(now.getTime() + limitMs, a.endsAt.getTime()));
+
+    const existing = await this.prisma.assignmentSubmission.findUnique({
+      where: { assignmentId_studentId: { assignmentId, studentId: actor.id } },
+    });
+    if (existing && existing.attemptDeadline && existing.attemptDeadline.getTime() > now.getTime()) {
+      // Faol urinish bor — xuddi shu qaytariladi (sahifa yangilansa taymer tiklanadi)
+      return toSubmissionDto(await this.prisma.assignmentSubmission.findUnique({
+        where: { id: existing.id },
+        select: SUBMISSION_SELECT,
+      }) as SubmissionRow);
+    }
+    if (existing && existing.status === 'GRADED') {
+      throw new BadRequestException('Bu topshiriq baholab bo‘lingan');
+    }
+
+    const row = existing
+      ? await this.prisma.assignmentSubmission.update({
+          where: { id: existing.id },
+          data: {
+            attemptStartedAt: now,
+            attemptDeadline: deadline,
+            status: AssignmentSubmissionStatus.SUBMITTED,
+          },
+          select: SUBMISSION_SELECT,
+        })
+      : await this.prisma.assignmentSubmission.create({
+          data: {
+            id: uuidv7(),
+            assignmentId,
+            studentId: actor.id,
+            textUz: null,
+            attempt: 1,
+            attemptStartedAt: now,
+            attemptDeadline: deadline,
+          },
+          select: SUBMISSION_SELECT,
+        });
+    return toSubmissionDto(row);
+  }
+
+  /**
+   * F4 TIMED/TASK: o'qituvchi alohida talabaga vaqt uzaytiradi.
+   */
+  async upsertAccommodation(
+    assignmentId: string,
+    studentId: string,
+    input: { extraMinutes?: number; newDueAt?: Date },
+    actor: Actor,
+  ) {
+    const a = await this.prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: { createdById: true, group: { select: { teacherId: true } } },
+    });
+    if (!a) throw new NotFoundException('Topshiriq topilmadi');
+    if (!this.isSuperAdmin(actor) && a.createdById !== actor.id && a.group.teacherId !== actor.id) {
+      throw new ForbiddenException("Faqat o'z guruhingiz uchun");
+    }
+    const existing = await this.prisma.assignmentAccommodation.findUnique({
+      where: { assignmentId_studentId: { assignmentId, studentId } },
+    });
+    const row = existing
+      ? await this.prisma.assignmentAccommodation.update({
+          where: { id: existing.id },
+          data: { extraMinutes: input.extraMinutes ?? null, newDueAt: input.newDueAt ?? null },
+        })
+      : await this.prisma.assignmentAccommodation.create({
+          data: {
+            id: uuidv7(),
+            assignmentId,
+            studentId,
+            extraMinutes: input.extraMinutes ?? null,
+            newDueAt: input.newDueAt ?? null,
+          },
+        });
+    return {
+      id: row.id,
+      assignmentId: row.assignmentId,
+      studentId: row.studentId,
+      extraMinutes: row.extraMinutes,
+      newDueAt: row.newDueAt?.toISOString() ?? null,
+    };
+  }
+
   async submitAssignment(
     assignmentId: string,
     input: SubmitAssignmentInput,
@@ -413,6 +736,9 @@ export class LmsService {
         dueAt: true,
         titleUz: true,
         createdById: true,
+        kind: true,
+        allowLate: true,
+        endsAt: true,
         group: { select: { teacherId: true, isActive: true } },
       },
     });
@@ -423,9 +749,18 @@ export class LmsService {
       throw new ConflictException('Guruh nofaol — topshirishga ruxsat yo‘q');
     }
 
-    // Muddati o'tgan bo'lsa — topshirish mumkin emas
-    if (assignment.dueAt && assignment.dueAt.getTime() < Date.now()) {
-      throw new BadRequestException('Topshiriq muddati o‘tdi');
+    const now = Date.now();
+    // L7: dueAt o'tgan — allowLate=true bo'lsa qabul qilinadi, lekin isLate=true belgilanadi
+    let isLate = false;
+    if (assignment.dueAt && assignment.dueAt.getTime() < now) {
+      if (!assignment.allowLate) {
+        throw new BadRequestException('Topshiriq muddati o‘tdi');
+      }
+      isLate = true;
+    }
+    // F4 TIMED: endsAt o'tgan — qabul qilinmaydi (qattiq)
+    if (assignment.kind === 'TIMED' && assignment.endsAt && assignment.endsAt.getTime() < now) {
+      throw new BadRequestException('Test oynasi yopildi');
     }
 
     // Student o'z guruhidagi topshiriqdagina
@@ -455,6 +790,22 @@ export class LmsService {
       throw new BadRequestException("Topshiriq o'qituvchi ko'rib chiqishida");
     }
 
+    // F4 TIMED: faol urinish bor bo'lsa deadline tekshirilsin
+    if (assignment.kind === 'TIMED') {
+      const existingAttempt = await this.prisma.assignmentSubmission.findUnique({
+        where: { assignmentId_studentId: { assignmentId, studentId: actor.id } },
+        select: { attemptDeadline: true },
+      });
+      if (!existingAttempt || !existingAttempt.attemptDeadline) {
+        throw new BadRequestException(
+          'TIMED: avval POST /assignments/:id/start chaqirib urinishni boshlang',
+        );
+      }
+      if (existingAttempt.attemptDeadline.getTime() < now) {
+        throw new BadRequestException('TIMED: urinish vaqti tugadi');
+      }
+    }
+
     let row;
     if (!existing) {
       row = await this.prisma.assignmentSubmission.create({
@@ -464,6 +815,7 @@ export class LmsService {
           studentId: actor.id,
           textUz: text,
           attempt: 1,
+          isLate,
         },
         select: SUBMISSION_SELECT,
       });
@@ -496,6 +848,7 @@ export class LmsService {
           feedbackUz: null,
           gradedAt: null,
           gradedById: null,
+          isLate,
         },
         select: SUBMISSION_SELECT,
       });
@@ -507,6 +860,7 @@ export class LmsService {
           textUz: text,
           submittedAt: new Date(),
           status: AssignmentSubmissionStatus.SUBMITTED,
+          isLate,
         },
         select: SUBMISSION_SELECT,
       });
