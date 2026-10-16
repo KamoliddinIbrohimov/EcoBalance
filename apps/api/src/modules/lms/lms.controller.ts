@@ -314,11 +314,24 @@ export class StatsController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.lms.studentTimeline(
-      id,
-      asActor(user),
-      from ? new Date(from) : undefined,
-      to ? new Date(to) : undefined,
-    );
+    // N16: noto'g'ri sana -> 400
+    const parseDate = (raw: string | undefined, label: string): Date | undefined => {
+      if (!raw) return undefined;
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) {
+        throw new (require('@nestjs/common').BadRequestException)(
+          `${label}: ISO 8601 formatida sana kiriting`,
+        );
+      }
+      return d;
+    };
+    return this.lms.studentTimeline(id, asActor(user), parseDate(from, 'from'), parseDate(to, 'to'));
+  }
+
+  @Get('me/overview')
+  @RequirePermissions(PERMISSION.STATS_READ_OWN)
+  @ApiOperation({ summary: "O'z overview — risks, time, weekly activity" })
+  async meOverview(@CurrentUser() user: AuthenticatedUser) {
+    return this.lms.studentOverview(user.id, asActor(user));
   }
 }

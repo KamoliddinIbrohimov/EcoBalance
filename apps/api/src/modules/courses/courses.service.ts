@@ -513,8 +513,14 @@ export class CoursesService {
         : {}),
       ...(studentCourseIds ? { courseId: { in: studentCourseIds } } : {}),
       ...teacherCourseFilter,
-      // STUDENT: faqat PUBLISHED va arxivlanmagan darslar
-      ...(isStudent ? { isPublished: true, archivedAt: null } : {}),
+      // STUDENT: faqat PUBLISHED va arxivlanmagan darslar + nashr etilgan modul
+      ...(isStudent
+        ? {
+            isPublished: true,
+            archivedAt: null,
+            OR: [{ moduleId: null }, { module: { isPublished: true } }],
+          }
+        : {}),
     };
 
     const [total, rows] = await this.prisma.$transaction([
@@ -571,7 +577,14 @@ export class CoursesService {
     const rows = await this.prisma.lesson.findMany({
       where: {
         courseId,
-        ...(isStudent ? { isPublished: true, archivedAt: null } : {}),
+        ...(isStudent
+          ? {
+              isPublished: true,
+              archivedAt: null,
+              // N14: nashr etilmagan modul darslari talabaga yopiq
+              OR: [{ moduleId: null }, { module: { isPublished: true } }],
+            }
+          : {}),
       },
       select: LESSON_SELECT,
       orderBy: { orderIndex: 'asc' },

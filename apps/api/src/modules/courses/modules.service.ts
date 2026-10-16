@@ -125,15 +125,62 @@ export class ModulesService {
     return toModuleDto(row);
   }
 
-  async remove(id: string, actorId: string, roles: string[]): Promise<void> {
+  async remove(id: string, actorId: string, roles: string[]): Promise<{
+    movedLessonCount: number;
+  }> {
+    const existing = await this.prisma.module.findUnique({
+      where: { id },
+      select: { courseId: true, titleUz: true },
+    });
+    if (!existing) throw new NotFoundException('Modul topilmadi');
+    await this.assertCourseOwnership(existing.courseId, actorId, roles);
+
+    // N14: darslarni "Umumiy" modulga ko'chiramiz (yo'q bo'lsa yaratamiz),
+    // keyin modulni o'chiramiz. Bitta tranzaksiya.
+    const generalName = 'Umumiy';
+    const movedLessonCount = await this.prisma.$transaction(async (tx) => {
+      let general = await tx.module.findFirst({
+        where: { courseId: existing.courseId, titleUz: generalName },
+      });
+      if (!general) {
+        const maxOrder = (
+          await tx.module.aggregate({
+            where: { courseId: existing.courseId },
+            _max: { orderIndex: true },
+          })
+        )._max.orderIndex;
+        general = await tx.module.create({
+          data: {
+            id: uuidv7(),
+            courseId: existing.courseId,
+            orderIndex: (maxOrder ?? -1) + 1,
+            titleUz: generalName,
+            isPublished: true,
+          },
+        });
+      }
+      const moved = await tx.lesson.updateMany({
+        where: { moduleId: id },
+        data: { moduleId: general.id },
+      });
+      await tx.module.delete({ where: { id } });
+      return moved.count;
+    });
+    return { movedLessonCount };
+  }
+
+  /**
+   * N14: modul darslarini oldindan ko'rish — nechta dars ta'sirlanadi.
+   */
+  async removalImpact(id: string, actorId: string, roles: string[]) {
     const existing = await this.prisma.module.findUnique({
       where: { id },
       select: { courseId: true },
     });
     if (!existing) throw new NotFoundException('Modul topilmadi');
     await this.assertCourseOwnership(existing.courseId, actorId, roles);
-    // Darslar: moduleId -> null (SetNull)
-    await this.prisma.module.delete({ where: { id } });
+    const lessonCount = await this.prisma.lesson.count({ where: { moduleId: id } });
+    return { moduleId: id, lessonsToMove: lessonCount };
   }
 
   /**

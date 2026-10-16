@@ -151,6 +151,46 @@ export class LmsService {
   ]);
   private static readonly MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 
+  /**
+   * N15 (a): magic-byte tekshiruvi — Content-Type ga ishonmaymiz, fayl boshidan
+   * imzoni tekshiramiz. Content-Type va magic byte mos kelmasa 400.
+   */
+  private assertMagicByte(file: Express.Multer.File): void {
+    const b = file.buffer;
+    const mime = file.mimetype;
+    const startsWith = (bytes: number[]): boolean =>
+      bytes.every((v, i) => b[i] === v);
+    // Qisqa fayl — magic yo'q, matn deb o'tkazamiz
+    if (b.length < 4) {
+      if (mime === 'text/plain') return;
+      throw new BadRequestException('Fayl bo‘sh yoki buzilgan');
+    }
+    const checks: Record<string, () => boolean> = {
+      'application/pdf': () => startsWith([0x25, 0x50, 0x44, 0x46]), // %PDF
+      'image/jpeg': () => startsWith([0xff, 0xd8, 0xff]),
+      'image/png': () => startsWith([0x89, 0x50, 0x4e, 0x47]),
+      'image/webp': () => startsWith([0x52, 0x49, 0x46, 0x46]), // RIFF
+      // ZIP-based (docx, xlsx) — PK..
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        () => startsWith([0x50, 0x4b, 0x03, 0x04]),
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+        () => startsWith([0x50, 0x4b, 0x03, 0x04]),
+      // Old office (D0 CF 11 E0)
+      'application/msword': () => startsWith([0xd0, 0xcf, 0x11, 0xe0]),
+      'application/vnd.ms-excel': () => startsWith([0xd0, 0xcf, 0x11, 0xe0]),
+      'text/plain': () => true, // text — magic yo'q
+    };
+    const checker = checks[mime];
+    if (!checker) {
+      throw new BadRequestException(`Qo'llab-quvvatlanmaydigan fayl turi: ${mime}`);
+    }
+    if (!checker()) {
+      throw new BadRequestException(
+        `Fayl Content-Type (${mime}) bilan haqiqiy formati mos kelmaydi`,
+      );
+    }
+  }
+
   async uploadAssignmentAttachment(
     assignmentId: string,
     file: Express.Multer.File | undefined,
@@ -163,6 +203,8 @@ export class LmsService {
     if (!LmsService.ALLOWED_MIME.has(file.mimetype)) {
       throw new BadRequestException(`Mumkin bo‘lmagan fayl turi: ${file.mimetype}`);
     }
+    // N15: magic-byte
+    this.assertMagicByte(file);
     const a = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
       select: { createdById: true, group: { select: { teacherId: true } } },
@@ -226,6 +268,8 @@ export class LmsService {
     if (!LmsService.ALLOWED_MIME.has(file.mimetype)) {
       throw new BadRequestException(`Mumkin bo‘lmagan fayl turi: ${file.mimetype}`);
     }
+    // N15: magic-byte
+    this.assertMagicByte(file);
     const assignment = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
       select: {
@@ -1221,10 +1265,13 @@ export class LmsService {
     actor: Actor,
   ) {
     if (!this.isStudent(actor)) throw new ForbiddenException('Faqat talaba');
-    if (!Number.isFinite(activeSeconds) || activeSeconds < 0) {
-      throw new BadRequestException('activeSeconds >= 0 bo‘lishi kerak');
+    // N16: heartbeat zod validatsiyasi — activeSeconds 0..90, position 0..100
+    if (!Number.isFinite(activeSeconds) || activeSeconds < 0 || activeSeconds > 90) {
+      throw new BadRequestException('activeSeconds 0..90 oralig‘ida bo‘lishi kerak');
     }
-    const bounded = Math.min(60, Math.max(0, Math.floor(activeSeconds)));
+    if (position !== undefined && (position < 0 || position > 100)) {
+      throw new BadRequestException('position 0..100 oralig‘ida bo‘lishi kerak');
+    }
 
     // Dars huquqini tekshirish (updateProgress bilan bir xil)
     const lesson = await this.prisma.lesson.findUnique({
@@ -1245,7 +1292,18 @@ export class LmsService {
 
     const now = new Date();
 
-    // LessonProgress yangilash (viewCount, timeSpentSec, lastPosition)
+    // N16: tezlik cheklovi — mavjud yozuvdan lastViewedAt ni olib,
+    // qo'shiladigan vaqt = min(activeSeconds, now - lastViewedAt + 5s).
+    const current = await this.prisma.lessonProgress.findUnique({
+      where: { studentId_lessonId: { studentId: actor.id, lessonId } },
+    });
+    let addSeconds = Math.floor(activeSeconds);
+    if (current?.lastViewedAt) {
+      const sinceLast = Math.floor((now.getTime() - current.lastViewedAt.getTime()) / 1000);
+      addSeconds = Math.max(0, Math.min(addSeconds, sinceLast + 5));
+    }
+
+    // LessonProgress yangilash
     await this.prisma.lessonProgress.upsert({
       where: { studentId_lessonId: { studentId: actor.id, lessonId } },
       create: {
@@ -1256,12 +1314,12 @@ export class LmsService {
         firstViewedAt: now,
         lastViewedAt: now,
         viewCount: 1,
-        timeSpentSec: bounded,
+        timeSpentSec: addSeconds,
         lastPosition: position ?? 0,
       },
       update: {
         lastViewedAt: now,
-        timeSpentSec: { increment: bounded },
+        timeSpentSec: { increment: addSeconds },
         ...(position !== undefined ? { lastPosition: position } : {}),
       },
     });
@@ -1273,12 +1331,12 @@ export class LmsService {
         studentId: actor.id,
         type: 'LESSON_HEARTBEAT',
         refId: lessonId,
-        meta: { activeSeconds: bounded, position: position ?? null } as Prisma.InputJsonValue,
+        meta: { activeSeconds: addSeconds, position: position ?? null } as Prisma.InputJsonValue,
         at: now,
       },
     });
 
-    return { ok: true, addedSeconds: bounded };
+    return { ok: true, addedSeconds: addSeconds };
   }
 
   /**
@@ -1470,12 +1528,17 @@ export class LmsService {
       where: { studentId: actor.id },
       orderBy: { lastViewedAt: 'desc' },
     });
+    // N16: viewCount, timeSpentSec, lastPosition qo'shildi
     return rows.map((r) => ({
       id: r.id,
       studentId: r.studentId,
       lessonId: r.lessonId,
       completedAt: r.completedAt?.toISOString() ?? null,
       lastViewedAt: r.lastViewedAt.toISOString(),
+      firstViewedAt: r.firstViewedAt?.toISOString() ?? null,
+      viewCount: r.viewCount,
+      timeSpentSec: r.timeSpentSec,
+      lastPosition: r.lastPosition,
     }));
   }
 
@@ -1545,10 +1608,31 @@ export class LmsService {
         ? 0
         : Math.min(100, Math.round((lessonsCompleted / lessonsTotal) * 100));
 
-    // L13: noyob testlar bo'yicha (bitta testni 2 marta topshirgan talaba
-    // "1" ko'rinadi); eng oxirgi urinish o'rtacha ballda hisobga olinadi.
+    // N17: joriy guruh ko'rsatkichlari — faqat shu guruhga biriktirilgan testlar
+    const currentGroupId = member?.groupId ?? null;
+    const currentGroupQuizIds = currentGroupId
+      ? (
+          await this.prisma.groupQuiz.findMany({
+            where: { groupId: currentGroupId },
+            select: { quizId: true },
+          })
+        ).map((g) => g.quizId)
+      : [];
+    const currentGroupAssignmentIds = currentGroupId
+      ? (
+          await this.prisma.assignment.findMany({
+            where: { groupId: currentGroupId },
+            select: { id: true },
+          })
+        ).map((a) => a.id)
+      : [];
+    // L13 + N17: noyob testlar bo'yicha, FAQAT joriy guruh
     const allQuizSubs = await this.prisma.quizSubmission.findMany({
-      where: { userId: studentId, status: 'SUBMITTED' },
+      where: {
+        userId: studentId,
+        status: 'SUBMITTED',
+        ...(currentGroupId ? { quizId: { in: currentGroupQuizIds } } : {}),
+      },
       select: { quizId: true, scorePercent: true, passed: true, submittedAt: true },
       orderBy: { submittedAt: 'desc' },
     });
@@ -1564,10 +1648,12 @@ export class LmsService {
     const quizzesAverageScore =
       scored.length === 0 ? null : Math.round(scored.reduce((s, q) => s + (q.scorePercent ?? 0), 0) / scored.length);
 
-    // L6: baho o'rtachasini FOIZ bilan hisoblash (score/maxScore*100), xom
-    // ball emas. Agar maxScore=0 (nazariy chekka) bo'lsa 0 deb olinadi.
+    // L6 + N17: baho o'rtachasini FOIZ bilan va FAQAT joriy guruh topshiriqlari bo'yicha.
     const asSubs = await this.prisma.assignmentSubmission.findMany({
-      where: { studentId },
+      where: {
+        studentId,
+        ...(currentGroupId ? { assignmentId: { in: currentGroupAssignmentIds } } : {}),
+      },
       select: {
         score: true,
         status: true,

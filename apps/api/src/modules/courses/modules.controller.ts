@@ -60,13 +60,24 @@ export class ModulesController {
 
   @Delete('modules/:id')
   @RequirePermissions(PERMISSION.LESSONS_MANAGE)
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Modulni o‘chirish (darslar null bo‘ladi)' })
+  @ApiOperation({
+    summary: 'Modulni o‘chirish (darslar "Umumiy" modulga ko‘chadi, soni qaytariladi)',
+  })
   async remove(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() actor: AuthenticatedUser,
   ) {
-    await this.modules.remove(id, actor.id, actor.roles);
+    return this.modules.remove(id, actor.id, actor.roles);
+  }
+
+  @Get('modules/:id/removal-impact')
+  @RequirePermissions(PERMISSION.LESSONS_MANAGE)
+  @ApiOperation({ summary: 'Modulni o‘chirish ta‘sir hisoboti (nechta dars ko‘chadi)' })
+  async removalImpact(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.modules.removalImpact(id, actor.id, actor.roles);
   }
 
   @Post('modules/backfill')
