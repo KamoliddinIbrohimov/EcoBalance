@@ -41,44 +41,16 @@ export class AuthService {
     private readonly storage: StorageService,
   ) {}
 
-  async register(dto: RegisterDto, ctx: AuthContext) {
-    const email = dto.email.trim().toLowerCase();
-    const existing = await this.prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      throw new ConflictException('Bu email allaqachon ro‘yxatdan o‘tgan');
-    }
-
-    const citizenRole = await this.prisma.role.findUnique({ where: { slug: RoleSlug.CITIZEN } });
-    if (!citizenRole) {
-      throw new Error('CITIZEN role is not seeded — run `pnpm prisma db seed`');
-    }
-
-    const passwordHash = await this.passwords.hash(dto.password);
-    const userId = uuidv7();
-
-    const user = await this.prisma.user.create({
-      data: {
-        id: userId,
-        firstName: dto.firstName.trim(),
-        lastName: dto.lastName.trim(),
-        email,
-        phone: dto.phone ?? null,
-        passwordHash,
-        roles: { create: { roleId: citizenRole.id } },
-      },
-      include: { roles: { include: { role: true } } },
-    });
-
-    await this.audit.record({
-      userId: user.id,
-      action: AuditAction.CREATE,
-      subjectType: 'User',
-      subjectId: user.id,
-      ipAddress: ctx.ip,
-      userAgent: ctx.userAgent,
-    });
-
-    return this.buildLoginResult(user.id, user.email, ctx);
+  /**
+   * NOTE: 3-rol LMS modelida ommaviy ro'yxatdan o'tish o'chirilgan.
+   * Foydalanuvchini SUPER_ADMIN yoki TEACHER UsersService orqali yaratadi.
+   * Bu metod kelajakda remova qilinishi mumkin — hozircha backward
+   * compatibility uchun saqlangan, lekin controller'dan chaqirilmaydi.
+   */
+  async register(_dto: RegisterDto, _ctx: AuthContext): Promise<never> {
+    throw new ConflictException(
+      'Ommaviy ro‘yxatdan o‘tish o‘chirilgan. Administrator bilan bog‘laning.',
+    );
   }
 
   async login(dto: LoginDto, ctx: AuthContext) {
@@ -334,9 +306,11 @@ export class AuthService {
     }
 
     const newHash = await this.passwords.hash(input.newPassword);
+    // Parol muvaffaqiyatli almashtirildi — mustChangePassword bayrog'ini
+    // olib tashlaymiz (SA/TEACHER yaratgan vaqtincha paroldan keyin).
     await this.prisma.user.update({
       where: { id: userId },
-      data: { passwordHash: newHash },
+      data: { passwordHash: newHash, mustChangePassword: false },
     });
 
     // Barcha faol sessiyalarni ham bekor qilish — xavfsizlik uchun
@@ -405,6 +379,8 @@ export class AuthService {
       permissions: Array.from(new Set(permissions.map((p) => p.permission.slug))),
       emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
       lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+      /** Birinchi login'da parolni almashtirish talab qilinadi. */
+      mustChangePassword: user.mustChangePassword,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     };

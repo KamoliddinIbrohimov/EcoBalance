@@ -27,7 +27,6 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { TokenService } from './services/token.service';
@@ -46,22 +45,8 @@ export class AuthController {
     private readonly tokens: TokenService,
   ) {}
 
-  @Public()
-  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
-  @Post('register')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Fuqaro sifatida ro‘yxatdan o‘tish' })
-  async register(
-    @Body() dto: RegisterDto,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-    @Ip() ip: string,
-  ) {
-    const ua = req.headers['user-agent'];
-    const result = await this.auth.register(dto, { ip, userAgent: ua });
-    this.setRefreshCookie(res, result.refreshToken);
-    return this.stripRefresh(result);
-  }
+  // NOTE: /register endpoint 3-rol LMS modelida olib tashlangan — foydalanuvchi
+  // hisobini faqat SUPER_ADMIN (yoki o'qituvchi talaba uchun) yarata oladi.
 
   @Public()
   @Throttle({ auth: { limit: 10, ttl: 60_000 } })

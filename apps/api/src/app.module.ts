@@ -18,6 +18,8 @@ import { NewsModule } from './modules/news/news.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { PlatformSettingsModule } from './modules/platform-settings/platform-settings.module';
+import { GroupsModule } from './modules/groups/groups.module';
+import { LmsModule } from './modules/lms/lms.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
 import { QuizzesModule } from './modules/quizzes/quizzes.module';
 import { RolesModule } from './modules/roles/roles.module';
@@ -81,6 +83,8 @@ import { UsersModule } from './modules/users/users.module';
     PlatformSettingsModule,
     ChatbotModule,
     QuizzesModule,
+    GroupsModule,
+    LmsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

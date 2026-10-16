@@ -10,3 +10,4 @@ export * from './schemas/chatbot';
 export * from './schemas/eco-report';
 export * from './schemas/news';
 export * from './schemas/quiz';
+export * from './schemas/lms';

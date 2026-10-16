@@ -661,7 +661,7 @@ export class QuizzesService {
         userId: submission.userId,
         scorePercent: submission.scorePercent,
       },
-      toRoles: [ROLE.SUPER_ADMIN, ROLE.ADMIN],
+      toRoles: [ROLE.SUPER_ADMIN],
     });
   }
 }

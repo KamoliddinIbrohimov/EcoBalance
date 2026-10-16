@@ -134,7 +134,11 @@ export class UsersService {
     return toAdminDto(user);
   }
 
-  async create(dto: CreateUserInput, ctx: RequestContext) {
+  async create(
+    dto: CreateUserInput,
+    ctx: RequestContext,
+    actorRoles: string[] = [],
+  ) {
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new ConflictException('Bu email allaqachon ro‘yxatdan o‘tgan');
@@ -145,6 +149,27 @@ export class UsersService {
       });
       if (!org) throw new NotFoundException('Tashkilot topilmadi');
     }
+
+    // --- 3-rol LMS cheklovi ---------------------------------------
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+    const isTeacher = actorRoles.includes('TEACHER') && !isSuperAdmin;
+
+    if (isTeacher) {
+      // Teacher faqat STUDENT yarata oladi — hech boshqa rol emas
+      const invalid = dto.roleSlugs.filter((s) => s !== 'STUDENT');
+      if (invalid.length > 0) {
+        throw new ForbiddenException(
+          'O‘qituvchi faqat STUDENT (talaba) yarata oladi',
+        );
+      }
+    }
+    if (dto.roleSlugs.includes('SUPER_ADMIN')) {
+      // DB trigger ushlab oladi, lekin aniq xato xabari uchun erta tekshirish
+      throw new ForbiddenException(
+        'Tizimda faqat BITTA SUPER_ADMIN bo‘lishi mumkin',
+      );
+    }
+    // --------------------------------------------------------------
 
     const roles = await this.prisma.role.findMany({
       where: { slug: { in: dto.roleSlugs as RoleSlug[] } },
@@ -166,6 +191,8 @@ export class UsersService {
         passwordHash,
         isActive: dto.isActive ?? true,
         organizationId: dto.organizationId ?? null,
+        createdById: ctx.actorId ?? null,
+        mustChangePassword: true, // SA/TEACHER yaratgan — vaqtincha parol
         roles: { create: roles.map((r) => ({ roleId: r.id })) },
       },
       select: ADMIN_SELECT,

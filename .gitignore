@@ -72,3 +72,6 @@ logs/
 
 # Office temp files
 ~$*
+
+# DB backups (local pg_dump)
+backups/

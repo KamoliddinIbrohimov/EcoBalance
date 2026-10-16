@@ -48,10 +48,15 @@ export const PERMISSION = {
   NEWS_MANAGE: 'news.manage',
 
   // Quizzes / Tests (Phase 8 — ekologik manbalar bo'limiga biriktirilgan testlar)
-  // QUIZZES_TAKE barcha autentifikatsiyadan o'tgan foydalanuvchilarga beriladi;
-  // QUIZZES_MANAGE faqat o'qituvchi/admin — test yaratish/tahrirlash/natijalarni ko'rish uchun.
   QUIZZES_TAKE: 'quizzes.take',
   QUIZZES_MANAGE: 'quizzes.manage',
+
+  // LMS (Phase 9 — 3 rolli model)
+  GROUPS_MANAGE: 'groups.manage',           // TEACHER o'z guruhlarini, SUPER_ADMIN hammasini
+  ASSIGNMENTS_MANAGE: 'assignments.manage', // yaratish/baholash — TEACHER o'ziniki, SA hammasi
+  ASSIGNMENTS_SUBMIT: 'assignments.submit', // STUDENT
+  STATS_READ_OWN: 'stats.read.own',         // TEACHER/STUDENT o'ziniki
+  STATS_READ_ALL: 'stats.read.all',         // SUPER_ADMIN
 } as const;
 
 export type Permission = (typeof PERMISSION)[keyof typeof PERMISSION];

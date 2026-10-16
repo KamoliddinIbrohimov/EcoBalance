@@ -58,14 +58,18 @@ export class UsersController {
   @UseGuards(PermissionsGuard)
   @RequirePermissions(PERMISSION.USERS_CREATE)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Yangi foydalanuvchi yaratish (admin tomonidan)' })
+  @ApiOperation({ summary: 'Yangi foydalanuvchi yaratish (SUPER_ADMIN: har qanday rol; TEACHER: faqat STUDENT)' })
   async create(
     @Body() dto: CreateUserDto,
-    @CurrentUser('id') actorId: string,
+    @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
     @Ip() ip: string,
   ) {
-    return this.users.create(dto, { actorId, ip, userAgent: req.headers['user-agent'] });
+    return this.users.create(
+      dto,
+      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
+      actor.roles,
+    );
   }
 
   @Patch(':id')

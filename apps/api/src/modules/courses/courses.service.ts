@@ -166,6 +166,8 @@ export class CoursesService {
         descriptionUz: dto.descriptionUz?.trim() ?? null,
         educationLevel: dto.educationLevel,
         isPublished: dto.isPublished ?? false,
+        // 3-rol LMS: kurs egasi = yaratgan user (TEACHER o'ziniki; SA uchun ham egalik beriladi).
+        ownerId: ctx.actorId ?? null,
       },
       select: COURSE_SELECT,
     });

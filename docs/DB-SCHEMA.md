@@ -1,4 +1,4 @@
-# Eco-Balance — Database schema (Phase 0)
+# PedResearch Lab — Database schema (Phase 0)
 
 PostgreSQL 16. All primary keys are UUIDv7 (time-ordered — index-friendly). Timestamps are
 `timestamptz`. Deletions cascade to junction tables, `SET NULL` where the relation is

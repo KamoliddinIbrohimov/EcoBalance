@@ -18,12 +18,14 @@ datasource db {
 
 enum RoleSlug {
   SUPER_ADMIN
-  ADMIN
-  CITY_ADMIN
-  MAHALLA_MANAGER
   TEACHER
   STUDENT
-  CITIZEN
+}
+
+enum AssignmentSubmissionStatus {
+  SUBMITTED
+  GRADED
+  RETURNED
 }
 
 enum OrganizationType {
@@ -120,6 +122,17 @@ model User {
   organizationId String?       @map("organization_id") @db.Uuid
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
+  /**
+   * Kim yaratgan: SUPER_ADMIN talaba/o'qituvchi uchun; o'qituvchi talaba uchun.
+   */
+  createdById        String? @map("created_by_id") @db.Uuid
+  createdBy          User?   @relation("UserCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers       User[]  @relation("UserCreator")
+  /**
+   * Vaqtincha parol — birinchi login'da almashtirish talab qilinadi.
+   */
+  mustChangePassword Boolean @default(false) @map("must_change_password")
+
   roles           UserRole[]
   auditLogs       AuditLog[]
   notifications   Notification[]
@@ -129,6 +142,16 @@ model User {
   aiConversations AiConversation[]
   news            News[]
   quizSubmissions QuizSubmission[]
+
+  // 3-rol LMS: o'qituvchi/talaba resurslari
+  teachingGroups        Group[]                @relation("GroupTeacher")
+  groupMembership       GroupMember?
+  ownedCourses          Course[]               @relation("CourseOwner")
+  ownedQuizzes          Quiz[]                 @relation("QuizOwner")
+  lessonProgress        LessonProgress[]
+  createdAssignments    Assignment[]           @relation("AssignmentCreator")
+  assignmentSubmissions AssignmentSubmission[] @relation("SubmissionAuthor")
+  gradedSubmissions     AssignmentSubmission[] @relation("SubmissionGrader")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -368,14 +391,23 @@ model Course {
   educationLevel String  @map("education_level") @db.VarChar(60)
   isPublished    Boolean @default(false) @map("is_published")
 
-  lessons   Lesson[]
-  materials CourseMaterial[]
+  /**
+   * Kurs egasi — TEACHER o'ziniki, null bo'lsa SUPER_ADMIN tayinlaydi.
+   */
+  ownerId String? @map("owner_id") @db.Uuid
+  owner   User?   @relation("CourseOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  lessons     Lesson[]
+  materials   CourseMaterial[]
+  groups      CourseGroup[]
+  assignments Assignment[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([isPublished])
   @@index([educationLevel])
+  @@index([ownerId])
   @@map("courses")
 }
 
@@ -411,8 +443,10 @@ model Lesson {
   theoryUz    String?    @map("theory_uz") @db.Text
   procedureUz Json       @default("[]") @map("procedure_uz") @db.JsonB
 
-  materials CourseMaterial[]
-  quizzes   Quiz[]
+  materials   CourseMaterial[]
+  quizzes     Quiz[]
+  progress    LessonProgress[]
+  assignments Assignment[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -535,8 +569,15 @@ model Quiz {
   passPercent   Int     @default(60) @map("pass_percent") @db.SmallInt
   isPublished   Boolean @default(false) @map("is_published")
 
+  /**
+   * Test egasi — TEACHER o'ziniki, null = SUPER_ADMIN tomonidan yaratilgan global.
+   */
+  ownerId String? @map("owner_id") @db.Uuid
+  owner   User?   @relation("QuizOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
   questions   QuizQuestion[]
   submissions QuizSubmission[]
+  groups      GroupQuiz[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -619,4 +660,179 @@ model QuizAnswer {
   @@unique([submissionId, questionId], map: "quiz_answers_submission_question_unique")
   @@index([questionId])
   @@map("quiz_answers")
+}
+
+// ---------------------------------------------------------------
+// LMS: Group / GroupMember (3-rol model: TEACHER guruhlari + STUDENT a'zoligi)
+// ---------------------------------------------------------------
+
+/**
+ * O'qituvchining guruhi (sinf/to'g'arak). TEACHER o'z guruhlarini yaratadi va boshqaradi.
+ * SUPER_ADMIN hamma guruhlarni ko'ra oladi.
+ */
+model Group {
+  id            String  @id @db.Uuid
+  nameUz        String  @map("name_uz") @db.VarChar(255)
+  descriptionUz String? @map("description_uz") @db.Text
+
+  /**
+   * Guruhning asosiy o'qituvchisi (egasi).
+   */
+  teacherId String @map("teacher_id") @db.Uuid
+  teacher   User   @relation("GroupTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+
+  isActive Boolean @default(true) @map("is_active")
+
+  members     GroupMember[]
+  courses     CourseGroup[]
+  quizzes     GroupQuiz[]
+  assignments Assignment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([teacherId])
+  @@index([isActive])
+  @@map("groups")
+}
+
+/**
+ * Talaba <-> guruh a'zoligi. QARO R: talaba bir vaqtda FAQAT bitta guruhda bo'ladi
+ * (studentId bo'yicha unique). Keyinchalik ko'p guruhli qilish uchun shu
+ * cheklovni olib tashlash kifoya qiladi.
+ */
+model GroupMember {
+  groupId   String @map("group_id") @db.Uuid
+  group     Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  studentId String @unique @map("student_id") @db.Uuid
+  student   User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  @@id([groupId, studentId])
+  @@index([groupId])
+  @@map("group_members")
+}
+
+// ---------------------------------------------------------------
+// Course <-> Group biriktirish (talaba kursni faqat guruhi orqali ko'radi)
+// ---------------------------------------------------------------
+
+model CourseGroup {
+  courseId String @map("course_id") @db.Uuid
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  groupId  String @map("group_id") @db.Uuid
+  group    Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([courseId, groupId])
+  @@index([groupId])
+  @@map("course_groups")
+}
+
+// ---------------------------------------------------------------
+// Quiz <-> Group biriktirish (STUDENT quiz'ni faqat shu orqali ko'radi)
+// ---------------------------------------------------------------
+
+model GroupQuiz {
+  quizId      String    @map("quiz_id") @db.Uuid
+  quiz        Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  groupId     String    @map("group_id") @db.Uuid
+  group       Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  opensAt     DateTime? @map("opens_at")
+  closesAt    DateTime? @map("closes_at")
+  maxAttempts Int?      @map("max_attempts") @db.SmallInt
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([quizId, groupId])
+  @@index([groupId])
+  @@map("group_quizzes")
+}
+
+// ---------------------------------------------------------------
+// LessonProgress — talaba darsni ko'rib bo'lganligini belgilaydi
+// ---------------------------------------------------------------
+
+model LessonProgress {
+  id        String @id @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+  student   User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lessonId  String @map("lesson_id") @db.Uuid
+  lesson    Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  completedAt  DateTime? @map("completed_at")
+  lastViewedAt DateTime  @default(now()) @map("last_viewed_at")
+
+  @@unique([studentId, lessonId], map: "lesson_progress_student_lesson_unique")
+  @@index([studentId])
+  @@index([lessonId])
+  @@map("lesson_progress")
+}
+
+// ---------------------------------------------------------------
+// Assignment / AssignmentSubmission — guruhga beriladigan topshiriqlar
+// ---------------------------------------------------------------
+
+model Assignment {
+  id          String  @id @db.Uuid
+  courseId    String? @map("course_id") @db.Uuid
+  course      Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  lessonId    String? @map("lesson_id") @db.Uuid
+  lesson      Lesson? @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  groupId     String  @map("group_id") @db.Uuid
+  group       Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdById String  @map("created_by_id") @db.Uuid
+  createdBy   User    @relation("AssignmentCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  titleUz       String    @map("title_uz") @db.VarChar(255)
+  descriptionUz String?   @map("description_uz") @db.Text
+  dueAt         DateTime? @map("due_at")
+  maxScore      Int       @default(100) @map("max_score") @db.SmallInt
+  /**
+   * Ixtiyoriy biriktirilgan fayl (masalan topshiriq shabloni).
+   */
+  attachmentKey String?   @map("attachment_key") @db.VarChar(512)
+
+  submissions AssignmentSubmission[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([groupId])
+  @@index([createdById])
+  @@index([courseId])
+  @@index([dueAt])
+  @@map("assignments")
+}
+
+model AssignmentSubmission {
+  id           String     @id @db.Uuid
+  assignmentId String     @map("assignment_id") @db.Uuid
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId    String     @map("student_id") @db.Uuid
+  student      User       @relation("SubmissionAuthor", fields: [studentId], references: [id], onDelete: Cascade)
+
+  textUz   String? @map("text_uz") @db.Text
+  /**
+   * MinIO storage key — null bo'lsa fayl yuklanmagan.
+   */
+  fileKey  String? @map("file_key") @db.VarChar(512)
+  fileName String? @map("file_name") @db.VarChar(255)
+
+  submittedAt DateTime @default(now()) @map("submitted_at")
+
+  score      Int?
+  feedbackUz String?   @map("feedback_uz") @db.Text
+  gradedById String?   @map("graded_by_id") @db.Uuid
+  gradedBy   User?     @relation("SubmissionGrader", fields: [gradedById], references: [id], onDelete: SetNull)
+  gradedAt   DateTime? @map("graded_at")
+
+  status AssignmentSubmissionStatus @default(SUBMITTED)
+
+  @@unique([assignmentId, studentId], map: "assignment_submissions_assignment_student_unique")
+  @@index([studentId])
+  @@index([status])
+  @@map("assignment_submissions")
 }

@@ -1,67 +1,35 @@
 /**
  * Prisma seeder — idempotent.
  * Run: `pnpm --filter @eco/api prisma db seed`
+ *
+ * Phase LMS-3-rol (2026-10): faqat 3 ta rol — SUPER_ADMIN / TEACHER / STUDENT.
  */
 import type { Role } from '@eco/shared';
 import { ALL_PERMISSIONS, PERMISSION, ROLE_LABELS_UZ } from '@eco/shared';
-import { EducationLevel, LessonType, PrismaClient, RoleSlug } from '@prisma/client';
+import {
+  EducationLevel,
+  LessonType,
+  PrismaClient,
+  RoleSlug,
+} from '@prisma/client';
 import * as argon2 from 'argon2';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { v7 as uuidv7 } from 'uuid';
 
 const prisma = new PrismaClient();
 
+// ---------------------------------------------------------------
+// Rolga biriktirilgan permissionlar — 3 ta rol
+// ---------------------------------------------------------------
+
 const ROLE_PERMISSIONS: Record<RoleSlug, string[]> = {
   SUPER_ADMIN: ALL_PERMISSIONS,
-  ADMIN: [
-    PERMISSION.USERS_READ,
-    PERMISSION.USERS_CREATE,
-    PERMISSION.USERS_UPDATE,
-    PERMISSION.ORGS_READ,
-    PERMISSION.ORGS_CREATE,
-    PERMISSION.ORGS_UPDATE,
-    PERMISSION.ROLES_READ,
-    PERMISSION.AUDIT_READ,
-    PERMISSION.NOTIFICATIONS_MANAGE,
-    PERMISSION.NOTIFICATIONS_READ_OWN,
-    PERMISSION.NEWS_READ,
-    PERMISSION.COURSES_READ,
-    PERMISSION.COURSES_CREATE,
-    PERMISSION.COURSES_UPDATE,
-    PERMISSION.COURSES_DELETE,
-    PERMISSION.LESSONS_MANAGE,
-    PERMISSION.MATERIALS_MANAGE,
-    PERMISSION.ECO_REPORTS_CREATE,
-    PERMISSION.ECO_REPORTS_READ,
-    PERMISSION.ECO_REPORTS_MANAGE,
-    PERMISSION.NEWS_MANAGE,
-    PERMISSION.QUIZZES_TAKE,
-    PERMISSION.QUIZZES_MANAGE,
-  ],
-  CITY_ADMIN: [
-    PERMISSION.USERS_READ,
-    PERMISSION.ORGS_READ,
-    PERMISSION.ORGS_UPDATE,
-    PERMISSION.NOTIFICATIONS_READ_OWN,
-    PERMISSION.NEWS_READ,
-    PERMISSION.COURSES_READ,
-    PERMISSION.ECO_REPORTS_CREATE,
-    PERMISSION.ECO_REPORTS_READ,
-    PERMISSION.ECO_REPORTS_MANAGE,
-  ],
-  MAHALLA_MANAGER: [
-    PERMISSION.USERS_READ,
-    PERMISSION.ORGS_READ,
-    PERMISSION.NOTIFICATIONS_READ_OWN,
-    PERMISSION.NEWS_READ,
-    PERMISSION.COURSES_READ,
-    PERMISSION.ECO_REPORTS_CREATE,
-    PERMISSION.ECO_REPORTS_READ,
-    PERMISSION.ECO_REPORTS_MANAGE,
-  ],
   TEACHER: [
     PERMISSION.USERS_READ,
+    PERMISSION.USERS_CREATE, // faqat STUDENT yaratish — servis layer tekshiradi
+    PERMISSION.USERS_UPDATE,
     PERMISSION.NOTIFICATIONS_READ_OWN,
-    PERMISSION.NEWS_READ,
     PERMISSION.COURSES_READ,
     PERMISSION.COURSES_CREATE,
     PERMISSION.COURSES_UPDATE,
@@ -69,15 +37,16 @@ const ROLE_PERMISSIONS: Record<RoleSlug, string[]> = {
     PERMISSION.MATERIALS_MANAGE,
     PERMISSION.QUIZZES_TAKE,
     PERMISSION.QUIZZES_MANAGE,
+    PERMISSION.GROUPS_MANAGE,
+    PERMISSION.ASSIGNMENTS_MANAGE,
+    PERMISSION.STATS_READ_OWN,
   ],
-  STUDENT: [PERMISSION.NOTIFICATIONS_READ_OWN, PERMISSION.COURSES_READ, PERMISSION.QUIZZES_TAKE],
-  CITIZEN: [
+  STUDENT: [
     PERMISSION.NOTIFICATIONS_READ_OWN,
-    PERMISSION.NEWS_READ,
     PERMISSION.COURSES_READ,
-    PERMISSION.ECO_REPORTS_CREATE,
-    PERMISSION.ECO_REPORTS_READ,
     PERMISSION.QUIZZES_TAKE,
+    PERMISSION.ASSIGNMENTS_SUBMIT,
+    PERMISSION.STATS_READ_OWN,
   ],
 };
 
@@ -99,15 +68,20 @@ const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION.COURSES_CREATE]: 'Kurs qo‘shish',
   [PERMISSION.COURSES_UPDATE]: 'Kursni tahrirlash',
   [PERMISSION.COURSES_DELETE]: 'Kursni o‘chirish',
-  [PERMISSION.LESSONS_MANAGE]: 'Darslarni boshqarish (qo‘shish/tahrir/o‘chirish)',
+  [PERMISSION.LESSONS_MANAGE]: 'Darslarni boshqarish',
   [PERMISSION.MATERIALS_MANAGE]: 'Darslik fayllarini yuklash va boshqarish',
-  [PERMISSION.ECO_REPORTS_CREATE]: 'Ekologik murojaat yaratish',
-  [PERMISSION.ECO_REPORTS_READ]: 'Ekologik murojaatlarni ko‘rish',
-  [PERMISSION.ECO_REPORTS_MANAGE]: 'Murojaat holatini boshqarish',
-  [PERMISSION.NEWS_READ]: 'Yangiliklarni ko‘rish',
-  [PERMISSION.NEWS_MANAGE]: 'Yangiliklarni yaratish/tahrirlash/nashr etish/o‘chirish',
+  [PERMISSION.ECO_REPORTS_CREATE]: 'Ekologik murojaat yaratish (eski modul)',
+  [PERMISSION.ECO_REPORTS_READ]: 'Ekologik murojaatlarni ko‘rish (eski modul)',
+  [PERMISSION.ECO_REPORTS_MANAGE]: 'Murojaat holatini boshqarish (eski modul)',
+  [PERMISSION.NEWS_READ]: 'Yangiliklarni ko‘rish (eski modul)',
+  [PERMISSION.NEWS_MANAGE]: 'Yangiliklarni boshqarish (eski modul)',
   [PERMISSION.QUIZZES_TAKE]: 'Testlarni yechish',
   [PERMISSION.QUIZZES_MANAGE]: 'Testlarni yaratish/tahrirlash/natijalarni ko‘rish',
+  [PERMISSION.GROUPS_MANAGE]: 'Guruhlarni yaratish va a‘zolarni boshqarish',
+  [PERMISSION.ASSIGNMENTS_MANAGE]: 'Topshiriqlarni yaratish va baholash',
+  [PERMISSION.ASSIGNMENTS_SUBMIT]: 'Topshiriq topshirish',
+  [PERMISSION.STATS_READ_OWN]: 'O‘z statistikasini ko‘rish',
+  [PERMISSION.STATS_READ_ALL]: 'Barcha statistikani ko‘rish',
 };
 
 async function seedPermissions(): Promise<Map<string, string>> {
@@ -171,7 +145,7 @@ async function seedRoles(permissionIds: Map<string, string>): Promise<Map<RoleSl
   return roleMap;
 }
 
-async function seedSuperAdmin(roleIds: Map<RoleSlug, string>): Promise<void> {
+async function seedSuperAdmin(roleIds: Map<RoleSlug, string>): Promise<string> {
   const email = (process.env.SUPER_ADMIN_EMAIL ?? 'admin@eco-balance.uz').toLowerCase();
   const password = process.env.SUPER_ADMIN_PASSWORD ?? 'ChangeMe!2026';
   const firstName = process.env.SUPER_ADMIN_FIRST_NAME ?? 'Bosh';
@@ -191,7 +165,7 @@ async function seedSuperAdmin(roleIds: Map<RoleSlug, string>): Promise<void> {
       });
       console.log(`  → attached SUPER_ADMIN role`);
     }
-    return;
+    return existing.id;
   }
 
   const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
@@ -208,10 +182,49 @@ async function seedSuperAdmin(roleIds: Map<RoleSlug, string>): Promise<void> {
     },
   });
   console.log(`✓ super admin created: ${email}`);
+  return userId;
 }
 
 // ---------------------------------------------------------------
-// Education levels (4 asosiy daraja)
+// Super Admin singleton trigger (idempotent)
+// ---------------------------------------------------------------
+
+async function installSuperAdminTrigger(): Promise<void> {
+  // Prisma's $executeRawUnsafe doesn't support multi-statement SQL. Run each
+  // statement separately. Function body uses $$-quoting internally.
+  const createFn = `
+CREATE OR REPLACE FUNCTION enforce_super_admin_singleton()
+RETURNS TRIGGER AS $f$
+DECLARE
+  super_role_id UUID;
+  other_count INT;
+BEGIN
+  SELECT id INTO super_role_id FROM roles WHERE slug = 'SUPER_ADMIN';
+  IF NEW.role_id = super_role_id THEN
+    SELECT COUNT(*) INTO other_count FROM user_roles
+      WHERE role_id = super_role_id AND user_id != NEW.user_id;
+    IF other_count > 0 THEN
+      RAISE EXCEPTION 'Only one SUPER_ADMIN is allowed';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$f$ LANGUAGE plpgsql
+`;
+  const dropTrigger = `DROP TRIGGER IF EXISTS user_roles_super_admin_singleton_trigger ON user_roles`;
+  const createTrigger = `
+CREATE TRIGGER user_roles_super_admin_singleton_trigger
+  BEFORE INSERT OR UPDATE ON user_roles
+  FOR EACH ROW EXECUTE FUNCTION enforce_super_admin_singleton()
+`;
+  await prisma.$executeRawUnsafe(createFn);
+  await prisma.$executeRawUnsafe(dropTrigger);
+  await prisma.$executeRawUnsafe(createTrigger);
+  console.log('  ✓ super admin singleton trigger installed');
+}
+
+// ---------------------------------------------------------------
+// Education levels (built-in)
 // ---------------------------------------------------------------
 
 async function seedEducationLevels(): Promise<Map<string, string>> {
@@ -258,8 +271,7 @@ async function seedEducationLevels(): Promise<Map<string, string>> {
 }
 
 // ---------------------------------------------------------------
-// "Pedagogik dasturiy vositalar" kursi — Oliy ta'lim (ChDPU)
-// RAR: Ma'ruzalar (15 ta) + Amaliy Mashg'ulotlar (7 ta)
+// PDV kursi (lecture nomlari) — mavjud bo'lsa o'tkazamiz
 // ---------------------------------------------------------------
 
 const PDV_LECTURES: { order: number; title: string }[] = [
@@ -290,12 +302,15 @@ const PDV_PRACTICALS: { order: number; title: string }[] = [
   { order: 22, title: "7-amaliy: Pedagogik dasturiy vosita yakuniy loyihasi" },
 ];
 
-async function seedPDVCourse(): Promise<void> {
+async function seedPDVCourse(superAdminId: string): Promise<void> {
   const SLUG = 'pedagogik-dasturiy-vositalar';
 
   const existing = await prisma.course.findUnique({ where: { slug: SLUG } });
   if (existing) {
-    console.log(`  ✓ PDV kursi allaqachon mavjud: ${SLUG}`);
+    if (!existing.ownerId) {
+      await prisma.course.update({ where: { id: existing.id }, data: { ownerId: superAdminId } });
+    }
+    console.log(`  ✓ PDV kursi mavjud: ${SLUG}`);
     return;
   }
 
@@ -309,6 +324,7 @@ async function seedPDVCourse(): Promise<void> {
         "LMS platformalarini o'rgatuvchi kurs. 15 ma'ruza + 7 amaliy mashg'ulot.",
       educationLevel: 'oliy-talim',
       isPublished: true,
+      ownerId: superAdminId,
     },
   });
 
@@ -331,26 +347,98 @@ async function seedPDVCourse(): Promise<void> {
 
   await prisma.lesson.createMany({ data: lessonData });
   console.log(
-    `  ✓ PDV kursi yaratildi: ${PDV_LECTURES.length} ma'ruza + ${PDV_PRACTICALS.length} amaliy (${lessonData.length} dars jami)`,
+    `  ✓ PDV kursi yaratildi (${lessonData.length} dars, owner=SUPER_ADMIN)`,
   );
 }
 
+// ---------------------------------------------------------------
+// Namuna (idempotent): 1 ta TEACHER + 1 ta Group + 2 ta STUDENT
+// Faqat NODE_ENV=development yoki SEED_DEMO=true bo'lsa.
+// ---------------------------------------------------------------
+
+const DEMO_TEACHER_EMAIL = 'teacher@test.uz';
+const DEMO_STUDENT1_EMAIL = 'student1@test.uz';
+const DEMO_STUDENT2_EMAIL = 'student2@test.uz';
+const DEMO_PASSWORD = 'StudentPass!2026';
+const DEMO_GROUP_NAME = 'Test guruh';
+
+async function seedDemoUsers(roleIds: Map<RoleSlug, string>, superAdminId: string): Promise<void> {
+  if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO !== 'true') {
+    console.log('  (demo foydalanuvchilar o‘tkazib yuborildi — prod rejim)');
+    return;
+  }
+
+  const teacherRoleId = roleIds.get(RoleSlug.TEACHER)!;
+  const studentRoleId = roleIds.get(RoleSlug.STUDENT)!;
+
+  const passHash = await argon2.hash(DEMO_PASSWORD, { type: argon2.argon2id });
+
+  async function upsertUser(email: string, firstName: string, lastName: string, roleId: string, createdById: string) {
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) return existing;
+    return prisma.user.create({
+      data: {
+        id: uuidv7(),
+        firstName,
+        lastName,
+        email,
+        passwordHash: passHash,
+        emailVerifiedAt: new Date(),
+        createdById,
+        roles: { create: { roleId } },
+      },
+    });
+  }
+
+  const teacher = await upsertUser(DEMO_TEACHER_EMAIL, "O'qituvchi", 'Karimov', teacherRoleId, superAdminId);
+  const student1 = await upsertUser(DEMO_STUDENT1_EMAIL, 'Ali', 'Valiev', studentRoleId, teacher.id);
+  const student2 = await upsertUser(DEMO_STUDENT2_EMAIL, 'Nilufar', 'Nazarova', studentRoleId, teacher.id);
+
+  // Guruh
+  let group = await prisma.group.findFirst({
+    where: { teacherId: teacher.id, nameUz: DEMO_GROUP_NAME },
+  });
+  if (!group) {
+    group = await prisma.group.create({
+      data: {
+        id: uuidv7(),
+        teacherId: teacher.id,
+        nameUz: DEMO_GROUP_NAME,
+        descriptionUz: 'Demo guruh — Ta‘lim yo‘nalishi talabalari uchun test maydoni.',
+      },
+    });
+  }
+
+  // Guruh a'zoligi — har studentId unique
+  for (const s of [student1, student2]) {
+    const existingMembership = await prisma.groupMember.findUnique({ where: { studentId: s.id } });
+    if (!existingMembership) {
+      await prisma.groupMember.create({ data: { groupId: group.id, studentId: s.id } });
+    }
+  }
+
+  console.log(`  ✓ demo: TEACHER (${teacher.email}), 2 STUDENT, 1 Group — parol: ${DEMO_PASSWORD}`);
+}
+
 async function main(): Promise<void> {
-  console.log('🌱 Seeding PedResearch Lab base data…');
+  console.log('🌱 Seeding PedResearch Lab (3-rol LMS) base data…');
   const permissionIds = await seedPermissions();
   console.log(`  ✓ ${permissionIds.size} permissions`);
   const roleIds = await seedRoles(permissionIds);
-  console.log(`  ✓ ${roleIds.size} roles`);
-  await seedSuperAdmin(roleIds);
+  console.log(`  ✓ ${roleIds.size} roles (SUPER_ADMIN / TEACHER / STUDENT)`);
+  const superAdminId = await seedSuperAdmin(roleIds);
+  await installSuperAdminTrigger();
   await seedEducationLevels();
   console.log('  ✓ ta\'lim darajalari');
-  await seedPDVCourse();
+  await seedPDVCourse(superAdminId);
+  await seedDemoUsers(roleIds, superAdminId);
   console.log('🌱 Seed complete.');
 }
 
 main()
   .then(async () => {
     await prisma.$disconnect();
+    process.exit(0);
   })
   .catch(async (err) => {
     console.error(err);

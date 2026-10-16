@@ -1,9 +1,14 @@
 import type { Role } from '@eco/shared';
 
-const ADMIN_ROLES: Role[] = ['SUPER_ADMIN', 'ADMIN', 'CITY_ADMIN', 'TEACHER'];
-
+/**
+ * 3-rol LMS: har bir rol o'z home sahifasiga ega.
+ *  SUPER_ADMIN → `/` (dashboard, tizim KPI)
+ *  TEACHER     → `/teacher` (guruhlar, tekshirilmagan topshiriqlar)
+ *  STUDENT     → `/home` (progress, deadline, oxirgi natijalar)
+ */
 export function getRoleHomePath(roles: Role[]): string {
-  if (roles.some((r) => ADMIN_ROLES.includes(r))) return '/';
-  if (roles.includes('MAHALLA_MANAGER')) return '/mahalla';
+  if (roles.includes('SUPER_ADMIN')) return '/';
+  if (roles.includes('TEACHER')) return '/teacher';
+  if (roles.includes('STUDENT')) return '/home';
   return '/home';
 }

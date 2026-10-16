@@ -171,7 +171,12 @@ type LabelKey =
   | 'organizations'
   | 'settings'
   | 'profile'
-  | 'aiSettings';
+  | 'aiSettings'
+  | 'groups'
+  | 'assignments'
+  | 'statistics'
+  | 'myStats'
+  | 'teacher';
 
 interface NavItem {
   href: string;
@@ -186,51 +191,47 @@ interface NavItem {
 // Rol bo'yicha ko'rinadigan sahifalar
 // ---------------------------------------------------------------
 
-type RoleGroup = 'admin' | 'mahalla' | 'user';
+type RoleGroup = 'super_admin' | 'teacher' | 'student';
 
 function getRoleGroup(roles: string[]): RoleGroup {
-  if (roles.some((r) => ['SUPER_ADMIN', 'ADMIN', 'CITY_ADMIN', 'TEACHER'].includes(r))) return 'admin';
-  if (roles.includes('MAHALLA_MANAGER')) return 'mahalla';
-  return 'user';
+  if (roles.includes('SUPER_ADMIN')) return 'super_admin';
+  if (roles.includes('TEACHER')) return 'teacher';
+  return 'student';
 }
 
-const MONITORING_CHILDREN: NavItem[] = [
-  { href: '/monitoring', icon: Leaf, labelKey: 'monitoringPatrul' },
-  { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
-];
-
-const NAV_ADMIN: NavItem[] = [
+/** Super Admin — tizim boshqaruvi, barcha modullar (eski + yangi). */
+const NAV_SUPER_ADMIN: NavItem[] = [
   { href: '/', icon: Home, labelKey: 'home' },
-  { href: '/monitoring', icon: Leaf, labelKey: 'monitoring', children: MONITORING_CHILDREN },
-  { href: '/learning', icon: GraduationCap, labelKey: 'learning', children: [] },
-  { href: '/chatbot', icon: Bot, labelKey: 'chatbot' },
-  { href: '/dashboard', icon: BarChart3, labelKey: 'dashboard' },
-  { href: '/reports', icon: FileText, labelKey: 'reports' },
-  { href: '/analytics', icon: LineChart, labelKey: 'analytics' },
-  { href: '/recommendations', icon: Lightbulb, labelKey: 'recommendations' },
-  { href: '/news', icon: Newspaper, labelKey: 'news' },
-  { href: '/events', icon: Calendar, labelKey: 'events' },
   { href: '/users', icon: Users, labelKey: 'users' },
-  { href: '/organizations', icon: Building2, labelKey: 'organizations' },
+  { href: '/groups', icon: Users, labelKey: 'groups' },
+  { href: '/learning', icon: GraduationCap, labelKey: 'learning', children: [] },
+  { href: '/assignments', icon: ClipboardList, labelKey: 'assignments' },
+  { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
+  { href: '/stats', icon: BarChart3, labelKey: 'statistics' },
+  { href: '/chatbot', icon: Bot, labelKey: 'chatbot' },
   { href: '/settings/profile', icon: UserCircle, labelKey: 'profile' },
   { href: '/settings', icon: Settings, labelKey: 'settings' },
 ];
 
-const NAV_MAHALLA: NavItem[] = [
-  { href: '/mahalla', icon: Home, labelKey: 'home' },
-  { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
+/** TEACHER — o'z guruhlari, kurslari, topshiriqlari, statistikasi. */
+const NAV_TEACHER: NavItem[] = [
+  { href: '/teacher', icon: Home, labelKey: 'home' },
+  { href: '/groups', icon: Users, labelKey: 'groups' },
   { href: '/learning', icon: GraduationCap, labelKey: 'learning', children: [] },
-  { href: '/news', icon: Newspaper, labelKey: 'news' },
+  { href: '/assignments', icon: ClipboardList, labelKey: 'assignments' },
+  { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
+  { href: '/stats', icon: BarChart3, labelKey: 'statistics' },
   { href: '/chatbot', icon: Bot, labelKey: 'chatbot' },
   { href: '/settings/profile', icon: UserCircle, labelKey: 'profile' },
 ];
 
-const NAV_USER: NavItem[] = [
+/** STUDENT — o'z darslari, testlari, topshiriqlari, natijalari. */
+const NAV_STUDENT: NavItem[] = [
   { href: '/home', icon: Home, labelKey: 'home' },
-  { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
   { href: '/learning', icon: GraduationCap, labelKey: 'learning', children: [] },
-  { href: '/news', icon: Newspaper, labelKey: 'news' },
-  { href: '/recommendations', icon: Lightbulb, labelKey: 'recommendations' },
+  { href: '/assignments', icon: ClipboardList, labelKey: 'assignments' },
+  { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
+  { href: '/stats/me', icon: BarChart3, labelKey: 'myStats' },
   { href: '/chatbot', icon: Bot, labelKey: 'chatbot' },
   { href: '/settings/profile', icon: UserCircle, labelKey: 'profile' },
 ];
@@ -259,7 +260,8 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const roles = useAuthStore((s) => s.user?.roles) ?? [];
 
   const roleGroup = getRoleGroup(roles as string[]);
-  const baseNav = roleGroup === 'admin' ? NAV_ADMIN : roleGroup === 'mahalla' ? NAV_MAHALLA : NAV_USER;
+  const baseNav =
+    roleGroup === 'super_admin' ? NAV_SUPER_ADMIN : roleGroup === 'teacher' ? NAV_TEACHER : NAV_STUDENT;
 
   const isActive = (href: string) => {
     if (href === '/' || href === '/home' || href === '/mahalla') return pathname === href;

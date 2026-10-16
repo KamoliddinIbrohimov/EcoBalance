@@ -1,4 +1,4 @@
-# Eco-Balance — Architecture
+# PedResearch Lab — Architecture (3-rol LMS)
 
 > Phase 0 — Foundation. This document reflects the state of the codebase at Phase 0.
 > Future phases will add: environmental monitoring (IoT + PostGIS), education,
