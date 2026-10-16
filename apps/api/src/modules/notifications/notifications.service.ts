@@ -56,6 +56,24 @@ export class NotificationsService {
     return created;
   }
 
+  /**
+   * Aniq foydalanuvchilarga bildirishnoma yuboradi (masalan guruh a'zolari yoki o'qituvchi).
+   */
+  async notifyUsers(userIds: string[], input: Omit<BroadcastInput, 'toRoles'>): Promise<number> {
+    const uniq = Array.from(new Set(userIds));
+    if (uniq.length === 0) return 0;
+    const rows = uniq.map((userId) => ({
+      id: uuidv7(),
+      userId,
+      type: input.type,
+      titleUz: input.titleUz.slice(0, 255),
+      bodyUz: input.bodyUz.slice(0, 8000),
+      data: input.data ?? Prisma.JsonNull,
+    }));
+    const res = await this.prisma.notification.createMany({ data: rows, skipDuplicates: true });
+    return res.count;
+  }
+
   async listForUser(userId: string, limit = 50) {
     return this.prisma.notification.findMany({
       where: { userId },

@@ -22,6 +22,7 @@ import type {
 } from '@eco/shared';
 import { v7 as uuidv7 } from 'uuid';
 
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface Actor {
@@ -101,7 +102,10 @@ function toSubmissionDto(r: SubmissionRow): AssignmentSubmissionDto {
 
 @Injectable()
 export class LmsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   private isSuperAdmin(actor: Actor) {
     return actor.roles.includes('SUPER_ADMIN');
@@ -165,6 +169,10 @@ export class LmsService {
       throw new ForbiddenException('Talaba topshiriq yarata olmaydi');
     }
 
+    if (input.dueAt && input.dueAt.getTime() < Date.now()) {
+      throw new BadRequestException('Topshiriq muddati o‘tgan sanaga tayinlanishi mumkin emas');
+    }
+
     const group = await this.prisma.group.findUnique({
       where: { id: input.groupId },
       select: { teacherId: true },
@@ -188,6 +196,23 @@ export class LmsService {
       },
       select: ASSIGNMENT_SELECT,
     });
+
+    const members = await this.prisma.groupMember.findMany({
+      where: { groupId: input.groupId },
+      select: { studentId: true },
+    });
+    if (members.length > 0) {
+      await this.notifications.notifyUsers(
+        members.map((m) => m.studentId),
+        {
+          type: 'assignment.created',
+          titleUz: 'Yangi topshiriq',
+          bodyUz: `Guruhingizga yangi topshiriq qo‘shildi: ${row.titleUz}`,
+          data: { assignmentId: row.id, groupId: row.groupId },
+        },
+      );
+    }
+
     return toAssignmentDto(row);
   }
 
@@ -241,9 +266,21 @@ export class LmsService {
 
     const assignment = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
-      select: { id: true, groupId: true },
+      select: {
+        id: true,
+        groupId: true,
+        dueAt: true,
+        titleUz: true,
+        createdById: true,
+        group: { select: { teacherId: true } },
+      },
     });
     if (!assignment) throw new NotFoundException('Topshiriq topilmadi');
+
+    // Muddati o'tgan bo'lsa — topshirish mumkin emas
+    if (assignment.dueAt && assignment.dueAt.getTime() < Date.now()) {
+      throw new BadRequestException('Topshiriq muddati o‘tdi');
+    }
 
     // Student o'z guruhidagi topshiriqdagina
     const membership = await this.prisma.groupMember.findUnique({
@@ -257,10 +294,17 @@ export class LmsService {
     const text = input.textUz?.trim();
     if (!text) throw new BadRequestException('Matn kiritilmagan (fayl yuklash alohida endpointda)');
 
-    // Mavjud bo'lsa — update
+    // Mavjud bo'lsa — tahrir ruxsat etiladi FAQAT status=SUBMITTED bo'lsa.
+    // GRADED/RETURNED bo'lsa — qayta topshirishga ruxsat yo'q (ustoz baholab bo'lgan).
     const existing = await this.prisma.assignmentSubmission.findUnique({
       where: { assignmentId_studentId: { assignmentId, studentId: actor.id } },
     });
+    if (existing && existing.status !== AssignmentSubmissionStatus.SUBMITTED) {
+      throw new BadRequestException(
+        'Topshiriq baholangandan keyin qayta topshirib bo‘lmaydi',
+      );
+    }
+
     const row = existing
       ? await this.prisma.assignmentSubmission.update({
           where: { id: existing.id },
@@ -268,10 +312,6 @@ export class LmsService {
             textUz: text,
             submittedAt: new Date(),
             status: AssignmentSubmissionStatus.SUBMITTED,
-            score: null,
-            feedbackUz: null,
-            gradedAt: null,
-            gradedById: null,
           },
           select: SUBMISSION_SELECT,
         })
@@ -284,6 +324,20 @@ export class LmsService {
           },
           select: SUBMISSION_SELECT,
         });
+
+    const teacherId = assignment.group.teacherId;
+    const targets = Array.from(
+      new Set([teacherId, assignment.createdById].filter(Boolean) as string[]),
+    );
+    if (targets.length > 0) {
+      await this.notifications.notifyUsers(targets, {
+        type: 'assignment.submitted',
+        titleUz: 'Topshiriq qabul qilindi',
+        bodyUz: `Talaba "${assignment.titleUz}" topshirig‘ini topshirdi`,
+        data: { assignmentId, submissionId: row.id, studentId: actor.id },
+      });
+    }
+
     return toSubmissionDto(row);
   }
 
@@ -296,7 +350,16 @@ export class LmsService {
       where: { id: submissionId },
       select: {
         id: true,
-        assignment: { select: { createdById: true, group: { select: { teacherId: true } } } },
+        studentId: true,
+        assignment: {
+          select: {
+            id: true,
+            titleUz: true,
+            maxScore: true,
+            createdById: true,
+            group: { select: { teacherId: true } },
+          },
+        },
       },
     });
     if (!existing) throw new NotFoundException('Topshiriq topilmadi');
@@ -307,6 +370,12 @@ export class LmsService {
       a.group.teacherId !== actor.id
     ) {
       throw new ForbiddenException('Bu topshiriqni baholash huquqingiz yo‘q');
+    }
+
+    if (input.score > a.maxScore) {
+      throw new BadRequestException(
+        `Ball maksimaldan oshmasligi kerak (maxScore=${a.maxScore})`,
+      );
     }
 
     const row = await this.prisma.assignmentSubmission.update({
@@ -320,6 +389,14 @@ export class LmsService {
       },
       select: SUBMISSION_SELECT,
     });
+
+    await this.notifications.notifyUsers([existing.studentId], {
+      type: 'assignment.graded',
+      titleUz: 'Topshiriq baholandi',
+      bodyUz: `"${a.titleUz}" topshirig‘i baholandi: ${input.score}/${a.maxScore}`,
+      data: { assignmentId: a.id, submissionId, score: input.score, maxScore: a.maxScore },
+    });
+
     return toSubmissionDto(row);
   }
 

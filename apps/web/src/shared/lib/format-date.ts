@@ -83,3 +83,17 @@ export function formatLongDate(date: Date, locale: AppLocale): string {
       return `${weekday}, ${day}-${month}, ${year}`;
   }
 }
+
+/**
+ * Qisqa "DD oy YYYY, HH:MM" ko'rinishi — ro'yxatlarda vaqt belgisi uchun.
+ * `toLocaleString('uz-UZ')` ni almashtiradi: Node docker-da u "2026 M10 15" ko'rinishini
+ * beradi (CLDR yo'q), biz esa qo'lda yozilgan oy nomlari bilan har joyda bir xil chiqaramiz.
+ */
+export function formatDateTime(date: Date, locale: AppLocale = 'uz'): string {
+  const month = MONTHS[locale][date.getMonth()];
+  const day = date.getDate();
+  const year = date.getFullYear();
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  return `${day} ${month} ${year}, ${hh}:${mm}`;
+}

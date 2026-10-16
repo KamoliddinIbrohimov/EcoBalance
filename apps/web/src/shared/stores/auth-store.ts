@@ -11,6 +11,7 @@ export interface AuthUser {
   roles: Role[];
   permissions: string[];
   organization: { id: string; nameUz: string; type: string; code: string } | null;
+  mustChangePassword?: boolean;
 }
 
 interface AuthState {

@@ -24,6 +24,7 @@ import { useEcoReportsList } from '@/features/eco-reports/hooks/use-eco-reports'
 import { useEducationLevels } from '@/features/learning/hooks/use-education-levels';
 import { Badge } from '@/shared/components/ui/badge';
 import { Card } from '@/shared/components/ui/card';
+import { formatDateTime } from '@/shared/lib/format-date';
 import {
   Table,
   TableBody,
@@ -231,7 +232,7 @@ export default function DashboardPage() {
                       {row.subjectType ?? '—'}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {new Date(row.createdAt).toLocaleString('uz-UZ')}
+                      {formatDateTime(new Date(row.createdAt))}
                     </TableCell>
                   </TableRow>
                 ))}

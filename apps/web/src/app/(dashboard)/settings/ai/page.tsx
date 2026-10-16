@@ -29,6 +29,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { UnderDevelopment } from '@/shared/components/layout/under-development';
 import type { ApiError } from '@/shared/lib/api-client';
+import { formatDateTime } from '@/shared/lib/format-date';
 import { useAuthStore } from '@/shared/stores/auth-store';
 
 function nfmt(n: number): string {
@@ -156,7 +157,7 @@ export default function AiSettingsPage() {
               <div className="text-xs text-muted-foreground">Oxirgi xabar</div>
               <div className="mt-1 text-sm font-semibold text-foreground">
                 {data.usage.lastMessageAt
-                  ? new Date(data.usage.lastMessageAt).toLocaleString('uz-UZ')
+                  ? formatDateTime(new Date(data.usage.lastMessageAt))
                   : '—'}
               </div>
             </div>

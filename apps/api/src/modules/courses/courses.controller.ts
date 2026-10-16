@@ -44,21 +44,21 @@ export class CoursesController {
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Kurslar ro‘yxati (STUDENT faqat published)' })
   async list(@Query() query: QueryCourseDto, @CurrentUser() actor: AuthenticatedUser) {
-    return this.courses.listCourses(query, actor.roles);
+    return this.courses.listCourses(query, actor.roles, actor.id);
   }
 
   @Get('slug/:slug')
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Kursni slug bo‘yicha topish (STUDENT faqat published)' })
   async detailBySlug(@Param('slug') slug: string, @CurrentUser() actor: AuthenticatedUser) {
-    return this.courses.findCourseBySlug(slug, actor.roles);
+    return this.courses.findCourseBySlug(slug, actor.roles, actor.id);
   }
 
   @Get(':id')
   @RequirePermissions(PERMISSION.COURSES_READ)
   @ApiOperation({ summary: 'Kurs tafsilotlari (STUDENT faqat published)' })
   async detail(@Param('id') id: string, @CurrentUser() actor: AuthenticatedUser) {
-    return this.courses.findCourseById(id, actor.roles);
+    return this.courses.findCourseById(id, actor.roles, actor.id);
   }
 
   @Get(':id/lessons')

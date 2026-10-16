@@ -8,6 +8,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { envSchema } from './config/env.validation';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { MustChangePasswordGuard } from './modules/auth/guards/must-change-password.guard';
 import { ChatbotModule } from './modules/chatbot/chatbot.module';
 import { CoursesModule } from './modules/courses/courses.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
@@ -89,6 +90,7 @@ import { UsersModule } from './modules/users/users.module';
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: MustChangePasswordGuard },
   ],
 })
 export class AppModule {}

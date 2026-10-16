@@ -30,6 +30,7 @@ import {
 } from '@/features/notifications/hooks/use-notifications';
 import { useChirchiqWeather, weatherLabelUz } from '@/features/weather/use-weather';
 import { cn } from '@/shared/lib/cn';
+import { formatDateTime } from '@/shared/lib/format-date';
 import { useAuthStore } from '@/shared/stores/auth-store';
 import { LanguageSwitcher } from './language-switcher';
 import { MobileSidebar } from './mobile-sidebar';
@@ -219,7 +220,7 @@ function NotificationsBell() {
                           {n.bodyUz}
                         </p>
                         <time className="mt-1 block text-[10px] text-muted-foreground">
-                          {new Date(n.createdAt).toLocaleString('uz-UZ')}
+                          {formatDateTime(new Date(n.createdAt))}
                         </time>
                       </div>
                       {isUnread ? (

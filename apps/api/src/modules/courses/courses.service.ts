@@ -101,13 +101,32 @@ export class CoursesService {
 
   // ------------- Courses -------------
 
-  async listCourses(query: CourseQuery, actorRoles: string[] = []) {
+  async listCourses(query: CourseQuery, actorRoles: string[] = [], actorId?: string) {
     const { page, perPage, search, isPublished, educationLevel } = query;
     const isStudent = !actorRoles.includes('SUPER_ADMIN') && !actorRoles.includes('TEACHER');
 
+    // STUDENT faqat o'z guruhiga biriktirilgan kurslarnigina ko'radi.
+    let studentGroupId: string | null = null;
+    if (isStudent && actorId) {
+      const member = await this.prisma.groupMember.findUnique({
+        where: { studentId: actorId },
+        select: { groupId: true },
+      });
+      studentGroupId = member?.groupId ?? null;
+    }
+
     const where: Prisma.CourseWhereInput = {
-      // STUDENT faqat nashr etilgan kurslarni ko'radi (query filtersiz).
-      ...(isStudent ? { isPublished: true } : isPublished !== undefined ? { isPublished } : {}),
+      ...(isStudent
+        ? {
+            isPublished: true,
+            ...(studentGroupId
+              ? { groups: { some: { groupId: studentGroupId } } }
+              : // Guruhsiz talaba hech qanday kurs ko'rmasligi uchun imkonsiz shart.
+                { id: '00000000-0000-0000-0000-000000000000' }),
+          }
+        : isPublished !== undefined
+          ? { isPublished }
+          : {}),
       ...(educationLevel ? { educationLevel } : {}),
       ...(search
         ? {
@@ -141,24 +160,52 @@ export class CoursesService {
     };
   }
 
-  async findCourseBySlug(slug: string, actorRoles: string[] = []): Promise<CourseDto> {
+  async findCourseBySlug(
+    slug: string,
+    actorRoles: string[] = [],
+    actorId?: string,
+  ): Promise<CourseDto> {
     const row = await this.prisma.course.findUnique({
       where: { slug: slug.toLowerCase() },
-      select: COURSE_SELECT,
+      select: { ...COURSE_SELECT, id: true },
     });
     if (!row) throw new NotFoundException('Kurs topilmadi');
     const isStudent = !actorRoles.includes('SUPER_ADMIN') && !actorRoles.includes('TEACHER');
-    if (isStudent && !row.isPublished) throw new NotFoundException('Kurs topilmadi');
+    if (isStudent) {
+      if (!row.isPublished) throw new NotFoundException('Kurs topilmadi');
+      await this.assertStudentCanSeeCourse(row.id, actorId);
+    }
     return toCourseDto(row);
   }
 
-  async findCourseById(id: string, actorRoles: string[] = []): Promise<CourseDto> {
+  async findCourseById(
+    id: string,
+    actorRoles: string[] = [],
+    actorId?: string,
+  ): Promise<CourseDto> {
     const row = await this.prisma.course.findUnique({ where: { id }, select: COURSE_SELECT });
     if (!row) throw new NotFoundException('Kurs topilmadi');
     const isStudent = !actorRoles.includes('SUPER_ADMIN') && !actorRoles.includes('TEACHER');
     // STUDENT qoralama kurslarni ko'rolmaydi (404 probe-safe).
-    if (isStudent && !row.isPublished) throw new NotFoundException('Kurs topilmadi');
+    if (isStudent) {
+      if (!row.isPublished) throw new NotFoundException('Kurs topilmadi');
+      await this.assertStudentCanSeeCourse(id, actorId);
+    }
     return toCourseDto(row);
+  }
+
+  private async assertStudentCanSeeCourse(courseId: string, actorId?: string): Promise<void> {
+    if (!actorId) throw new NotFoundException('Kurs topilmadi');
+    const member = await this.prisma.groupMember.findUnique({
+      where: { studentId: actorId },
+      select: { groupId: true },
+    });
+    if (!member) throw new NotFoundException('Kurs topilmadi');
+    const link = await this.prisma.courseGroup.findUnique({
+      where: { courseId_groupId: { courseId, groupId: member.groupId } },
+      select: { courseId: true },
+    });
+    if (!link) throw new NotFoundException('Kurs topilmadi');
   }
 
   async createCourse(dto: CreateCourseInput, ctx: RequestContext): Promise<CourseDto> {

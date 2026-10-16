@@ -152,22 +152,28 @@ export class QuizzesUserController {
   @Get('by-lesson/:lessonId')
   @RequirePermissions(PERMISSION.QUIZZES_TAKE)
   @ApiOperation({ summary: 'Dars tagidagi nashr etilgan testlar ro‘yxati' })
-  async listForLesson(@Param('lessonId', new ParseUUIDPipe()) lessonId: string) {
-    return this.quizzes.listForLessonPublic(lessonId);
+  async listForLesson(
+    @Param('lessonId', new ParseUUIDPipe()) lessonId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.quizzes.listForLessonPublic(lessonId, userId);
   }
 
   @Get('ekologik')
   @RequirePermissions(PERMISSION.QUIZZES_TAKE)
   @ApiOperation({ summary: 'Ekologik monitoring bo‘limidagi barcha nashr etilgan testlar' })
-  async listMonitoringTests() {
-    return this.quizzes.listPublishedStandalone();
+  async listMonitoringTests(@CurrentUser('id') userId: string) {
+    return this.quizzes.listPublishedStandalone(userId);
   }
 
   @Get(':id/take')
   @RequirePermissions(PERMISSION.QUIZZES_TAKE)
   @ApiOperation({ summary: 'Testni yechish uchun savollarni olish (to‘g‘ri javoblarsiz)' })
-  async takeDetail(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.quizzes.getPublicDetail(id);
+  async takeDetail(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.quizzes.getPublicDetail(id, userId);
   }
 
   @Post(':id/submissions')

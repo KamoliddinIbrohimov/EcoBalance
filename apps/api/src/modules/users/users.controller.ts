@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Ip,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -50,7 +51,10 @@ export class UsersController {
   @UseGuards(PermissionsGuard)
   @RequirePermissions(PERMISSION.USERS_READ)
   @ApiOperation({ summary: 'Foydalanuvchi tafsilotlari (TEACHER faqat o‘ziniki)' })
-  async detail(@Param('id') id: string, @CurrentUser() actor: AuthenticatedUser) {
+  async detail(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
     return this.users.findAdminDetail(id, actor.roles, actor.id);
   }
 
@@ -77,7 +81,7 @@ export class UsersController {
   @RequirePermissions(PERMISSION.USERS_UPDATE)
   @ApiOperation({ summary: 'Foydalanuvchini tahrirlash (TEACHER faqat o‘zi yaratganlarini)' })
   async update(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateUserDto,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
@@ -96,7 +100,7 @@ export class UsersController {
   @RequirePermissions(PERMISSION.USERS_DELETE)
   @ApiOperation({ summary: 'Foydalanuvchini faolsizlantirish (TEACHER faqat o‘zi yaratganlarini)' })
   async deactivate(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() req: Request,
     @Ip() ip: string,

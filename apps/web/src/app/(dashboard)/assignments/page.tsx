@@ -1,53 +1,84 @@
 'use client';
 
 import type { AssignmentDto } from '@eco/shared';
-import { ClipboardList, Loader2 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { PERMISSION } from '@eco/shared';
+import {
+  ClipboardList,
+  GraduationCap,
+  Loader2,
+  Pencil,
+  Plus,
+  Send,
+  Trash2,
+} from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 
+import { assignmentsApi } from '@/features/assignments/api/assignments-api';
+import { AssignmentFormDialog } from '@/features/assignments/components/assignment-form-dialog';
+import { AssignmentGradeDialog } from '@/features/assignments/components/assignment-grade-dialog';
+import { AssignmentSubmitDialog } from '@/features/assignments/components/assignment-submit-dialog';
 import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
-import { apiClient } from '@/shared/lib/api-client';
+import { ConfirmDialog } from '@/shared/components/ui/confirm-dialog';
+import { formatDateTime } from '@/shared/lib/format-date';
 import { useAuthStore } from '@/shared/stores/auth-store';
 
-interface Paginated<T> {
-  data: T[];
-  meta: { total: number };
-}
-
-const DATE_FMT = new Intl.DateTimeFormat('uz-UZ', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-});
-
 export default function AssignmentsPage() {
+  const qc = useQueryClient();
   const user = useAuthStore((s) => s.user);
-  const isTeacherOrSA = user?.roles?.some((r) => r === 'SUPER_ADMIN' || r === 'TEACHER');
+  const canManage = useAuthStore((s) => s.hasPermission(PERMISSION.ASSIGNMENTS_MANAGE));
+  const canSubmit = useAuthStore((s) => s.hasPermission(PERMISSION.ASSIGNMENTS_SUBMIT));
+  const isTeacherOrSA =
+    user?.roles?.some((r) => r === 'SUPER_ADMIN' || r === 'TEACHER') ?? false;
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<AssignmentDto | null>(null);
+  const [submitTarget, setSubmitTarget] = useState<AssignmentDto | null>(null);
+  const [gradeTarget, setGradeTarget] = useState<AssignmentDto | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AssignmentDto | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['assignments', 'list'],
-    queryFn: async () => {
-      const res = await apiClient.get<Paginated<AssignmentDto>>('/assignments', {
-        params: { page: 1, perPage: 50 },
-      });
-      return res.data;
+    queryFn: () => assignmentsApi.list(),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => assignmentsApi.remove(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['assignments'] });
+      setDeleteTarget(null);
     },
   });
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="rounded-xl bg-primary/10 p-2.5 text-primary">
-          <ClipboardList className="h-6 w-6" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-primary/10 p-2.5 text-primary">
+            <ClipboardList className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Topshiriqlar</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {isTeacherOrSA
+                ? "O'qituvchi — o'z guruhlariga topshiriq yaratish va baholash."
+                : 'Siz uchun berilgan topshiriqlar ro\'yxati.'}
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Topshiriqlar</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {isTeacherOrSA
-              ? "O'qituvchi — o'z guruhlariga topshiriq yaratish va baholash."
-              : 'Siz uchun berilgan topshiriqlar ro\'yxati.'}
-          </p>
-        </div>
+        {canManage ? (
+          <Button
+            onClick={() => {
+              setEditTarget(null);
+              setFormOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Yangi topshiriq
+          </Button>
+        ) : null}
       </div>
 
       {isLoading ? (
@@ -64,7 +95,9 @@ export default function AssignmentsPage() {
             <li key={a.id}>
               <Card className="flex items-start justify-between gap-4 p-5">
                 <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-base font-semibold text-foreground">{a.titleUz}</h2>
+                  <h2 className="truncate text-base font-semibold text-foreground">
+                    {a.titleUz}
+                  </h2>
                   {a.descriptionUz ? (
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                       {a.descriptionUz}
@@ -72,7 +105,9 @@ export default function AssignmentsPage() {
                   ) : null}
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                     {a.dueAt ? (
-                      <Badge variant="outline">Muddat: {DATE_FMT.format(new Date(a.dueAt))}</Badge>
+                      <Badge variant="outline">
+                        Muddat: {formatDateTime(new Date(a.dueAt))}
+                      </Badge>
                     ) : (
                       <Badge variant="outline">Muddat belgilanmagan</Badge>
                     )}
@@ -82,11 +117,79 @@ export default function AssignmentsPage() {
                     ) : null}
                   </div>
                 </div>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  {canSubmit && !isTeacherOrSA ? (
+                    <Button size="sm" onClick={() => setSubmitTarget(a)}>
+                      <Send className="h-4 w-4" />
+                      Topshirish
+                    </Button>
+                  ) : null}
+                  {canManage ? (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setGradeTarget(a)}
+                      >
+                        <GraduationCap className="h-4 w-4" />
+                        Baholash
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditTarget(a);
+                          setFormOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteTarget(a)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
               </Card>
             </li>
           ))}
         </ul>
       )}
+
+      <AssignmentFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        assignment={editTarget}
+      />
+
+      {submitTarget ? (
+        <AssignmentSubmitDialog
+          open={!!submitTarget}
+          onOpenChange={(v) => !v && setSubmitTarget(null)}
+          assignment={submitTarget}
+        />
+      ) : null}
+
+      {gradeTarget ? (
+        <AssignmentGradeDialog
+          open={!!gradeTarget}
+          onOpenChange={(v) => !v && setGradeTarget(null)}
+          assignment={gradeTarget}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+        title="Topshiriqni o'chirish"
+        description={`"${deleteTarget?.titleUz}" topshirig'i va barcha topshirilgan javoblar o'chadi.`}
+        loading={deleteMut.isPending}
+        onConfirm={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

@@ -34,6 +34,7 @@ async function bootstrap(): Promise<void> {
     helmet({
       contentSecurityPolicy: false,
       crossOriginResourcePolicy: { policy: 'cross-origin' },
+      frameguard: false,
     }),
   );
 

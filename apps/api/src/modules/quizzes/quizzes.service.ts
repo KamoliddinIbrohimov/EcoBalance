@@ -225,9 +225,15 @@ export class QuizzesService {
     };
   }
 
-  async listForLessonPublic(lessonId: string): Promise<QuizSummaryDto[]> {
+  async listForLessonPublic(lessonId: string, studentId?: string): Promise<QuizSummaryDto[]> {
+    const groupId = await this.resolveStudentGroupId(studentId);
+    if (!groupId) return [];
     const rows = await this.prisma.quiz.findMany({
-      where: { lessonId, isPublished: true },
+      where: {
+        lessonId,
+        isPublished: true,
+        groups: { some: { groupId } },
+      },
       select: QUIZ_SUMMARY_SELECT,
       orderBy: { createdAt: 'asc' },
     });
@@ -248,9 +254,10 @@ export class QuizzesService {
     };
   }
 
-  async getPublicDetail(id: string): Promise<QuizPublicDetailDto> {
+  async getPublicDetail(id: string, studentId?: string): Promise<QuizPublicDetailDto> {
     const quiz = await this.loadQuizWithLesson(id);
     if (!quiz.isPublished) throw new NotFoundException('Test topilmadi');
+    await this.assertStudentCanTakeQuiz(id, studentId);
 
     const questions = await this.prisma.quizQuestion.findMany({
       where: { quizId: id },
@@ -265,13 +272,39 @@ export class QuizzesService {
     };
   }
 
-  async listPublishedStandalone(): Promise<QuizSummaryDto[]> {
+  private async assertStudentCanTakeQuiz(quizId: string, studentId?: string): Promise<void> {
+    if (!studentId) return; // SA/TEACHER o'tsin
+    const groupId = await this.resolveStudentGroupId(studentId);
+    if (!groupId) throw new NotFoundException('Test topilmadi');
+    const link = await this.prisma.groupQuiz.findUnique({
+      where: { quizId_groupId: { quizId, groupId } },
+      select: { quizId: true },
+    });
+    if (!link) throw new NotFoundException('Test topilmadi');
+  }
+
+  async listPublishedStandalone(studentId?: string): Promise<QuizSummaryDto[]> {
+    const groupId = await this.resolveStudentGroupId(studentId);
+    if (!groupId) return [];
     const rows = await this.prisma.quiz.findMany({
-      where: { isPublished: true, lessonId: null },
+      where: {
+        isPublished: true,
+        lessonId: null,
+        groups: { some: { groupId } },
+      },
       select: QUIZ_SUMMARY_SELECT,
       orderBy: { createdAt: 'desc' },
     });
     return rows.map(toSummaryDto);
+  }
+
+  private async resolveStudentGroupId(studentId?: string): Promise<string | null> {
+    if (!studentId) return null;
+    const member = await this.prisma.groupMember.findUnique({
+      where: { studentId },
+      select: { groupId: true },
+    });
+    return member?.groupId ?? null;
   }
 
   async create(input: CreateQuizInput, ownerId?: string): Promise<QuizSummaryDto> {
@@ -471,6 +504,9 @@ export class QuizzesService {
       select: { id: true, isPublished: true, titleUz: true, passPercent: true },
     });
     if (!quiz || !quiz.isPublished) throw new NotFoundException('Test topilmadi');
+
+    // Guruh orqali ulanmagan bo'lsa — 404 (probe-safe).
+    await this.assertStudentCanTakeQuiz(quizId, userId);
 
     const questions = await this.prisma.quizQuestion.findMany({
       where: { quizId },

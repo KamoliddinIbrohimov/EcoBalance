@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/shared/components/ui/card';
 import { UnderDevelopment } from '@/shared/components/layout/under-development';
 import { apiClient } from '@/shared/lib/api-client';
+import { formatDateTime } from '@/shared/lib/format-date';
 import { useAuthStore } from '@/shared/stores/auth-store';
 
 export default function MyStatsPage() {
@@ -74,7 +75,7 @@ export default function MyStatsPage() {
 
       {data.lastActivityAt ? (
         <Card className="p-4 text-xs text-muted-foreground">
-          Oxirgi faollik: {new Date(data.lastActivityAt).toLocaleString('uz-UZ')}
+          Oxirgi faollik: {formatDateTime(new Date(data.lastActivityAt))}
         </Card>
       ) : null}
     </div>
