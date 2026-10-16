@@ -39,6 +39,48 @@ interface Mcq {
   correctKey: 'A' | 'B' | 'C' | 'D';
 }
 
+type OptKey = 'A' | 'B' | 'C' | 'D';
+const KEYS: OptKey[] = ['A', 'B', 'C', 'D'];
+
+/**
+ * To'g'ri javobni ko'rsatilgan pozitsiyaga ko'chiradi, qolgan variantlarning
+ * tartibini saqlaydi. Dastlabki variantlar faylga mazmunan to'g'ri yozilgan,
+ * ammo to'g'ri javob doim 'A' da bo'lgani uchun kalit shunga og'ib qolgan.
+ * Shu funksiya orqali adolatli taqsimot qiladi (A/B/C/D ga 6-9 tadan).
+ */
+function moveCorrectTo(mcq: Mcq, target: OptKey): Mcq {
+  const correct = mcq.options.find((o) => o.key === mcq.correctKey)!;
+  const others = mcq.options.filter((o) => o.key !== mcq.correctKey);
+  const result: Mcq['options'] = [];
+  let otherIdx = 0;
+  for (const letter of KEYS) {
+    if (letter === target) {
+      result.push({ key: letter, textUz: correct.textUz });
+    } else {
+      result.push({ key: letter, textUz: others[otherIdx].textUz });
+      otherIdx++;
+    }
+  }
+  return { ...mcq, options: result, correctKey: target };
+}
+
+/**
+ * 30 savol uchun maqsadli to'g'ri javob kaliti.
+ * Taqsimot: A=7, B=8, C=8, D=7 (jami 30) — statistik adolatli.
+ */
+const TARGET_KEYS: OptKey[] = [
+  'B', 'C', 'B', 'D', 'C', // Q1-Q5
+  'B', 'D', 'C', 'B', 'A', // Q6-Q10
+  'C', 'D', 'B', 'A', 'C', // Q11-Q15
+  'D', 'B', 'A', 'C', 'D', // Q16-Q20
+  'B', 'A', 'C', 'D', 'B', // Q21-Q25
+  'A', 'C', 'D', 'A', 'A', // Q26-Q30
+];
+
+function rebalance(questions: Mcq[]): Mcq[] {
+  return questions.map((q, i) => moveCorrectTo(q, TARGET_KEYS[i] ?? q.correctKey));
+}
+
 const KOGNITIV: Mcq[] = [
   {
     textUz: 'Pedagogik dasturiy vositaning asosiy vazifasi qaysi?',
@@ -445,7 +487,8 @@ async function main() {
   }> = [];
 
   let idx = 0;
-  for (const q of KOGNITIV) {
+  const kognitiv = rebalance(KOGNITIV);
+  for (const q of kognitiv) {
     questions.push({
       id: uuidv7(),
       quizId,
