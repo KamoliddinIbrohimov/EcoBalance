@@ -232,6 +232,8 @@ export class LmsService {
         groupId: true,
         dueAt: true,
         allowLate: true,
+        kind: true,
+        endsAt: true,
         group: { select: { isActive: true } },
       },
     });
@@ -247,17 +249,58 @@ export class LmsService {
       throw new ForbiddenException('Bu topshiriq sizning guruhingizga tegishli emas');
     }
     const now = Date.now();
+
+    // N9: accommodation hisobga olinadi
+    const effectiveDue = await this.effectiveDueAt(assignmentId, actor.id, assignment.dueAt);
     let isLate = false;
-    if (assignment.dueAt && assignment.dueAt.getTime() < now) {
+    if (effectiveDue && effectiveDue.getTime() < now) {
       if (!assignment.allowLate) throw new BadRequestException('Topshiriq muddati o‘tdi');
       isLate = true;
     }
+
     const existing = await this.prisma.assignmentSubmission.findUnique({
       where: { assignmentId_studentId: { assignmentId, studentId: actor.id } },
     });
+
+    // N6 (b): TIMED fayl yuklashda start majburiy va deadline ichida
+    if (assignment.kind === 'TIMED') {
+      if (!existing || !existing.attemptDeadline) {
+        throw new BadRequestException(
+          'TIMED: avval POST /assignments/:id/start chaqirib urinishni boshlang',
+        );
+      }
+      if (existing.attemptDeadline.getTime() < now) {
+        throw new BadRequestException('TIMED: urinish vaqti tugadi');
+      }
+    }
+
+    // N15 (b): RETURNED holatida fayl yuklansa attempt oshsin va revision yaratilsin
+    const isReturnedResubmit =
+      existing && existing.status === AssignmentSubmissionStatus.RETURNED;
+
     if (existing && existing.status === AssignmentSubmissionStatus.GRADED) {
       throw new BadRequestException('Baholangan topshiriqga fayl qo‘shib bo‘lmaydi');
     }
+
+    if (isReturnedResubmit && existing) {
+      await this.prisma.assignmentSubmissionRevision.create({
+        data: {
+          id: uuidv7(),
+          submissionId: existing.id,
+          attempt: existing.attempt,
+          textUz: existing.textUz,
+          fileKey: existing.fileKey,
+          fileName: existing.fileName,
+          submittedAt: existing.submittedAt,
+          score: existing.score,
+          feedbackUz: existing.feedbackUz,
+          gradedById: existing.gradedById,
+          gradedAt: existing.gradedAt,
+          status: existing.status,
+        },
+      });
+    }
+
     const key = `submissions/${assignmentId}/${actor.id}/${uuidv7()}-${file.originalname}`;
     await this.storage.upload(key, file.buffer, file.mimetype);
 
@@ -270,6 +313,15 @@ export class LmsService {
             submittedAt: new Date(),
             status: AssignmentSubmissionStatus.SUBMITTED,
             isLate,
+            ...(isReturnedResubmit
+              ? {
+                  attempt: existing.attempt + 1,
+                  score: null,
+                  feedbackUz: null,
+                  gradedAt: null,
+                  gradedById: null,
+                }
+              : {}),
           },
           select: SUBMISSION_SELECT,
         })
@@ -286,6 +338,21 @@ export class LmsService {
           select: SUBMISSION_SELECT,
         });
     return toSubmissionDto(row);
+  }
+
+  /**
+   * N9: effective deadline = accommodation.newDueAt yoki assignment.dueAt
+   */
+  private async effectiveDueAt(
+    assignmentId: string,
+    studentId: string,
+    fallback: Date | null,
+  ): Promise<Date | null> {
+    const acc = await this.prisma.assignmentAccommodation.findUnique({
+      where: { assignmentId_studentId: { assignmentId, studentId } },
+    });
+    if (acc?.newDueAt) return acc.newDueAt;
+    return fallback;
   }
 
   async getSubmissionFileUrl(submissionId: string, actor: Actor): Promise<{ url: string }> {
@@ -720,6 +787,12 @@ export class LmsService {
     if (existing && existing.status === 'GRADED') {
       throw new BadRequestException('Bu topshiriq baholab bo‘lingan');
     }
+    // N6: deadline tugagan bo'lsa, qayta boshlash — faqat o'qituvchi reopen/accommodation orqali.
+    if (existing && existing.attemptDeadline && existing.attemptDeadline.getTime() <= now.getTime()) {
+      throw new ConflictException(
+        "TIMED urinish tugagan. Qayta boshlash uchun o'qituvchi topshiriqni ochishi kerak",
+      );
+    }
 
     const row = existing
       ? await this.prisma.assignmentSubmission.update({
@@ -757,11 +830,30 @@ export class LmsService {
   ) {
     const a = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
-      select: { createdById: true, group: { select: { teacherId: true } } },
+      select: {
+        createdById: true,
+        groupId: true,
+        group: { select: { teacherId: true } },
+      },
     });
     if (!a) throw new NotFoundException('Topshiriq topilmadi');
     if (!this.isSuperAdmin(actor) && a.createdById !== actor.id && a.group.teacherId !== actor.id) {
       throw new ForbiddenException("Faqat o'z guruhingiz uchun");
+    }
+    // N9: talaba shu topshiriq guruhida bo'lishi shart
+    const member = await this.prisma.groupMember.findUnique({
+      where: { studentId },
+      select: { groupId: true },
+    });
+    if (!member || member.groupId !== a.groupId) {
+      throw new BadRequestException('Talaba bu guruh a‘zosi emas');
+    }
+    // N9: bo'sh yoki noto'g'ri payload rad
+    if (!input.extraMinutes && !input.newDueAt) {
+      throw new BadRequestException('extraMinutes yoki newDueAt — birini belgilang');
+    }
+    if (input.extraMinutes !== undefined && input.extraMinutes !== null && input.extraMinutes < 1) {
+      throw new BadRequestException('extraMinutes >= 1 bo‘lishi kerak');
     }
     const existing = await this.prisma.assignmentAccommodation.findUnique({
       where: { assignmentId_studentId: { assignmentId, studentId } },
@@ -820,9 +912,11 @@ export class LmsService {
     }
 
     const now = Date.now();
-    // L7: dueAt o'tgan — allowLate=true bo'lsa qabul qilinadi, lekin isLate=true belgilanadi
+    // L7 + N9: dueAt o'tgan — allowLate=true bo'lsa qabul qilinadi;
+    // accommodation.newDueAt mavjud bo'lsa shu ustunlik qiladi.
+    const effectiveDue = await this.effectiveDueAt(assignmentId, actor.id, assignment.dueAt);
     let isLate = false;
-    if (assignment.dueAt && assignment.dueAt.getTime() < now) {
+    if (effectiveDue && effectiveDue.getTime() < now) {
       if (!assignment.allowLate) {
         throw new BadRequestException('Topshiriq muddati o‘tdi');
       }
@@ -962,11 +1056,14 @@ export class LmsService {
       select: {
         id: true,
         studentId: true,
+        isLate: true,
         assignment: {
           select: {
             id: true,
             titleUz: true,
             maxScore: true,
+            allowLate: true,
+            latePenaltyPercent: true,
             createdById: true,
             group: { select: { teacherId: true } },
           },
@@ -989,10 +1086,16 @@ export class LmsService {
       );
     }
 
+    // N8: kechikish jarimasi — isLate=true bo'lsa yakuniy ball xom balldan latePenaltyPercent% kam.
+    const rawScore = input.score;
+    const penalty = existing.isLate ? a.latePenaltyPercent : 0;
+    const finalScore =
+      penalty > 0 ? Math.max(0, Math.round(rawScore * (1 - penalty / 100))) : rawScore;
+
     const row = await this.prisma.assignmentSubmission.update({
       where: { id: submissionId },
       data: {
-        score: input.score,
+        score: finalScore,
         feedbackUz: input.feedbackUz?.trim() ?? null,
         gradedAt: new Date(),
         gradedById: actor.id,
@@ -1001,11 +1104,22 @@ export class LmsService {
       select: SUBMISSION_SELECT,
     });
 
+    const bodyParts = [`${finalScore}/${a.maxScore}`];
+    if (penalty > 0) {
+      bodyParts.push(`(xom ${rawScore} − jarima ${penalty}%)`);
+    }
     await this.notifications.notifyUsers([existing.studentId], {
       type: 'assignment.graded',
       titleUz: 'Topshiriq baholandi',
-      bodyUz: `"${a.titleUz}" topshirig‘i baholandi: ${input.score}/${a.maxScore}`,
-      data: { assignmentId: a.id, submissionId, score: input.score, maxScore: a.maxScore },
+      bodyUz: `"${a.titleUz}" topshirig‘i baholandi: ${bodyParts.join(' ')}`,
+      data: {
+        assignmentId: a.id,
+        submissionId,
+        score: finalScore,
+        rawScore,
+        penaltyApplied: penalty,
+        maxScore: a.maxScore,
+      },
     });
 
     return toSubmissionDto(row);
