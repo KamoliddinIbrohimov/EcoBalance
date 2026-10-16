@@ -240,4 +240,56 @@ export class GroupsController {
   ) {
     await this.groups.unbindQuiz(id, quizId, { id: actor.id, roles: actor.roles });
   }
+
+  // ---- Lesson/Module releases (F3) ----
+
+  @Get(':id/releases')
+  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
+  @ApiOperation({ summary: 'Guruh dars/modul ochilish rejalari' })
+  async listReleases(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.groups.listReleases(id, { id: actor.id, roles: actor.roles });
+  }
+
+  @Post(':id/releases')
+  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Dars/modul ochilishini belgilash (upsert)' })
+  async upsertRelease(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() body: {
+      lessonId?: string;
+      moduleId?: string;
+      opensAt?: string | null;
+      closesAt?: string | null;
+      status?: 'LOCKED' | 'SCHEDULED' | 'OPEN';
+    },
+  ) {
+    return this.groups.upsertRelease(
+      id,
+      {
+        lessonId: body.lessonId,
+        moduleId: body.moduleId,
+        opensAt: body.opensAt ? new Date(body.opensAt) : null,
+        closesAt: body.closesAt ? new Date(body.closesAt) : null,
+        status: body.status ?? 'LOCKED',
+      },
+      { id: actor.id, roles: actor.roles },
+    );
+  }
+
+  @Delete(':id/releases/:releaseId')
+  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Release olib tashlash (default — dars ochiq)' })
+  async removeRelease(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('releaseId', new ParseUUIDPipe()) releaseId: string,
+  ) {
+    await this.groups.removeRelease(id, releaseId, { id: actor.id, roles: actor.roles });
+  }
 }

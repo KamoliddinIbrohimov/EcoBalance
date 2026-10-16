@@ -238,6 +238,130 @@ export class GroupsService {
     };
   }
 
+  // -------- Group lesson/module release (F3 2.A) --------
+
+  async listReleases(groupId: string, actor: ActorContext) {
+    await this.assertGroupOwnership(groupId, actor);
+    const rows = await this.prisma.groupLessonRelease.findMany({
+      where: { groupId },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      groupId: r.groupId,
+      lessonId: r.lessonId,
+      moduleId: r.moduleId,
+      opensAt: r.opensAt?.toISOString() ?? null,
+      closesAt: r.closesAt?.toISOString() ?? null,
+      status: r.status,
+    }));
+  }
+
+  async upsertRelease(
+    groupId: string,
+    input: {
+      lessonId?: string;
+      moduleId?: string;
+      opensAt?: Date | null;
+      closesAt?: Date | null;
+      status: 'LOCKED' | 'SCHEDULED' | 'OPEN';
+    },
+    actor: ActorContext,
+  ) {
+    await this.assertGroupOwnership(groupId, actor);
+    if (!input.lessonId === !input.moduleId) {
+      throw new BadRequestException('lessonId yoki moduleId — birini belgilang');
+    }
+    const existing = await this.prisma.groupLessonRelease.findFirst({
+      where: {
+        groupId,
+        lessonId: input.lessonId ?? null,
+        moduleId: input.moduleId ?? null,
+      },
+    });
+    let row;
+    if (existing) {
+      row = await this.prisma.groupLessonRelease.update({
+        where: { id: existing.id },
+        data: {
+          opensAt: input.opensAt ?? null,
+          closesAt: input.closesAt ?? null,
+          status: input.status,
+        },
+      });
+    } else {
+      row = await this.prisma.groupLessonRelease.create({
+        data: {
+          id: uuidv7(),
+          groupId,
+          lessonId: input.lessonId ?? null,
+          moduleId: input.moduleId ?? null,
+          opensAt: input.opensAt ?? null,
+          closesAt: input.closesAt ?? null,
+          status: input.status,
+        },
+      });
+    }
+    // Dars/modul OPEN bo'ldi — talabalarga bir martalik xabar.
+    if (row.status === 'OPEN') {
+      const members = await this.prisma.groupMember.findMany({
+        where: { groupId },
+        select: { studentId: true },
+      });
+      if (members.length > 0) {
+        const title = input.lessonId
+          ? await this.prisma.lesson.findUnique({ where: { id: input.lessonId }, select: { titleUz: true } })
+          : await this.prisma.module.findUnique({ where: { id: input.moduleId! }, select: { titleUz: true } });
+        await this.notifyUniqueReleaseOpen(members.map((m) => m.studentId), title?.titleUz ?? '', row.id);
+      }
+    }
+    return {
+      id: row.id,
+      groupId: row.groupId,
+      lessonId: row.lessonId,
+      moduleId: row.moduleId,
+      opensAt: row.opensAt?.toISOString() ?? null,
+      closesAt: row.closesAt?.toISOString() ?? null,
+      status: row.status,
+    };
+  }
+
+  async removeRelease(groupId: string, id: string, actor: ActorContext) {
+    await this.assertGroupOwnership(groupId, actor);
+    await this.prisma.groupLessonRelease.delete({ where: { id } }).catch(() => {
+      throw new NotFoundException('Release topilmadi');
+    });
+  }
+
+  /**
+   * Bir xil dars/modul OPEN bo'lganda bir martalik xabar — Notification.data
+   * ichida releaseId bilan filterlab, qayta yubormaslik uchun.
+   */
+  private async notifyUniqueReleaseOpen(studentIds: string[], title: string, releaseId: string) {
+    // Allaqachon shu releaseId uchun yuborilgan foydalanuvchilarni istisno qilish
+    const alreadyNotified = await this.prisma.notification.findMany({
+      where: {
+        userId: { in: studentIds },
+        type: 'RELEASE_OPEN',
+        data: { path: ['releaseId'], equals: releaseId } as never,
+      },
+      select: { userId: true },
+    });
+    const sent = new Set(alreadyNotified.map((n) => n.userId));
+    const targets = studentIds.filter((id) => !sent.has(id));
+    if (targets.length === 0) return;
+    await this.prisma.notification.createMany({
+      data: targets.map((userId) => ({
+        id: uuidv7(),
+        userId,
+        type: 'RELEASE_OPEN',
+        titleUz: 'Dars ochildi',
+        bodyUz: `"${title}" dars/mavzusi ochildi — davom etishingiz mumkin.`,
+        data: { releaseId } as unknown as Prisma.InputJsonValue,
+      })),
+    });
+  }
+
   // -------- Course / Quiz bindings --------
 
   private async assertGroupOwnership(groupId: string, actor: ActorContext) {
