@@ -26,7 +26,7 @@ export default function LearningLevelPage() {
   const canManage =
     hasPermission(PERMISSION.COURSES_CREATE) || hasPermission(PERMISSION.LESSONS_MANAGE);
 
-  const level = (levels ?? []).find((l) => l.slug === params.slug);
+  const level = (levels ?? []).find((l) => l.slug === params?.slug);
 
   const { data: coursesData, isLoading: coursesLoading } = useCoursesList({
     page: 1,

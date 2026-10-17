@@ -17,7 +17,7 @@ import { Button } from '@/shared/components/ui/button';
 function ResetPasswordForm() {
   const t = useTranslations('auth.reset');
   const params = useSearchParams();
-  const token = params.get('token') ?? '';
+  const token = params?.get('token') ?? '';
   const reset = useResetPassword();
 
   const {

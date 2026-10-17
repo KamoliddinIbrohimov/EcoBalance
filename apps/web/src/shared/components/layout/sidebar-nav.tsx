@@ -41,7 +41,6 @@ import {
   Lightbulb,
   LogOut,
   Map as MapIcon,
-  MapPin,
   Medal,
   Microscope,
   MoreHorizontal,
@@ -265,7 +264,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   const isActive = (href: string) => {
     if (href === '/' || href === '/home' || href === '/mahalla') return pathname === href;
-    return pathname.startsWith(href);
+    return pathname?.startsWith(href) ?? false;
   };
 
   // Ta'lim darajalarini dinamik ravishda /learning bandi ostiga qo'shamiz.

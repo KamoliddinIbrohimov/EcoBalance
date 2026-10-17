@@ -34,7 +34,7 @@ export function RouteGate({ children }: { children: ReactNode }) {
   const hydrated = useAuthStore((s) => s.hydrated);
 
   useEffect(() => {
-    if (!hydrated || !user) return;
+    if (!hydrated || !user || !pathname) return;
 
     // 1) Majburiy parol almashtirish
     if (user.mustChangePassword && pathname !== '/change-password') {
