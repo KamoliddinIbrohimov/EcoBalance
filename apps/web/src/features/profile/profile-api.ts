@@ -26,7 +26,17 @@ export const profileApi = {
     const { data } = await apiClient.delete<Envelope<AuthUser>>('/auth/me/avatar');
     return data.data;
   },
-  async changePassword(input: ChangePasswordInput): Promise<void> {
-    await apiClient.post('/auth/me/change-password', input);
+  async changePassword(
+    input: ChangePasswordInput,
+  ): Promise<{ accessToken: string | null; expiresIn: number | null }> {
+    const { data } = await apiClient.post<{
+      ok: boolean;
+      accessToken?: string;
+      expiresIn?: number;
+    }>('/auth/me/change-password', input);
+    return {
+      accessToken: data.accessToken ?? null,
+      expiresIn: data.expiresIn ?? null,
+    };
   },
 };

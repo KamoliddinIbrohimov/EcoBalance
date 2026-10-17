@@ -20,7 +20,7 @@ import type { RegisterDto } from './dto/register.dto';
 import type { ResetPasswordDto } from './dto/reset-password.dto';
 import { AuditService } from './services/audit.service';
 import { PasswordService } from './services/password.service';
-import { TokenService } from './services/token.service';
+import { TokenService, type IssuedTokens } from './services/token.service';
 
 export interface AuthContext {
   ip?: string;
@@ -290,10 +290,16 @@ export class AuthService {
     userId: string,
     input: ChangePasswordInput,
     ctx: AuthContext,
+    currentRefreshToken?: string,
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, passwordHash: true },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        roles: { include: { role: true } },
+      },
     });
     if (!user) throw new UnauthorizedException();
 
@@ -313,8 +319,34 @@ export class AuthService {
       data: { passwordHash: newHash, mustChangePassword: false },
     });
 
-    // Barcha faol sessiyalarni ham bekor qilish — xavfsizlik uchun
-    await this.tokens.revokeAllForUser(userId);
+    // B1: joriy refresh oilasini saqlab, qolgan sessiyalarni bekor qilamiz.
+    // Shu tariqa parolni almashtirgan foydalanuvchi tizimda qoladi, boshqa
+    // qurilma/tab'lari esa chiqarib tashlanadi. Yangi tokenlar qaytariladi,
+    // kontroller ularni cookie va javobga qo'yadi.
+    let issued: IssuedTokens | null = null;
+    if (currentRefreshToken) {
+      const [familyId] = currentRefreshToken.split('.', 1);
+      if (familyId) {
+        await this.tokens.revokeOtherFamiliesForUser(userId, familyId);
+        const roles = user.roles.map((r) => r.role.slug);
+        const perms = await this.prisma.rolePermission.findMany({
+          where: { role: { users: { some: { userId } } } },
+          include: { permission: true },
+        });
+        const permissionSlugs = Array.from(new Set(perms.map((p) => p.permission.slug)));
+        // Eski oilani ham revoke qilib, yangi token juftligini chiqaramiz.
+        await this.tokens.revokeFamily(familyId);
+        issued = await this.tokens.issueTokens(userId, user.email, roles, permissionSlugs, {
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+        });
+      }
+    }
+    if (!issued) {
+      // Refresh cookie yetkazilmagan — fallback xavfsiz yo'nalish:
+      // barcha sessiyalarni bekor qilib, foydalanuvchini qayta kirishga yuboramiz.
+      await this.tokens.revokeAllForUser(userId);
+    }
 
     await this.audit.record({
       userId,
@@ -325,7 +357,7 @@ export class AuthService {
       userAgent: ctx.userAgent,
     });
 
-    return { ok: true };
+    return { ok: true, tokens: issued };
   }
 
   private extractAvatarKey(url: string): string | null {

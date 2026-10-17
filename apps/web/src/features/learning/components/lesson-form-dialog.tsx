@@ -6,8 +6,10 @@ import {
   LESSON_TYPE_LABELS_UZ,
   type CreateLessonInput,
   type LessonDto,
+  type ModuleDto,
 } from '@eco/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery } from '@tanstack/react-query';
 import { Download, FileText, Loader2, Paperclip, Plus, Trash2, Upload, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -15,6 +17,7 @@ import { useForm } from 'react-hook-form';
 import { materialsApi } from '@/features/learning/api/materials-api';
 import { useCreateLesson, useUpdateLesson } from '@/features/learning/hooks/use-learning';
 import { useCourseMaterials, useRemoveMaterial } from '@/features/learning/hooks/use-materials';
+import { apiClient, type ApiError } from '@/shared/lib/api-client';
 import {
   ACCEPT_ATTR,
   MAX_FILE_SIZE,
@@ -39,7 +42,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/components/ui/select';
-import type { ApiError } from '@/shared/lib/api-client';
 import { cn } from '@/shared/lib/cn';
 
 interface LessonFormDialogProps {
@@ -62,6 +64,19 @@ export function LessonFormDialog({
   const update = useUpdateLesson();
   const removeMaterial = useRemoveMaterial(courseId);
   const { data: courseMaterials } = useCourseMaterials(isEdit ? courseId : undefined);
+  // B3: dars uchun modul tanlash — kurs modullari ro'yxati (ixtiyoriy, bo'sh = "Umumiy")
+  const { data: modules } = useQuery({
+    queryKey: ['modules', courseId],
+    queryFn: async () => {
+      const r = await apiClient.get<{ data: ModuleDto[] }>(`/courses/${courseId}/modules`);
+      return r.data.data;
+    },
+    enabled: open && !!courseId,
+  });
+  const sortedModules = useMemo(
+    () => (modules ?? []).slice().sort((a, b) => a.orderIndex - b.orderIndex),
+    [modules],
+  );
   const existingFiles = useMemo(
     () =>
       lesson
@@ -83,6 +98,7 @@ export function LessonFormDialog({
     resolver: zodResolver(createLessonSchema),
     defaultValues: {
       courseId,
+      moduleId: null,
       orderIndex: nextOrderIndex,
       lessonType: LESSON_TYPE.AMALIY,
       titleUz: '',
@@ -114,6 +130,7 @@ export function LessonFormDialog({
     setUploadProgress(null);
     reset({
       courseId,
+      moduleId: lesson?.moduleId ?? null,
       orderIndex: lesson?.orderIndex ?? nextOrderIndex,
       lessonType: lesson?.lessonType ?? LESSON_TYPE.AMALIY,
       titleUz: lesson?.titleUz ?? '',
@@ -239,6 +256,26 @@ export function LessonFormDialog({
                 {Object.values(LESSON_TYPE).map((t) => (
                   <SelectItem key={t} value={t}>
                     {LESSON_TYPE_LABELS_UZ[t]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Modul (ixtiyoriy)</Label>
+            <Select
+              value={watch('moduleId') ?? '__none__'}
+              onValueChange={(v) => setValue('moduleId', v === '__none__' ? null : v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Umumiy (modulsiz)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Umumiy (modulsiz)</SelectItem>
+                {sortedModules.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.orderIndex + 1}. {m.titleUz}
                   </SelectItem>
                 ))}
               </SelectContent>

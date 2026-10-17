@@ -31,7 +31,15 @@ export function useRemoveAvatar() {
 }
 
 export function useChangePassword() {
+  const setAccessToken = useAuthStore((s) => s.setAccessToken);
   return useMutation({
     mutationFn: (input: ChangePasswordInput) => profileApi.changePassword(input),
+    onSuccess: (result) => {
+      // B1: server joriy sessiyani saqlab, yangi access token qaytaradi.
+      // Store'ni yangilab qo'yamiz — keyingi so'rovlar yangi token bilan ketadi.
+      if (result.accessToken && result.expiresIn != null) {
+        setAccessToken(result.accessToken, result.expiresIn);
+      }
+    },
   });
 }

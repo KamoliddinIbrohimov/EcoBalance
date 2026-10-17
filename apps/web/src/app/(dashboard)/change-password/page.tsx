@@ -2,22 +2,23 @@
 
 import { changePasswordSchema, type ChangePasswordInput } from '@eco/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 
 import { FormField } from '@/features/auth/components/form-field';
+import { useChangePassword } from '@/features/profile/use-profile';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
-import { ApiError, apiClient, refreshAuthSession } from '@/shared/lib/api-client';
+import { ApiError, refreshAuthSession } from '@/shared/lib/api-client';
 import { getRoleHomePath } from '@/shared/lib/role-path';
 import { useAuthStore } from '@/shared/stores/auth-store';
 
 export default function ChangePasswordPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
   const forced = !!user?.mustChangePassword;
 
   const {
@@ -29,22 +30,36 @@ export default function ChangePasswordPage() {
     defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
   });
 
-  const mut = useMutation({
-    mutationFn: async (values: ChangePasswordInput) => {
-      await apiClient.post('/auth/me/change-password', values);
-    },
-    onSuccess: async () => {
-      await refreshAuthSession();
-      const next = user ? getRoleHomePath(user.roles) : '/';
-      router.replace(next);
-    },
-  });
+  // B1: hook store'ga yangi access tokenni yozib qo'yadi. Keyin profilni
+  // yangilab, mustChangePassword=false holatini store'da ko'rsatamiz, so'ng
+  // rol asosidagi bosh sahifaga o'tamiz. Qo'shimcha /auth/refresh chaqirmaymiz
+  // — bu "reuse detected" sabab bo'lgan.
+  const changePassword = useChangePassword();
+  const mut = {
+    isPending: changePassword.isPending,
+    error: changePassword.error,
+    mutate: (values: ChangePasswordInput) =>
+      changePassword.mutate(values, {
+        onSuccess: async () => {
+          // Profilni yangilab, mustChangePassword=false'ni store'ga tushiramiz.
+          if (user) setUser({ ...user, mustChangePassword: false });
+          // Agar yangi tokenlar qaytmasa (fallback), to'liq qayta kirish zarur
+          // bo'ladi — refreshAuthSession bo'sh cookie bilan /login'ga olib
+          // boradi.
+          if (!changePassword.data?.accessToken) {
+            await refreshAuthSession();
+          }
+          const next = user ? getRoleHomePath(user.roles) : '/';
+          router.replace(next);
+        },
+      }),
+  };
 
   const onSubmit = handleSubmit((values) => mut.mutate(values));
 
   const rootError =
     mut.error instanceof ApiError
-      ? mut.error.problem.title || 'Parolni almashtirib bo‘lmadi'
+      ? mut.error.problem.title ?? 'Parolni almashtirib bo‘lmadi'
       : null;
 
   return (

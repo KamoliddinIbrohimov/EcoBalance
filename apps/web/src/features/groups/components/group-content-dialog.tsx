@@ -47,21 +47,23 @@ export function GroupContentDialog({ open, onOpenChange, group }: Props) {
     queryFn: () => groupsApi.quizBindings(group.id),
     enabled: open,
   });
-  const { data: allCourses } = useQuery({
+  // Diqqat: API perPage limiti 100. 100+ kurs/test bo'lsa keyinroq
+  // qidiruv-asosli combobox kerak bo'ladi.
+  const { data: allCourses, error: coursesError } = useQuery({
     queryKey: ['courses', 'all'],
     queryFn: async () => {
       const res = await apiClient.get<Paginated<CourseDto>>('/courses', {
-        params: { perPage: 200 },
+        params: { perPage: 100 },
       });
       return res.data.data;
     },
     enabled: open,
   });
-  const { data: allQuizzes } = useQuery({
+  const { data: allQuizzes, error: quizzesError } = useQuery({
     queryKey: ['quizzes', 'all'],
     queryFn: async () => {
       const res = await apiClient.get<Paginated<QuizSummaryDto>>('/quizzes', {
-        params: { perPage: 200 },
+        params: { perPage: 100 },
       });
       return res.data.data;
     },
@@ -106,10 +108,17 @@ export function GroupContentDialog({ open, onOpenChange, group }: Props) {
   const availableCourses = (allCourses ?? []).filter((c) => !boundCourseIds.has(c.id));
   const availableQuizzes = (allQuizzes ?? []).filter((q) => !boundQuizIds.has(q.id));
 
+  const loadErr =
+    coursesError instanceof ApiError
+      ? coursesError.problem.title ?? 'Kurslarni yuklab bo\'lmadi'
+      : quizzesError instanceof ApiError
+        ? quizzesError.problem.title ?? 'Testlarni yuklab bo\'lmadi'
+        : null;
   const err =
-    [bindCourseMut, unbindCourseMut, bindQuizMut, unbindQuizMut]
+    loadErr ??
+    ([bindCourseMut, unbindCourseMut, bindQuizMut, unbindQuizMut]
       .map((m) => (m.error instanceof ApiError ? m.error.problem.title : null))
-      .find((e) => e) ?? null;
+      .find((e) => e) ?? null);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

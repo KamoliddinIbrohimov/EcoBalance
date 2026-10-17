@@ -196,12 +196,29 @@ export class AuthController {
     @CurrentUser('id') userId: string,
     @Body() dto: ChangePasswordDto,
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
   ) {
-    return this.auth.changePassword(userId, dto, {
-      ip,
-      userAgent: req.headers['user-agent'],
-    });
+    const currentRefresh = req.cookies?.[REFRESH_COOKIE];
+    const result = await this.auth.changePassword(
+      userId,
+      dto,
+      { ip, userAgent: req.headers['user-agent'] },
+      currentRefresh,
+    );
+    // B1: parolni almashtirgan sessiyani saqlab qolamiz — yangi tokenlar
+    // qaytariladi, cookie yangilanadi. Shu tariqa klient "reuse detected"
+    // bilan uchramaydi, qayta kirishga tushib qolmaydi.
+    if (result.tokens) {
+      this.setRefreshCookie(res, result.tokens.refreshToken);
+      return {
+        ok: true,
+        accessToken: result.tokens.accessToken,
+        expiresIn: result.tokens.expiresIn,
+      };
+    }
+    this.clearRefreshCookie(res);
+    return { ok: true };
   }
 
   // ---- helpers -----------------------------------------------------

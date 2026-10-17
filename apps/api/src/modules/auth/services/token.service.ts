@@ -201,6 +201,18 @@ export class TokenService {
     });
   }
 
+  /**
+   * Barcha oilalarni bekor qiladi, lekin bitta oilani (`keepFamilyId`) tegmaydi.
+   * Parolni o'zgartirish oqimida foydalaniladi: boshqa qurilma/tab sessiyalari
+   * bekor qilinadi, joriy sessiya saqlanadi va yangi token juftligi beriladi.
+   */
+  async revokeOtherFamiliesForUser(userId: string, keepFamilyId: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null, familyId: { not: keepFamilyId } },
+      data: { revokedAt: new Date() },
+    });
+  }
+
   getRefreshCookieOptions() {
     // NOTE: path is intentionally '/' so that Next.js edge middleware can detect
     // its presence and gate protected routes. The cookie remains httpOnly + Secure

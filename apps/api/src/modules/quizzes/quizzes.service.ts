@@ -44,6 +44,10 @@ const QUIZ_SUMMARY_SELECT = {
   descriptionUz: true,
   passPercent: true,
   isPublished: true,
+  // B4: getAdminDetail egalik tekshiruvi uchun — ownerId yo'q bo'lsa
+  // har bir TEACHER so'rovi `undefined !== actorId` tufayli 404 bo'lardi.
+  ownerId: true,
+  visibility: true,
   createdAt: true,
   updatedAt: true,
   _count: { select: { questions: true, submissions: true } },

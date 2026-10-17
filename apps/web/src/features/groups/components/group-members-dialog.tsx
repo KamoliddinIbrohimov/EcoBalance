@@ -44,12 +44,14 @@ export function GroupMembersDialog({ open, onOpenChange, group }: Props) {
     enabled: open,
   });
 
-  const { data: freeStudents } = useQuery({
+  const { data: freeStudents, error: freeStudentsError } = useQuery({
     queryKey: ['users', 'students-free'],
     queryFn: async () => {
-      // Hamma faol studentlar ro'yxati — guruhdagilarni filterda chiqaramiz
+      // Hamma faol studentlar ro'yxati — guruhdagilarni filterda chiqaramiz.
+      // API perPage limiti 100; 100+ talabali tashkilotlarda qidiruv-asosli
+      // combobox kerak bo'ladi (hozir birinchi 100 ta).
       const res = await apiClient.get<Paginated<Student>>('/users', {
-        params: { role: 'STUDENT', perPage: 200, isActive: true },
+        params: { role: 'STUDENT', perPage: 100, isActive: true },
       });
       return res.data.data;
     },
@@ -73,11 +75,13 @@ export function GroupMembersDialog({ open, onOpenChange, group }: Props) {
   const addableStudents = (freeStudents ?? []).filter((s) => !memberIds.has(s.id));
 
   const err =
-    addMut.error instanceof ApiError
-      ? addMut.error.problem.title ?? 'Qo\'shib bo\'lmadi'
-      : removeMut.error instanceof ApiError
-        ? removeMut.error.problem.title ?? 'Chiqarib bo\'lmadi'
-        : null;
+    freeStudentsError instanceof ApiError
+      ? freeStudentsError.problem.title ?? 'Talabalar ro\'yxatini yuklab bo\'lmadi'
+      : addMut.error instanceof ApiError
+        ? addMut.error.problem.title ?? 'Qo\'shib bo\'lmadi'
+        : removeMut.error instanceof ApiError
+          ? removeMut.error.problem.title ?? 'Chiqarib bo\'lmadi'
+          : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
