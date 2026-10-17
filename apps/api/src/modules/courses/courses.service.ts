@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -309,8 +308,9 @@ export class CoursesService {
     if (!existing) throw new NotFoundException('Kurs topilmadi');
 
     const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+    // N3: begona PRIVATE kurs — GET bilan izchil 404 qaytaramiz (mavjudligini oshkor qilmaslik).
     if (!isSuperAdmin && existing.ownerId !== ctx.actorId) {
-      throw new ForbiddenException('Faqat o‘z kursingizni tahrirlashingiz mumkin');
+      throw new NotFoundException('Kurs topilmadi');
     }
 
     let slug: string | undefined;
@@ -371,7 +371,7 @@ export class CoursesService {
     const isOwner = src.ownerId === ctx.actorId;
     const isLibrary = src.visibility === 'LIBRARY';
     if (!isSuperAdmin && !isOwner && !isLibrary) {
-      throw new ForbiddenException("Faqat o'z yoki kutubxona kursini nusxalashingiz mumkin");
+      throw new NotFoundException('Kurs topilmadi');
     }
 
     // slug unikal: "orig-copy", "orig-copy-2", ...
@@ -527,7 +527,7 @@ export class CoursesService {
 
     const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
     if (!isSuperAdmin && existing.ownerId !== ctx.actorId) {
-      throw new ForbiddenException('Faqat o‘z kursingizni o‘chira olasiz');
+      throw new NotFoundException('Kurs topilmadi');
     }
 
     // Lessons cascade-delete tufayli avtomatik o'chadi.
@@ -829,7 +829,7 @@ export class CoursesService {
     // Egalik: faqat SA yoki kurs egasi dars qo'sha oladi
     const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
     if (!isSuperAdmin && course.ownerId !== ctx.actorId) {
-      throw new ForbiddenException('Faqat o‘z kursingizga dars qo‘sha olasiz');
+      throw new NotFoundException('Kurs topilmadi');
     }
 
     const clash = await this.prisma.lesson.findFirst({
@@ -911,7 +911,7 @@ export class CoursesService {
 
     const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
     if (!isSuperAdmin && existing.course.ownerId !== ctx.actorId) {
-      throw new ForbiddenException('Faqat o‘z kursingiz darslarini tahrir qila olasiz');
+      throw new NotFoundException('Dars topilmadi');
     }
 
     if (dto.orderIndex !== undefined && dto.orderIndex !== existing.orderIndex) {
@@ -1026,7 +1026,7 @@ export class CoursesService {
     if (!course) throw new NotFoundException('Kurs topilmadi');
     const isSA = actorRoles.includes('SUPER_ADMIN');
     if (!isSA && course.ownerId !== ctx.actorId) {
-      throw new ForbiddenException("Faqat o'z kursingiz darslarini qayta tartiblashingiz mumkin");
+      throw new NotFoundException('Kurs topilmadi');
     }
     const allLessons = await this.prisma.lesson.findMany({
       where: { courseId },
@@ -1092,7 +1092,7 @@ export class CoursesService {
 
     const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
     if (!isSuperAdmin && existing.course.ownerId !== ctx.actorId) {
-      throw new ForbiddenException('Faqat o‘z kursingiz darslarini o‘chira olasiz');
+      throw new NotFoundException('Dars topilmadi');
     }
 
     // L11: default — soft-delete (archivedAt). Haqiqiy o'chirish uchun ?hard=true.

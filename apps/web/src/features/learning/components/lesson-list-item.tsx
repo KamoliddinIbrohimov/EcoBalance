@@ -31,7 +31,7 @@ export function LessonListItem({ lesson, courseSlug, onEdit, onRemove }: LessonL
   const content = (
     <>
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-        {lesson.orderIndex}
+        {lesson.orderIndex + 1}
       </div>
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">

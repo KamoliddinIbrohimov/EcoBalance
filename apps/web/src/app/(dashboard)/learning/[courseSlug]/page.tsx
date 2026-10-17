@@ -1,7 +1,8 @@
 'use client';
 
-import { PERMISSION, type LessonDto } from '@eco/shared';
-import { ArrowLeft, BookOpen, Pencil, Plus, Settings } from 'lucide-react';
+import { PERMISSION, type LessonDto, type ModuleDto } from '@eco/shared';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, BookOpen, Layers, Pencil, Plus, Settings } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -21,7 +22,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
 import { ConfirmDialog } from '@/shared/components/ui/confirm-dialog';
 import { UnderDevelopment } from '@/shared/components/layout/under-development';
-import type { ApiError } from '@/shared/lib/api-client';
+import { apiClient, type ApiError } from '@/shared/lib/api-client';
 import { useAuthStore } from '@/shared/stores/auth-store';
 
 export default function CourseDetailPage() {
@@ -37,6 +38,36 @@ export default function CourseDetailPage() {
 
   const { data: course, isLoading: courseLoading } = useCourseBySlug(slug);
   const { data: lessons, isLoading: lessonsLoading } = useCourseLessons(course?.id);
+  const { data: modules } = useQuery({
+    queryKey: ['modules', course?.id],
+    queryFn: async () => {
+      const r = await apiClient.get<{ data: ModuleDto[] }>(`/courses/${course!.id}/modules`);
+      return r.data.data;
+    },
+    enabled: !!course?.id,
+  });
+
+  // Darslarni modullar bo'yicha guruhlaymiz: har modul uchun o'z darslari + "Umumiy"
+  // (moduleId=null) bo'limi oxirida. Modul tartibi orderIndex bo'yicha.
+  const grouped = useMemo(() => {
+    if (!lessons) return [] as Array<{ module: ModuleDto | null; lessons: LessonDto[] }>;
+    const byModule = new Map<string | null, LessonDto[]>();
+    for (const l of lessons) {
+      const key = l.moduleId ?? null;
+      const arr = byModule.get(key) ?? [];
+      arr.push(l);
+      byModule.set(key, arr);
+    }
+    const result: Array<{ module: ModuleDto | null; lessons: LessonDto[] }> = [];
+    const sortedModules = (modules ?? []).slice().sort((a, b) => a.orderIndex - b.orderIndex);
+    for (const m of sortedModules) {
+      const items = (byModule.get(m.id) ?? []).sort((a, b) => a.orderIndex - b.orderIndex);
+      if (items.length > 0) result.push({ module: m, lessons: items });
+    }
+    const unassigned = (byModule.get(null) ?? []).sort((a, b) => a.orderIndex - b.orderIndex);
+    if (unassigned.length > 0) result.push({ module: null, lessons: unassigned });
+    return result;
+  }, [lessons, modules]);
 
   // Ko'rish / O'zgartirish rejimi. Ruxsat bo'lsa ham default — "ko'rish"; foydalanuvchi
   // "O'zgartirish" tugmasi bilan boshqaruvni yoqadi.
@@ -153,24 +184,41 @@ export default function CourseDetailPage() {
             {t('noLessonsYet')}
           </Card>
         ) : (
-          <div className="space-y-2">
-            {lessons.map((lesson) => (
-              <LessonListItem
-                key={lesson.id}
-                lesson={lesson}
-                courseSlug={course.slug}
-                onEdit={
-                  editMode && canManageLessons
-                    ? (l) => {
-                        setEditingLesson(l);
-                        setLessonDialogOpen(true);
+          <div className="space-y-4">
+            {grouped.map(({ module: m, lessons: items }) => (
+              <div key={m?.id ?? 'unassigned'} className="space-y-2">
+                <div className="flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <Layers className="h-3.5 w-3.5" />
+                  <span>
+                    {m ? `${m.orderIndex + 1}. ${m.titleUz}` : 'Umumiy'}
+                  </span>
+                  <Badge variant="secondary" className="ml-1 text-[10px]">
+                    {items.length}
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  {items.map((lesson) => (
+                    <LessonListItem
+                      key={lesson.id}
+                      lesson={lesson}
+                      courseSlug={course.slug}
+                      onEdit={
+                        editMode && canManageLessons
+                          ? (l) => {
+                              setEditingLesson(l);
+                              setLessonDialogOpen(true);
+                            }
+                          : undefined
                       }
-                    : undefined
-                }
-                onRemove={
-                  editMode && canManageLessons ? (l) => setRemovingLesson(l) : undefined
-                }
-              />
+                      onRemove={
+                        editMode && canManageLessons
+                          ? (l) => setRemovingLesson(l)
+                          : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}

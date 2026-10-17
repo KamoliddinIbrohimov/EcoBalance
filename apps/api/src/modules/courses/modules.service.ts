@@ -1,7 +1,5 @@
 import {
-  BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -51,8 +49,9 @@ export class ModulesService {
       select: { ownerId: true },
     });
     if (!course) throw new NotFoundException('Kurs topilmadi');
+    // N3: izchil 404 — PATCH va GET bir xil javob beradi
     if (!roles.includes('SUPER_ADMIN') && course.ownerId !== actorId) {
-      throw new ForbiddenException("Faqat o'z kursingiz modullarini boshqara olasiz");
+      throw new NotFoundException('Kurs topilmadi');
     }
   }
 

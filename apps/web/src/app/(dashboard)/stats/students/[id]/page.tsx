@@ -100,9 +100,16 @@ export default function StudentCardPage() {
     );
   }
 
-  const hours = Math.floor(overview.totalStudyTimeSec / 3600);
-  const minutes = Math.floor((overview.totalStudyTimeSec % 3600) / 60);
-  const timeLabel = hours > 0 ? `${hours} s ${minutes} daq` : `${minutes} daq`;
+  const totalSec = Math.max(0, Math.floor(overview.totalStudyTimeSec));
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  const timeLabel =
+    hours > 0
+      ? `${hours} s ${minutes} daq`
+      : minutes > 0
+        ? `${minutes} daq`
+        : `${seconds} son`;
 
   return (
     <div className="space-y-6">

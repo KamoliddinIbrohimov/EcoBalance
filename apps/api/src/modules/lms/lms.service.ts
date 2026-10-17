@@ -325,6 +325,18 @@ export class LmsService {
     if (existing && existing.status === AssignmentSubmissionStatus.GRADED) {
       throw new BadRequestException('Baholangan topshiriqga fayl qo‘shib bo‘lmaydi');
     }
+    // TIMED: topshirilgan javobni (textUz yoki fayl) qayta tahrir qilib bo'lmaydi.
+    // Faqat RETURNED holatida yangi urinish ruxsat.
+    if (
+      assignment.kind === 'TIMED' &&
+      existing &&
+      existing.status === AssignmentSubmissionStatus.SUBMITTED &&
+      (existing.textUz !== null || existing.fileKey !== null)
+    ) {
+      throw new BadRequestException(
+        "TIMED topshiriq topshirilgan — baholanishini kuting",
+      );
+    }
 
     if (isReturnedResubmit && existing) {
       await this.prisma.assignmentSubmissionRevision.create({
@@ -1004,6 +1016,19 @@ export class LmsService {
     if (existing && existing.status === AssignmentSubmissionStatus.PENDING_REVIEW) {
       throw new BadRequestException("Topshiriq o'qituvchi ko'rib chiqishida");
     }
+    // TIMED: `/start` row'ni oldindan yaratadi (textUz=null). Birinchi `/submissions`
+    // chaqiriqda talaba matnni to'ldiradi — bu normal. Lekin textUz allaqachon
+    // yozilgan bo'lsa, qayta topshirish taqiqlanadi (faqat RETURNED/attempt +1 orqali).
+    if (
+      assignment.kind === 'TIMED' &&
+      existing &&
+      existing.status === AssignmentSubmissionStatus.SUBMITTED &&
+      (existing.textUz !== null || existing.fileKey !== null)
+    ) {
+      throw new BadRequestException(
+        "TIMED topshiriq topshirilgan — baholanishini kuting",
+      );
+    }
 
     // F4 TIMED: faol urinish bor bo'lsa deadline tekshirilsin
     if (assignment.kind === 'TIMED') {
@@ -1397,17 +1422,20 @@ export class LmsService {
       },
     });
 
-    // StudyEvent (heartbeat)
-    await this.prisma.studyEvent.create({
-      data: {
-        id: uuidv7(),
-        studentId: actor.id,
-        type: 'LESSON_HEARTBEAT',
-        refId: lessonId,
-        meta: { activeSeconds: addSeconds, position: position ?? null } as Prisma.InputJsonValue,
-        at: now,
-      },
-    });
+    // StudyEvent (heartbeat) — tezlik limiti tufayli 0 soniyaga tushgan so'rovlar
+    // audit yozmaydi, aks holda statistikada "nol faollik" hodisalar paydo bo'ladi.
+    if (addSeconds > 0) {
+      await this.prisma.studyEvent.create({
+        data: {
+          id: uuidv7(),
+          studentId: actor.id,
+          type: 'LESSON_HEARTBEAT',
+          refId: lessonId,
+          meta: { activeSeconds: addSeconds, position: position ?? null } as Prisma.InputJsonValue,
+          at: now,
+        },
+      });
+    }
 
     return { ok: true, addedSeconds: addSeconds };
   }

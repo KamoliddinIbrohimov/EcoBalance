@@ -64,7 +64,7 @@ export default function LessonDetailPage() {
             {LESSON_TYPE_LABELS_UZ[lesson.lessonType]}
           </Badge>
           <span className="text-xs text-muted-foreground">
-            {t('lessonNumber', { n: lesson.orderIndex })}
+            {t('lessonNumber', { n: lesson.orderIndex + 1 })}
           </span>
         </div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{lesson.titleUz}</h1>

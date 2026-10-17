@@ -29,7 +29,6 @@ export function UsersTable({ users, isLoading, onEdit, onDeactivate }: UsersTabl
       <TableHeader>
         <TableRow>
           <TableHead>Foydalanuvchi</TableHead>
-          <TableHead>Tashkilot</TableHead>
           <TableHead>Rollar</TableHead>
           <TableHead>Holati</TableHead>
           <TableHead className="text-right">Amallar</TableHead>
@@ -37,9 +36,9 @@ export function UsersTable({ users, isLoading, onEdit, onDeactivate }: UsersTabl
       </TableHeader>
       <TableBody>
         {isLoading ? (
-          <TableEmpty colSpan={5}>Yuklanmoqda…</TableEmpty>
+          <TableEmpty colSpan={4}>Yuklanmoqda…</TableEmpty>
         ) : users.length === 0 ? (
-          <TableEmpty colSpan={5}>Foydalanuvchilar topilmadi</TableEmpty>
+          <TableEmpty colSpan={4}>Foydalanuvchilar topilmadi</TableEmpty>
         ) : (
           users.map((user) => (
             <TableRow key={user.id}>
@@ -48,13 +47,6 @@ export function UsersTable({ users, isLoading, onEdit, onDeactivate }: UsersTabl
                   {user.firstName} {user.lastName}
                 </div>
                 <div className="text-xs text-muted-foreground">{user.email}</div>
-              </TableCell>
-              <TableCell>
-                {user.organization ? (
-                  <span className="text-sm">{user.organization.nameUz}</span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
-                )}
               </TableCell>
               <TableCell>
                 <div className="flex flex-wrap gap-1">

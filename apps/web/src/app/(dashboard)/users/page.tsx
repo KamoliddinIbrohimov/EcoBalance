@@ -2,9 +2,8 @@
 
 import { PERMISSION, ROLE, ROLE_LABELS_UZ, type AdminUserDto, type Role } from '@eco/shared';
 import { Search, UserPlus } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
-import { flattenTree, useOrganizationsTree } from '@/features/organizations/hooks/use-organizations';
 import { UserFormDialog } from '@/features/users/components/user-form-dialog';
 import { UsersTable } from '@/features/users/components/users-table';
 import { useDeactivateUser, useUsersList } from '@/features/users/hooks/use-users';
@@ -31,7 +30,6 @@ export default function UsersPage() {
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [organizationId, setOrganizationId] = useState<string>('');
   const [role, setRole] = useState<string>('');
   const [isActive, setIsActive] = useState<string>('');
 
@@ -39,14 +37,10 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<AdminUserDto | null>(null);
   const [deactivating, setDeactivating] = useState<AdminUserDto | null>(null);
 
-  const { data: tree } = useOrganizationsTree();
-  const flatOrgs = useMemo(() => (tree ? flattenTree(tree) : []), [tree]);
-
   const { data, isLoading } = useUsersList({
     page,
     perPage: 20,
     search: search || undefined,
-    organizationId: organizationId || undefined,
     role: (role || undefined) as Role | undefined,
     isActive: isActive === '' ? undefined : isActive === 'true',
   });
@@ -65,7 +59,7 @@ export default function UsersPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Foydalanuvchilar</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Platformadagi barcha foydalanuvchilarni boshqarish — rol va tashkilot biriktirish.
+            O&apos;qituvchi va talabalarni boshqarish — rollarni belgilash va faollikni nazorat qilish.
           </p>
         </div>
         {canCreate ? (
@@ -95,26 +89,6 @@ export default function UsersPage() {
               }}
             />
           </div>
-
-          <Select
-            value={organizationId || ALL}
-            onValueChange={(v) => {
-              setPage(1);
-              setOrganizationId(v === ALL ? '' : v);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Tashkilot" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Barcha tashkilotlar</SelectItem>
-              {flatOrgs.map((opt) => (
-                <SelectItem key={opt.id} value={opt.id}>
-                  {'—'.repeat(opt.depth)} {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
           <Select
             value={role || ALL}
