@@ -51,7 +51,10 @@ jobs:
         run: pnpm --filter @eco/api build
 
       - name: Build Web
-        run: pnpm --filter @eco/web build
+        # NODE_ENV=production majburiy — aks holda Next.js'ning dev-mode
+        # <Html> runtime guard'i /404 static prerender vaqtida yoqilib
+        # ketadi va build fail bo'ladi (framework-level bug'ni chetlab o'tish).
+        run: NODE_ENV=production pnpm --filter @eco/web build
 
   build-api:
     needs: [verify]

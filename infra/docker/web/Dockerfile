@@ -23,6 +23,10 @@ COPY --from=deps /workspace/apps/web/node_modules ./apps/web/node_modules
 COPY --from=deps /workspace/packages/shared/node_modules ./packages/shared/node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# NODE_ENV=production — Next.js'ning dev-mode <Html> runtime guard'i /404
+# prerender vaqtida false-positive error beradi; prod build vaqtida bu
+# majburiy. "Non-standard NODE_ENV" warning'ini ham tozalaydi.
+ENV NODE_ENV=production
 RUN pnpm --filter @eco/shared build \
  && pnpm --filter @eco/web build
 
