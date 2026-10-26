@@ -214,7 +214,7 @@ const NAV_SUPER_ADMIN: NavItem[] = [
 
 /** TEACHER — o'z guruhlari, kurslari, topshiriqlari, statistikasi. */
 const NAV_TEACHER: NavItem[] = [
-  { href: '/teacher', icon: Home, labelKey: 'home' },
+  { href: '/', icon: Home, labelKey: 'home' },
   { href: '/groups', icon: Users, labelKey: 'groups' },
   { href: '/learning', icon: GraduationCap, labelKey: 'learning', children: [] },
   { href: '/assignments', icon: ClipboardList, labelKey: 'assignments' },
@@ -226,7 +226,7 @@ const NAV_TEACHER: NavItem[] = [
 
 /** STUDENT — o'z darslari, testlari, topshiriqlari, natijalari. */
 const NAV_STUDENT: NavItem[] = [
-  { href: '/home', icon: Home, labelKey: 'home' },
+  { href: '/', icon: Home, labelKey: 'home' },
   { href: '/learning', icon: GraduationCap, labelKey: 'learning', children: [] },
   { href: '/assignments', icon: ClipboardList, labelKey: 'assignments' },
   { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },

@@ -1,14 +1,9 @@
 import type { Role } from '@eco/shared';
 
 /**
- * 3-rol LMS: har bir rol o'z home sahifasiga ega.
- *  SUPER_ADMIN → `/` (dashboard, tizim KPI)
- *  TEACHER     → `/teacher` (guruhlar, tekshirilmagan topshiriqlar)
- *  STUDENT     → `/home` (progress, deadline, oxirgi natijalar)
+ * Kirgandan keyin barcha rollar yangi bosh sahifaga (`/`) tushadi; rolga xos
+ * panellar (`/teacher`, `/home`) bosh sahifadagi birinchi modul orqali ochiladi.
  */
-export function getRoleHomePath(roles: Role[]): string {
-  if (roles.includes('SUPER_ADMIN')) return '/';
-  if (roles.includes('TEACHER')) return '/teacher';
-  if (roles.includes('STUDENT')) return '/home';
-  return '/home';
+export function getRoleHomePath(_roles: Role[]): string {
+  return '/';
 }

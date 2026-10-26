@@ -115,6 +115,48 @@
     "todayIs": "Сегодня, {date}",
     "phasePlaceholder": "Содержимое панели будет добавлено на этапе 3"
   },
+  "home": {
+    "breadcrumb": "PedResearch Lab · Главная",
+    "welcome": "Добро пожаловать, {name}!",
+    "todayIs": "Сегодня, {date}",
+    "slogan": "«Беречь природу – значит беречь будущее!»",
+    "ecoCard": {
+      "title": "Экологический мониторинг",
+      "description": "Показатели по воздуху, воде и зелёным зонам, карта проекта и графики динамики.",
+      "cta": "Открыть мониторинг",
+      "chipIndex": "{value} /100 экоиндекс",
+      "chipPm25": "{value} µg/m³ PM2.5",
+      "chipPoints": "{value} точек"
+    },
+    "eduCard": {
+      "title": "Образование и e-learning",
+      "description": "Курсы, уроки и методические материалы для дошкольного, школьного и высшего образования.",
+      "cta": "Перейти к курсам",
+      "chipLevels": "{value} уровня",
+      "chipCourses": "{value} курсов",
+      "chipLessons": "{value} уроков"
+    },
+    "modulesTitle": "Модули управления",
+    "modules": {
+      "teacherPanel": { "title": "Моя панель", "description": "Группы и непроверенные задания" },
+      "studentPanel": { "title": "Моё обучение", "description": "Прогресс и сроки" },
+      "courses": { "title": "Курсы", "description": "Уроки и материалы" },
+      "myStats": { "title": "Мои результаты", "description": "Баллы и прогресс" },
+      "users": { "title": "Пользователи", "description": "Учителя и ученики, роли" },
+      "groups": { "title": "Группы", "description": "Состав группы и планирование" },
+      "assignments": { "title": "Задания", "description": "Выдача и проверка" },
+      "quizzes": { "title": "Экологические тесты", "description": "Оценка знаний" },
+      "stats": { "title": "Статистика", "description": "Прогресс и средние баллы" },
+      "chatbot": { "title": "AI чат-бот", "description": "Быстрые ответы на вопросы" }
+    },
+    "changeImage": "Заменить изображение",
+    "imageUploadHint": "JPG, PNG или WebP, до 5 МБ",
+    "imageUploadError": "Не удалось загрузить изображение. Попробуйте снова.",
+    "imageUploadErrorType": "Можно загружать только JPG, PNG или WebP",
+    "imageUploadErrorSize": "Размер изображения не должен превышать 5 МБ",
+    "monitoringOverviewTitle": "Экологический мониторинг",
+    "backToHome": "Вернуться на главную"
+  },
   "roles": {
     "SUPER_ADMIN": "Главный администратор",
     "ADMIN": "Администратор",

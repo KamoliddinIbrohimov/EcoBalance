@@ -115,6 +115,48 @@
     "todayIs": "Today, {date}",
     "phasePlaceholder": "Dashboard content will be added in Phase 3"
   },
+  "home": {
+    "breadcrumb": "PedResearch Lab · Home",
+    "welcome": "Welcome, {name}!",
+    "todayIs": "Today, {date}",
+    "slogan": "“Protecting nature means protecting the future!”",
+    "ecoCard": {
+      "title": "Ecological monitoring",
+      "description": "Air, water and green-area indicators, the project map and trend charts.",
+      "cta": "Open monitoring",
+      "chipIndex": "{value} /100 eco index",
+      "chipPm25": "{value} µg/m³ PM2.5",
+      "chipPoints": "{value} points"
+    },
+    "eduCard": {
+      "title": "Education & e-learning",
+      "description": "Courses, lessons and teaching materials for preschool, school and higher education.",
+      "cta": "Go to courses",
+      "chipLevels": "{value} levels",
+      "chipCourses": "{value} courses",
+      "chipLessons": "{value} lessons"
+    },
+    "modulesTitle": "Management modules",
+    "modules": {
+      "teacherPanel": { "title": "My dashboard", "description": "Groups and unreviewed assignments" },
+      "studentPanel": { "title": "My learning", "description": "Progress and deadlines" },
+      "courses": { "title": "Courses", "description": "Lessons and materials" },
+      "myStats": { "title": "My results", "description": "Scores and progress" },
+      "users": { "title": "Users", "description": "Teachers and students, roles" },
+      "groups": { "title": "Groups", "description": "Group composition and planning" },
+      "assignments": { "title": "Assignments", "description": "Give and review" },
+      "quizzes": { "title": "Ecological tests", "description": "Knowledge assessment" },
+      "stats": { "title": "Statistics", "description": "Progress and average scores" },
+      "chatbot": { "title": "AI Chatbot", "description": "Quick answers to questions" }
+    },
+    "changeImage": "Change image",
+    "imageUploadHint": "JPG, PNG or WebP, up to 5 MB",
+    "imageUploadError": "Could not upload the image. Please try again.",
+    "imageUploadErrorType": "Only JPG, PNG or WebP can be uploaded",
+    "imageUploadErrorSize": "The image must not exceed 5 MB",
+    "monitoringOverviewTitle": "Ecological monitoring",
+    "backToHome": "Back to home"
+  },
   "roles": {
     "SUPER_ADMIN": "Super administrator",
     "ADMIN": "Administrator",

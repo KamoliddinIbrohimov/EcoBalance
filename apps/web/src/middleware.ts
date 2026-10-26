@@ -17,8 +17,12 @@ const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password'];
 /**
  * Eski ekologik monitoring modullari — hozircha hamma uchun bloklangan.
  * /monitoring/tests (ekologik testlar) ishlab turibdi — alohida tekshiramiz.
+ * /monitoring/overview — bosh sahifadagi "Ekologik monitoring" kartasi
+ * ochadigan YANGI sahifa (bosh-sahifa-prompt.md), eski /monitoring'dan farqli —
+ * u ham alohida ruxsat etilgan.
  */
 const HIDDEN_LEGACY_PATHS = ['/mahalla', '/news', '/organizations', '/recommendations', '/reports', '/analytics', '/events'];
+const ALLOWED_MONITORING_SUBPATHS = ['/monitoring/tests', '/monitoring/overview'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -32,8 +36,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Eski modullar — bosh sahifaga qaytar (/monitoring/tests saqlanadi)
-  const isLegacyMonitoring = pathname === '/monitoring' || pathname.startsWith('/monitoring/') && !pathname.startsWith('/monitoring/tests');
+  // Eski modullar — bosh sahifaga qaytar (/monitoring/tests, /monitoring/overview saqlanadi)
+  const isLegacyMonitoring =
+    pathname === '/monitoring' ||
+    (pathname.startsWith('/monitoring/') &&
+      !ALLOWED_MONITORING_SUBPATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`)));
   const isLegacy = HIDDEN_LEGACY_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (isLegacy || isLegacyMonitoring) {
     const url = req.nextUrl.clone();

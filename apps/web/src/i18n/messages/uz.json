@@ -119,6 +119,48 @@
     "todayIs": "Bugun, {date}",
     "phasePlaceholder": "Dashboard kontenti Phase 3 da qo'shiladi"
   },
+  "home": {
+    "breadcrumb": "PedResearch Lab · Bosh sahifa",
+    "welcome": "Xush kelibsiz, {name}!",
+    "todayIs": "Bugun, {date}",
+    "slogan": "“Tabiatni asrash – kelajakni asrash demakdir!”",
+    "ecoCard": {
+      "title": "Ekologik monitoring",
+      "description": "Havo, suv va yashil hududlar bo'yicha ko'rsatkichlar, loyiha xaritasi va dinamika grafiklari.",
+      "cta": "Monitoringni ochish",
+      "chipIndex": "{value} /100 ekologik indeks",
+      "chipPm25": "{value} µg/m³ PM2.5",
+      "chipPoints": "{value} ta nuqta"
+    },
+    "eduCard": {
+      "title": "Ta'lim va e-learning",
+      "description": "Maktabgacha, maktab va oliy ta'lim uchun kurslar, darslar va metodik materiallar.",
+      "cta": "Kurslarga o'tish",
+      "chipLevels": "{value} daraja",
+      "chipCourses": "{value} kurs",
+      "chipLessons": "{value} dars"
+    },
+    "modulesTitle": "Boshqaruv modullari",
+    "modules": {
+      "teacherPanel": { "title": "Mening panelim", "description": "Guruhlar va tekshirilmagan topshiriqlar" },
+      "studentPanel": { "title": "Mening o'qishim", "description": "Progress va muddatlar" },
+      "courses": { "title": "Kurslar", "description": "Darslar va materiallar" },
+      "myStats": { "title": "Mening natijalarim", "description": "Ballar va progress" },
+      "users": { "title": "Foydalanuvchilar", "description": "O'qituvchi va talabalar, rollar" },
+      "groups": { "title": "Guruhlar", "description": "Guruh tarkibi va rejalashtirish" },
+      "assignments": { "title": "Topshiriqlar", "description": "Berish va tekshirish" },
+      "quizzes": { "title": "Ekologik testlar", "description": "Bilimni baholash" },
+      "stats": { "title": "Statistika", "description": "Progress va o'rtacha ballar" },
+      "chatbot": { "title": "AI Chatbot", "description": "Savollarga tezkor javob" }
+    },
+    "changeImage": "Rasmni almashtirish",
+    "imageUploadHint": "JPG, PNG yoki WebP, 5 MB gacha",
+    "imageUploadError": "Rasm yuklanmadi. Qaytadan urinib ko'ring.",
+    "imageUploadErrorType": "Faqat JPG, PNG yoki WebP yuklash mumkin",
+    "imageUploadErrorSize": "Rasm hajmi 5 MB dan oshmasligi kerak",
+    "monitoringOverviewTitle": "Ekologik monitoring",
+    "backToHome": "Bosh sahifaga qaytish"
+  },
   "roles": {
     "SUPER_ADMIN": "Bosh administrator",
     "ADMIN": "Administrator",

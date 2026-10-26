@@ -9,6 +9,19 @@
         }
     }
 
+    # Public MinIO bucket (bosh sahifa kartalari va h.k.) — GET/HEAD only, bitta
+    # doimiy origin (PUBLIC_ASSET_ORIGIN) orqali, MinIO'ni alohida host portga
+    # chiqarish shart emas.
+    handle /ecobalance-public/* {
+        @disallowedMethod not method GET HEAD
+        respond @disallowedMethod 405
+        # Host header'ni qayta yozish shart emas — Caddy uni standart holatda
+        # o'zgartirmasdan uzatadi, MinIO anonim GET uchun ham buni talab qilmaydi
+        # (forcePathStyle, imzosiz so'rov). deploy-tekshiruv-prompt.md 3-band.
+        reverse_proxy minio:9000
+        header Cache-Control "public, max-age=600"
+    }
+
     # Everything else -> Next.js
     handle {
         reverse_proxy web:3000

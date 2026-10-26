@@ -10,7 +10,7 @@ import { useAuthStore } from '@/shared/stores/auth-store';
  * Dashboard ichidagi barcha sahifalar uchun client-side gate:
  *  1. `mustChangePassword=true` bo'lsa — faqat `/change-password` sahifasi ochiq.
  *  2. STUDENT `/` yoki admin-only sahifalarga tushsa — o'z home sahifasiga.
- *  3. TEACHER `/` ga tushsa — `/teacher` ga.
+ *  3. `/` (yangi bosh sahifa) barcha rollarga ochiq — rolga mos modullar ko'rsatiladi.
  *
  * Haqiqiy avtorizatsiya backend tomondan amalga oshiriladi; bu — faqat UX uchun.
  */
@@ -64,12 +64,6 @@ export function RouteGate({ children }: { children: ReactNode }) {
     }
     if (isTeacher && TEACHER_FORBIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
       router.replace('/teacher');
-      return;
-    }
-
-    // 3) `/` — SA bo'lmaganlarni o'z sahifasiga
-    if (pathname === '/' && !isSuperAdmin) {
-      router.replace(getRoleHomePath(user.roles));
       return;
     }
   }, [hydrated, user, pathname, router]);

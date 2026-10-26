@@ -19,6 +19,13 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
  *     Agar berilmasa, S3_ENDPOINT'ga qaytadi (bu ishlab chiqarishda,
  *     ichki va tashqi manzil bir xil bo'lganda kifoya).
  *   • S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY, S3_BUCKET_PRIVATE.
+ *   • PUBLIC_ASSET_ORIGIN — `ecobalance-public` bucket uchun brauzer VA Next
+ *     server (next/image) ikkisi ham bir xil ishlatadigan doimiy origin
+ *     (masalan `http://localhost:8080` dev'da, prod'da sayt domeni). Bu
+ *     origin'dagi `/ecobalance-public/...` yo'li nginx/Caddy orqali MinIO'ga
+ *     proksi qilinadi — MinIO'ni alohida host portga chiqarish shart emas,
+ *     shuning uchun server (konteyner ichidan) ham brauzer ham bir xil
+ *     manzildan rasmni topa oladi.
  */
 @Injectable()
 export class StorageService implements OnModuleInit {
@@ -26,6 +33,9 @@ export class StorageService implements OnModuleInit {
   private client!: S3Client;
   private signingClient!: S3Client;
   private bucket!: string;
+  private publicBucket!: string;
+  private publicEndpoint!: string;
+  private publicAssetOrigin!: string;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -33,6 +43,26 @@ export class StorageService implements OnModuleInit {
     const endpoint = this.config.get<string>('S3_ENDPOINT', 'http://minio:9000');
     const publicEndpoint = this.config.get<string>('S3_PUBLIC_ENDPOINT', endpoint);
     this.bucket = this.config.get<string>('S3_BUCKET_PRIVATE', 'ecobalance-private');
+    this.publicBucket = this.config.get<string>('S3_BUCKET_PUBLIC', 'ecobalance-public');
+    this.publicEndpoint = publicEndpoint;
+    this.publicAssetOrigin = this.config.get<string>('PUBLIC_ASSET_ORIGIN', 'http://localhost:8080');
+    const nodeEnv = this.config.get<string>('NODE_ENV', 'development');
+    if (
+      nodeEnv === 'production' &&
+      (this.publicAssetOrigin.includes('CHANGE_ME') ||
+        this.publicAssetOrigin.includes('localhost') ||
+        this.publicAssetOrigin.trim().length === 0)
+    ) {
+      // deploy-tekshiruv-prompt.md 3-band — bu CHANGE_ME/localhost'da qolib
+      // ketsa, barcha yuklangan rasm manzillari browserga noto'g'ri qaytadi
+      // (sayt domenidagi foydalanuvchi uni ochib bo'lmaydi). Jarayonni
+      // to'xtatmaymiz (boot'ni buzmaslik uchun) — lekin baland ovozda ogohlantiramiz.
+      this.logger.error(
+        `PUBLIC_ASSET_ORIGIN prod muhitda noto'g'ri sozlangan: "${this.publicAssetOrigin}". ` +
+          `.env'da haqiqiy sayt domenini qo'ying (masalan https://eco-balance.uz) — ` +
+          `aks holda bosh sahifa kartalari uchun yuklangan rasmlar brauzerda ochilmaydi.`,
+      );
+    }
     const region = this.config.get<string>('S3_REGION', 'us-east-1');
     const credentials = {
       accessKeyId: this.config.get<string>('S3_ACCESS_KEY', 'ecobalance'),
@@ -73,6 +103,33 @@ export class StorageService implements OnModuleInit {
 
   async delete(key: string): Promise<void> {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+  }
+
+  /**
+   * `ecobalance-public` bucket'ga yuklaydi (anonim o'qishga ochiq — minio-init
+   * shu bucket'ni `mc anonymous set download` bilan sozlaydi). Signing'siz —
+   * muddati tugaydigan presigned URL emas, doimiy ochiq fayl.
+   * Chaqiruvchi faqat `key`ni saqlashi kerak (DB'da) — to'liq URL har doim
+   * `getPublicUrl(key)` bilan HOZIRGI `PUBLIC_ASSET_ORIGIN`dan qayta hisoblanadi,
+   * shunda origin o'zgarsa (domen, port) eski yozuvlar buzilmaydi.
+   */
+  async uploadPublic(key: string, body: Buffer, contentType: string): Promise<void> {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.publicBucket,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+      }),
+    );
+  }
+
+  async deletePublic(key: string): Promise<void> {
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.publicBucket, Key: key }));
+  }
+
+  getPublicUrl(key: string): string {
+    return `${this.publicAssetOrigin}/${this.publicBucket}/${key}`;
   }
 
   /**

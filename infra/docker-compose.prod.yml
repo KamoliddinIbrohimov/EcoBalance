@@ -43,6 +43,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - eco-balance_net
 
@@ -94,6 +96,29 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+    networks:
+      - eco-balance_net
+
+  # Bir martalik, idempotent init — docker-compose.yml (dev) dagi minio-init
+  # bilan bir xil. Ikkala bucket'ni yaratadi (|| true — allaqachon bor bo'lsa
+  # ham xato bermaydi); FAQAT public bucket anonim o'qishga ochiladi — private
+  # bucket (fayl materiallar, presigned-only) hech qachon anonim bo'lmaydi.
+  # `docker compose up` ishga tushgan sayin qayta ishga tushadi va darhol
+  # chiqadi (exit 0) — restart siyosati yo'q, shuning uchun muammo bo'lmaydi.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}) do sleep 1; done;
+      /usr/bin/mc mb -p local/${S3_BUCKET_PUBLIC:-ecobalance-public} || true;
+      /usr/bin/mc mb -p local/${S3_BUCKET_PRIVATE:-ecobalance-private} || true;
+      /usr/bin/mc anonymous set download local/${S3_BUCKET_PUBLIC:-ecobalance-public};
+      echo 'minio buckets ready';
+      exit 0;
+      "
     networks:
       - eco-balance_net
 
