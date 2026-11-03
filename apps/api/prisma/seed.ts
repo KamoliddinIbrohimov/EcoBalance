@@ -6,6 +6,7 @@ import { ROLE_LABELS_UZ } from '@eco/shared';
 import { PrismaClient, RoleSlug } from '@prisma/client';
 import * as argon2 from 'argon2';
 
+import { fixDarslar } from './data/darslar-tuzatish';
 import { importEkologiyaFayllar } from './data/ekologiya-fayllar';
 import { importOliyEkologiya, resetHomeMedia } from './data/oliy-ekologiya';
 import { importPdvDarslar } from './data/pdv-darslar';
@@ -69,6 +70,7 @@ async function runDataImportsOnce() {
     ['data_import:home-media-reset-v1', () => resetHomeMedia(prisma)],
     ['data_import:pdv-darslar-v1', () => importPdvDarslar(prisma)],
     ['data_import:ekologiya-fayllar-v1', () => importEkologiyaFayllar(prisma)],
+    ['data_import:darslar-tuzatish-v1', () => fixDarslar(prisma)],
   ];
   for (const [key, run] of imports) {
     if (await prisma.platformSetting.findUnique({ where: { key } })) continue;
