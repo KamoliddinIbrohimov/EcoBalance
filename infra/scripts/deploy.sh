@@ -37,9 +37,10 @@ warn() { printf '%s! %s%s\n' "$C_YELLOW" "$*" "$C_RESET" >&2; }
 ok()   { printf '%s✓ %s%s\n' "$C_GREEN"  "$*" "$C_RESET"; }
 die()  { printf '%s✗ %s%s\n' "$C_RED"    "$*" "$C_RESET" >&2; exit 1; }
 
-# Serverda compose fayli ildizda yoki infra/ ichida bo'lishi mumkin.
-COMPOSE_FILE="docker-compose.prod.yml"
-[[ -f "$COMPOSE_FILE" ]] || COMPOSE_FILE="infra/docker-compose.prod.yml"
+# Prod stack infra/ ichidagi compose bilan ishlaydi (./Caddyfile shu papkaga
+# nisbatan). Ildizdagi nusxa eski — u bilan Caddy mount'i buziladi.
+COMPOSE_FILE="infra/docker-compose.prod.yml"
+[[ -f "$COMPOSE_FILE" ]] || COMPOSE_FILE="docker-compose.prod.yml"
 ENV_FILE=".env"
 
 [[ -f "$COMPOSE_FILE" ]] || die "Missing $APP_DIR/$COMPOSE_FILE"
@@ -83,17 +84,21 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# 3) Pull all images referenced by the compose file
+# 3) Pull app images
 # -----------------------------------------------------------------------------
-log "pulling images"
-"${COMPOSE[@]}" pull
+# Faqat ilova image'lari: infra image'lari (caddy, postgres, minio, minio/mc)
+# serverda allaqachon bor; minio/mc Docker Hub'dan olib tashlangan — umumiy
+# `pull` shu sababli butun deploy'ni yiqitardi.
+log "pulling app images (web, api)"
+"${COMPOSE[@]}" pull web api
 ok "images up to date"
 
 # -----------------------------------------------------------------------------
 # 4) Start / update infra services first (they don't depend on new app images)
 # -----------------------------------------------------------------------------
 log "starting infra services: caddy, postgres, minio"
-"${COMPOSE[@]}" up -d caddy postgres minio
+# --no-deps: caddy web/api'ga bog'liq — usiz yangi API backup'dan oldin ishga tushib ketardi.
+"${COMPOSE[@]}" up -d --no-deps caddy postgres minio
 ok "infra services running"
 
 # -----------------------------------------------------------------------------
