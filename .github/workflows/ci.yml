@@ -49,3 +49,32 @@ jobs:
       - name: Build Web
         # NODE_ENV=production — Next.js dev-mode <Html> guard'ini oldini oladi
         run: NODE_ENV=production pnpm --filter @eco/web build
+
+  api-e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ecobalance
+          POSTGRES_PASSWORD: ecobalance
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ecobalance" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      # Testlar har run uchun shu server ichida alohida baza yaratadi.
+      TEST_DATABASE_URL: postgresql://ecobalance:ecobalance@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.11'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @eco/shared build
+      - run: pnpm --filter @eco/api exec prisma generate
+      - run: pnpm --filter @eco/api test

@@ -1,15 +1,14 @@
 import { Module } from '@nestjs/common';
 
-import { AuthModule } from '../auth/auth.module';
-import { NotificationsModule } from '../notifications/notifications.module';
-import { PrismaModule } from '../prisma/prisma.module';
-import { QuizzesAdminController, QuizzesUserController } from './quizzes.controller';
+import { AttemptsService } from './attempts.service';
+import { QuestionsService } from './questions.service';
+import { MyQuizzesController, QuizzesController } from './quizzes.controller';
 import { QuizzesService } from './quizzes.service';
+import { SubmissionEffectsService } from './submission-effects.service';
 
 @Module({
-  imports: [PrismaModule, AuthModule, NotificationsModule],
-  controllers: [QuizzesAdminController, QuizzesUserController],
-  providers: [QuizzesService],
+  controllers: [QuizzesController, MyQuizzesController],
+  providers: [QuizzesService, QuestionsService, AttemptsService, SubmissionEffectsService],
   exports: [QuizzesService],
 })
 export class QuizzesModule {}

@@ -1,202 +1,137 @@
-/**
- * End-to-end auth flow tests.
- *
- * Requires a running Postgres reachable via DATABASE_URL.
- * Run inside docker: `docker compose exec api pnpm test`.
- * The tests wipe and reseed the database between runs — do NOT run against production data.
- */
-import { INestApplication, VersioningType } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import cookieParser from 'cookie-parser';
-import { ZodValidationPipe } from 'nestjs-zod';
-import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { INestApplication } from '@nestjs/common';
 
-import { AppModule } from '../src/app.module';
-import { GlobalExceptionFilter } from '../src/common/filters/global-exception.filter';
-import { ResponseTransformInterceptor } from '../src/common/interceptors/response-transform.interceptor';
-import { PrismaService } from '../src/modules/prisma/prisma.service';
+import { type Http, createApp, createUser, loginAdmin, refreshCookie } from './app';
+import { ADMIN } from './env';
 
-const strongPassword = 'ValidPass!2026';
-
-describe('Auth (e2e)', () => {
+describe('auth', () => {
   let app: INestApplication;
-  let prisma: PrismaService;
+  let http: Http;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+    ({ app, http } = await createApp());
+  });
+  afterAll(() => app.close());
 
-    app = moduleRef.createNestApplication();
-    app.use(cookieParser());
-    app.setGlobalPrefix('api');
-    app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
-    app.useGlobalPipes(new ZodValidationPipe());
-    app.useGlobalInterceptors(new ResponseTransformInterceptor());
-    app.useGlobalFilters(new GlobalExceptionFilter());
-
-    await app.init();
-
-    prisma = app.get(PrismaService);
-
-    await prisma.user.deleteMany({ where: { email: { contains: '@test.eco-balance.uz' } } });
+  it("noto'g'ri parol — 401 problem+json", async () => {
+    const res = await http.post('/api/v1/auth/login').send({ email: ADMIN.email, password: 'wrong' });
+    expect(res.status).toBe(401);
+    expect(res.headers['content-type']).toContain('application/problem+json');
+    expect(res.body.title).toBe('Email yoki parol noto‘g‘ri');
   });
 
-  afterAll(async () => {
-    await prisma.user.deleteMany({ where: { email: { contains: '@test.eco-balance.uz' } } });
-    await app.close();
+  it("validatsiya xatosi — 422 va maydon xatolari", async () => {
+    const res = await http.post('/api/v1/auth/login').send({ email: 'not-an-email' });
+    expect(res.status).toBe(422);
+    expect(Object.keys(res.body.errors)).toEqual(expect.arrayContaining(['email', 'password']));
   });
 
-  const uniqueEmail = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.eco-balance.uz`;
+  it('login — token, httpOnly cookie va profil (web kontrakti)', async () => {
+    const res = await http.post('/api/v1/auth/login').send(ADMIN).expect(200);
+    const { data } = res.body;
+    expect(data).toMatchObject({ tokenType: 'Bearer', expiresIn: 900 });
+    expect(data.refreshToken).toBeUndefined();
+    expect(data.user).toMatchObject({ email: ADMIN.email, roles: ['SUPER_ADMIN'], mustChangePassword: false });
+    expect(data.user.permissions).toContain('users.read');
+    const cookie = ([] as string[]).concat(res.headers['set-cookie']).join(';');
+    expect(cookie).toMatch(/refresh_token=.+HttpOnly/);
+    expect(cookie).toContain('Path=/');
+  });
 
-  it('POST /auth/register — 201 with valid payload', async () => {
-    const email = uniqueEmail();
-    const res = await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
-      .send({
-        firstName: 'Ali',
-        lastName: 'Valiyev',
-        email,
-        password: strongPassword,
-        confirmPassword: strongPassword,
-      })
+  it('tokensiz himoyalangan endpoint — 401', async () => {
+    await http.get('/api/v1/auth/me').expect(401);
+  });
+
+  it('refresh tokenni almashtiradi; logout butun sessiyani yopadi', async () => {
+    const login = await http.post('/api/v1/auth/login').send(ADMIN).expect(200);
+    const first = refreshCookie(login);
+
+    const r1 = await http.post('/api/v1/auth/refresh').set('Cookie', first).send({}).expect(200);
+    const second = refreshCookie(r1);
+    expect(second).not.toBe(first);
+    expect(r1.body.data.user.email).toBe(ADMIN.email);
+
+    // Parallel tab: eski token grace oralig'ida hali ishlaydi.
+    await http.post('/api/v1/auth/refresh').set('Cookie', first).send({}).expect(200);
+
+    await http.post('/api/v1/auth/logout').set('Cookie', second).expect(204);
+    await new Promise((r) => setTimeout(r, 2_100));
+    await http.post('/api/v1/auth/refresh').set('Cookie', second).send({}).expect(401);
+  });
+
+  it('cookiesiz logout ham 204', async () => {
+    await http.post('/api/v1/auth/logout').expect(204);
+  });
+
+  it("vaqtinchalik parol: faqat profil va parol almashtirish ochiq", async () => {
+    const admin = await http.post('/api/v1/auth/login').send(ADMIN).expect(200);
+    const token = admin.body.data.accessToken;
+    const email = `temp-${Date.now()}@test.local`;
+    await http
+      .post('/api/v1/users')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ firstName: 'Vaqt', lastName: 'Parol', email, password: 'TempPass1234', roleSlugs: ['TEACHER'] })
       .expect(201);
 
-    expect(res.body.data.accessToken).toBeDefined();
-    expect(res.body.data.tokenType).toBe('Bearer');
-    const rawCookies = res.headers['set-cookie'];
-    const cookies = Array.isArray(rawCookies) ? rawCookies : rawCookies ? [rawCookies] : [];
-    expect(cookies.some((c) => c.startsWith('refresh_token='))).toBe(true);
+    const login = await http.post('/api/v1/auth/login').send({ email, password: 'TempPass1234' }).expect(200);
+    const t = login.body.data.accessToken;
+    expect(login.body.data.user.mustChangePassword).toBe(true);
+
+    const blocked = await http.get('/api/v1/users').set('Authorization', `Bearer ${t}`);
+    expect(blocked.status).toBe(403);
+    expect(blocked.body.title).toBe('Avval parolingizni almashtirishingiz kerak');
+    await http.get('/api/v1/auth/me').set('Authorization', `Bearer ${t}`).expect(200);
+
+    // Web klient bu javobni o'ramsiz o'qiydi.
+    const changed = await http
+      .post('/api/v1/auth/me/change-password')
+      .set('Authorization', `Bearer ${t}`)
+      .set('Cookie', refreshCookie(login))
+      .send({ currentPassword: 'TempPass1234', newPassword: 'NewPass12345', confirmPassword: 'NewPass12345' })
+      .expect(200);
+    expect(changed.body).toMatchObject({ ok: true, expiresIn: 900 });
+    expect(changed.body.data).toBeUndefined();
+
+    await http.get('/api/v1/users').set('Authorization', `Bearer ${changed.body.accessToken}`).expect(200);
+    // Eski sessiya bekor qilingan.
+    await http.post('/api/v1/auth/refresh').set('Cookie', refreshCookie(login)).send({}).expect(401);
   });
 
-  it('POST /auth/register — 400 when password is weak', async () => {
-    const res = await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
-      .send({
-        firstName: 'Ali',
-        lastName: 'Valiyev',
-        email: uniqueEmail(),
-        password: 'weak',
-        confirmPassword: 'weak',
-      })
+  it("noto'g'ri joriy parol — 400 (401 emas, aks holda klient sessiyani tashlab yuboradi)", async () => {
+    const admin = await http.post('/api/v1/auth/login').send(ADMIN).expect(200);
+    const teacher = await createUser(http, admin.body.data.accessToken, 'TEACHER');
+    await http
+      .post('/api/v1/auth/me/change-password')
+      .set('Authorization', `Bearer ${teacher.token}`)
+      .send({ currentPassword: 'nope', newPassword: 'Another12345', confirmPassword: 'Another12345' })
       .expect(400);
-
-    expect(res.body.status).toBe(400);
   });
 
-  it('POST /auth/register — 409 when email already exists', async () => {
-    const email = uniqueEmail();
-    const payload = {
-      firstName: 'Ali',
-      lastName: 'Valiyev',
-      email,
-      password: strongPassword,
-      confirmPassword: strongPassword,
-    };
-    await request(app.getHttpServer()).post('/api/v1/auth/register').send(payload).expect(201);
-    await request(app.getHttpServer()).post('/api/v1/auth/register').send(payload).expect(409);
-  });
+  it('profilni tahrirlash va avatar', async () => {
+    const admin = await http.post('/api/v1/auth/login').send(ADMIN).expect(200);
+    const auth = { Authorization: `Bearer ${admin.body.data.accessToken}` };
 
-  it('POST /auth/login — 200 with correct credentials', async () => {
-    const email = uniqueEmail();
-    await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
-      .send({
-        firstName: 'Dilfuza',
-        lastName: 'Makhmudova',
-        email,
-        password: strongPassword,
-        confirmPassword: strongPassword,
-      })
+    const patched = await http.patch('/api/v1/auth/me').set(auth).send({ firstName: 'Yangi' }).expect(200);
+    expect(patched.body.data.firstName).toBe('Yangi');
+
+    const up = await http
+      .post('/api/v1/auth/me/avatar')
+      .set(auth)
+      .attach('file', Buffer.from('fake-png'), { filename: 'a.png', contentType: 'image/png' })
       .expect(201);
+    expect(up.body.data.avatarUrl).toMatch(/^http:\/\/assets\.test\/ecobalance-public\/avatars\//);
 
-    const res = await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({ email, password: strongPassword })
-      .expect(200);
+    const bad = await http
+      .post('/api/v1/auth/me/avatar')
+      .set(auth)
+      .attach('file', Buffer.from('x'), { filename: 'a.txt', contentType: 'text/plain' });
+    expect(bad.status).toBe(400);
 
-    expect(res.body.data.accessToken).toBeDefined();
+    const removed = await http.delete('/api/v1/auth/me/avatar').set(auth).expect(200);
+    expect(removed.body.data.avatarUrl).toBeNull();
   });
 
-  it('POST /auth/login — 401 with wrong password', async () => {
-    const email = uniqueEmail();
-    await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
-      .send({
-        firstName: 'Xasan',
-        lastName: 'Yolchi',
-        email,
-        password: strongPassword,
-        confirmPassword: strongPassword,
-      })
-      .expect(201);
-
-    await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({ email, password: 'WrongPass!2026' })
-      .expect(401);
-  });
-
-  it('GET /auth/me — 200 with bearer token', async () => {
-    const email = uniqueEmail();
-    const reg = await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
-      .send({
-        firstName: 'Kamoliddin',
-        lastName: 'Tester',
-        email,
-        password: strongPassword,
-        confirmPassword: strongPassword,
-      })
-      .expect(201);
-
-    const res = await request(app.getHttpServer())
-      .get('/api/v1/auth/me')
-      .set('Authorization', `Bearer ${reg.body.data.accessToken}`)
-      .expect(200);
-
-    expect(res.body.data.email).toBe(email);
-    expect(res.body.data.roles).toContain('CITIZEN');
-    expect(res.body.data.permissions).toContain('notifications.read.own');
-  });
-
-  it('GET /auth/me — 401 without token', async () => {
-    await request(app.getHttpServer()).get('/api/v1/auth/me').expect(401);
-  });
-
-  it('POST /auth/refresh — 200 with valid refresh cookie', async () => {
-    const email = uniqueEmail();
-    const reg = await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
-      .send({
-        firstName: 'Refresh',
-        lastName: 'Test',
-        email,
-        password: strongPassword,
-        confirmPassword: strongPassword,
-      })
-      .expect(201);
-
-    const cookie = reg.headers['set-cookie']!;
-    const res = await request(app.getHttpServer())
-      .post('/api/v1/auth/refresh')
-      .set('Cookie', cookie)
-      .expect(200);
-
-    expect(res.body.data.accessToken).toBeDefined();
-  });
-
-  it('POST /auth/refresh — 401 when no cookie', async () => {
-    await request(app.getHttpServer()).post('/api/v1/auth/refresh').expect(401);
-  });
-
-  it('POST /auth/forgot-password — 200 (does not leak account existence)', async () => {
-    const res = await request(app.getHttpServer())
-      .post('/api/v1/auth/forgot-password')
-      .send({ email: 'nobody@test.eco-balance.uz' })
-      .expect(200);
-
-    expect(res.body.data.ok).toBe(true);
+  it('health ochiq', async () => {
+    const res = await http.get('/api/v1/health').expect(200);
+    expect(res.body).toEqual({ data: { status: 'ok' } });
   });
 });

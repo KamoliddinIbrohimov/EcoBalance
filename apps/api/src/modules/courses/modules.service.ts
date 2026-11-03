@@ -1,266 +1,125 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import type {
-  CreateModuleInput,
-  ModuleDto,
-  UpdateModuleInput,
-} from '@eco/shared';
-import { v7 as uuidv7 } from 'uuid';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import type { CreateModuleInput, ModuleDto, UpdateModuleInput } from '@eco/shared';
 
-import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../../infra/audit.service';
+import { PrismaService, isUniqueViolation } from '../../infra/prisma.service';
+import { type Actor, type ClientInfo, isStudent } from '../auth/actor';
+import { COURSE_REF_SELECT, CourseAccess } from './course-access.service';
+import { MODULE_SELECT, toModuleDto } from './course.mappers';
 
-const MODULE_SELECT = {
-  id: true,
-  courseId: true,
-  orderIndex: true,
-  titleUz: true,
-  descriptionUz: true,
-  isPublished: true,
-  createdAt: true,
-  updatedAt: true,
-} satisfies Prisma.ModuleSelect;
-
-type ModuleRow = Prisma.ModuleGetPayload<{ select: typeof MODULE_SELECT }>;
-
-function toModuleDto(r: ModuleRow): ModuleDto {
-  return {
-    id: r.id,
-    courseId: r.courseId,
-    orderIndex: r.orderIndex,
-    titleUz: r.titleUz,
-    descriptionUz: r.descriptionUz,
-    isPublished: r.isPublished,
-    createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt.toISOString(),
-  };
-}
+const MODULE_NOT_FOUND = 'Modul topilmadi';
+/** Modul o'chirilganda uning darslari shu nomli modulga ko'chadi. */
+const GENERAL_MODULE = 'Umumiy';
 
 @Injectable()
 export class ModulesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: CourseAccess,
+    private readonly audit: AuditService,
+  ) {}
 
-  private async assertCourseOwnership(courseId: string, actorId: string, roles: string[]) {
-    const course = await this.prisma.course.findUnique({
-      where: { id: courseId },
-      select: { ownerId: true },
-    });
-    if (!course) throw new NotFoundException('Kurs topilmadi');
-    // N3: izchil 404 — PATCH va GET bir xil javob beradi
-    if (!roles.includes('SUPER_ADMIN') && course.ownerId !== actorId) {
-      throw new NotFoundException('Kurs topilmadi');
-    }
-  }
-
-  async listByCourse(
-    courseId: string,
-    actor?: { id: string; roles: string[] },
-  ): Promise<ModuleDto[]> {
-    // Kirish tekshiruvi — teacher own/LIBRARY; student guruh orqali.
-    const course = await this.prisma.course.findUnique({
-      where: { id: courseId },
-      select: { ownerId: true, visibility: true, isPublished: true },
-    });
-    if (!course) throw new NotFoundException('Kurs topilmadi');
-    if (actor) {
-      const isSA = actor.roles.includes('SUPER_ADMIN');
-      const isTeacher = actor.roles.includes('TEACHER') && !isSA;
-      const isStudent = !isSA && !isTeacher;
-      if (isTeacher) {
-        if (course.ownerId !== actor.id && course.visibility !== 'LIBRARY') {
-          throw new NotFoundException('Kurs topilmadi');
-        }
-      } else if (isStudent) {
-        if (!course.isPublished) throw new NotFoundException('Kurs topilmadi');
-        const member = await this.prisma.groupMember.findUnique({
-          where: { studentId: actor.id },
-          select: { groupId: true, group: { select: { isActive: true } } },
-        });
-        if (!member || !member.group.isActive) throw new NotFoundException('Kurs topilmadi');
-        const link = await this.prisma.courseGroup.findUnique({
-          where: { courseId_groupId: { courseId, groupId: member.groupId } },
-          select: { courseId: true },
-        });
-        if (!link) throw new NotFoundException('Kurs topilmadi');
-      }
-    }
+  async listByCourse(courseId: string, actor: Actor): Promise<ModuleDto[]> {
+    await this.access.loadForView(courseId, actor);
     const rows = await this.prisma.module.findMany({
-      where: {
-        courseId,
-        // STUDENT uchun faqat nashr etilgan modullar
-        ...(actor && !actor.roles.includes('SUPER_ADMIN') && !actor.roles.includes('TEACHER')
-          ? { isPublished: true }
-          : {}),
-      },
+      where: { courseId, ...(isStudent(actor) ? { isPublished: true } : {}) },
       select: MODULE_SELECT,
       orderBy: { orderIndex: 'asc' },
     });
     return rows.map(toModuleDto);
   }
 
-  async create(input: CreateModuleInput, actorId: string, roles: string[]): Promise<ModuleDto> {
-    await this.assertCourseOwnership(input.courseId, actorId, roles);
-    const next =
-      input.orderIndex ??
-      ((
-        await this.prisma.module.aggregate({
-          where: { courseId: input.courseId },
-          _max: { orderIndex: true },
-        })
-      )._max.orderIndex ?? -1) + 1;
-    const clash = await this.prisma.module.findFirst({
-      where: { courseId: input.courseId, orderIndex: next },
-    });
-    if (clash) {
-      throw new ConflictException(`#${next} tartibli modul mavjud`);
-    }
-    const row = await this.prisma.module.create({
-      data: {
-        id: uuidv7(),
-        courseId: input.courseId,
-        orderIndex: next,
-        titleUz: input.titleUz.trim(),
-        descriptionUz: input.descriptionUz?.trim() ?? null,
-        isPublished: input.isPublished ?? true,
-      },
-      select: MODULE_SELECT,
-    });
+  async create(input: CreateModuleInput, actor: Actor, client: ClientInfo): Promise<ModuleDto> {
+    await this.access.loadForManage(input.courseId, actor);
+    const orderIndex = input.orderIndex ?? (await this.nextOrder(input.courseId));
+    await this.assertOrderFree(input.courseId, orderIndex);
+    const row = await this.withOrderConflict(orderIndex, () =>
+      this.prisma.module.create({
+        data: {
+          courseId: input.courseId,
+          orderIndex,
+          titleUz: input.titleUz.trim(),
+          descriptionUz: input.descriptionUz?.trim() ?? null,
+          isPublished: input.isPublished,
+        },
+        select: MODULE_SELECT,
+      }),
+    );
+    await this.audit.record({ userId: actor.id, action: 'CREATE', subjectType: 'Module', subjectId: row.id, ...client });
     return toModuleDto(row);
   }
 
-  async update(id: string, input: UpdateModuleInput, actorId: string, roles: string[]): Promise<ModuleDto> {
-    const existing = await this.prisma.module.findUnique({
-      where: { id },
-      select: { courseId: true },
-    });
-    if (!existing) throw new NotFoundException('Modul topilmadi');
-    await this.assertCourseOwnership(existing.courseId, actorId, roles);
-
-    if (input.orderIndex !== undefined) {
-      const clash = await this.prisma.module.findFirst({
-        where: { courseId: existing.courseId, orderIndex: input.orderIndex, NOT: { id } },
-      });
-      if (clash) throw new ConflictException(`#${input.orderIndex} tartibli modul mavjud`);
-    }
-
-    const row = await this.prisma.module.update({
-      where: { id },
-      data: {
-        ...(input.titleUz !== undefined ? { titleUz: input.titleUz.trim() } : {}),
-        ...(input.descriptionUz !== undefined
-          ? { descriptionUz: input.descriptionUz?.trim() ?? null }
-          : {}),
-        ...(input.orderIndex !== undefined ? { orderIndex: input.orderIndex } : {}),
-        ...(input.isPublished !== undefined ? { isPublished: input.isPublished } : {}),
-      },
-      select: MODULE_SELECT,
-    });
+  async update(id: string, input: UpdateModuleInput, actor: Actor, client: ClientInfo): Promise<ModuleDto> {
+    const existing = await this.loadForManage(id, actor);
+    if (input.orderIndex !== undefined) await this.assertOrderFree(existing.courseId, input.orderIndex, id);
+    const row = await this.withOrderConflict(input.orderIndex ?? 0, () =>
+      this.prisma.module.update({
+        where: { id },
+        data: {
+          titleUz: input.titleUz?.trim(),
+          descriptionUz: input.descriptionUz === undefined ? undefined : (input.descriptionUz?.trim() ?? null),
+          orderIndex: input.orderIndex,
+          isPublished: input.isPublished,
+        },
+        select: MODULE_SELECT,
+      }),
+    );
+    await this.audit.record({ userId: actor.id, action: 'UPDATE', subjectType: 'Module', subjectId: id, changes: input, ...client });
     return toModuleDto(row);
   }
 
-  async remove(id: string, actorId: string, roles: string[]): Promise<{
-    movedLessonCount: number;
-  }> {
-    const existing = await this.prisma.module.findUnique({
-      where: { id },
-      select: { courseId: true, titleUz: true },
-    });
-    if (!existing) throw new NotFoundException('Modul topilmadi');
-    await this.assertCourseOwnership(existing.courseId, actorId, roles);
-
-    // N14: darslarni "Umumiy" modulga ko'chiramiz (yo'q bo'lsa yaratamiz),
-    // keyin modulni o'chiramiz. Bitta tranzaksiya.
-    const generalName = 'Umumiy';
+  /**
+   * Darslar yo'qolmasligi uchun "Umumiy" modulga ko'chiriladi (kerak bo'lsa
+   * yaratiladi). "Umumiy"ning o'zi o'chirilsa — darslar modulsiz qoladi.
+   */
+  async remove(id: string, actor: Actor, client: ClientInfo): Promise<{ movedLessonCount: number }> {
+    const { courseId } = await this.loadForManage(id, actor);
     const movedLessonCount = await this.prisma.$transaction(async (tx) => {
-      let general = await tx.module.findFirst({
-        where: { courseId: existing.courseId, titleUz: generalName },
-      });
+      let general = await tx.module.findFirst({ where: { courseId, titleUz: GENERAL_MODULE }, select: { id: true } });
       if (!general) {
-        const maxOrder = (
-          await tx.module.aggregate({
-            where: { courseId: existing.courseId },
-            _max: { orderIndex: true },
-          })
-        )._max.orderIndex;
+        const max = await tx.module.aggregate({ where: { courseId }, _max: { orderIndex: true } });
         general = await tx.module.create({
-          data: {
-            id: uuidv7(),
-            courseId: existing.courseId,
-            orderIndex: (maxOrder ?? -1) + 1,
-            titleUz: generalName,
-            isPublished: true,
-          },
+          data: { courseId, orderIndex: (max._max.orderIndex ?? -1) + 1, titleUz: GENERAL_MODULE, isPublished: true },
+          select: { id: true },
         });
       }
-      const moved = await tx.lesson.updateMany({
-        where: { moduleId: id },
-        data: { moduleId: general.id },
-      });
+      const moved = await tx.lesson.updateMany({ where: { moduleId: id }, data: { moduleId: general.id === id ? null : general.id } });
       await tx.module.delete({ where: { id } });
       return moved.count;
     });
+    await this.audit.record({ userId: actor.id, action: 'DELETE', subjectType: 'Module', subjectId: id, changes: { movedLessonCount }, ...client });
     return { movedLessonCount };
   }
 
-  /**
-   * N14: modul darslarini oldindan ko'rish — nechta dars ta'sirlanadi.
-   */
-  async removalImpact(id: string, actorId: string, roles: string[]) {
-    const existing = await this.prisma.module.findUnique({
+  private async loadForManage(id: string, actor: Actor) {
+    const mod = await this.prisma.module.findUnique({
       where: { id },
-      select: { courseId: true },
+      select: { courseId: true, course: { select: COURSE_REF_SELECT } },
     });
-    if (!existing) throw new NotFoundException('Modul topilmadi');
-    await this.assertCourseOwnership(existing.courseId, actorId, roles);
-    const lessonCount = await this.prisma.lesson.count({ where: { moduleId: id } });
-    return { moduleId: id, lessonsToMove: lessonCount };
+    if (!mod) throw new NotFoundException(MODULE_NOT_FOUND);
+    this.access.assertCanManage(mod.course, actor, MODULE_NOT_FOUND);
+    return mod;
   }
 
-  /**
-   * Mavjud kurslarga "Umumiy" nomli default modul yaratadi va moduleId=null
-   * bo'lgan darslarni unga biriktiradi. Idempotent.
-   */
-  async backfillDefaultModules(): Promise<{ coursesTouched: number; lessonsLinked: number }> {
-    const courses = await this.prisma.course.findMany({
-      where: { lessons: { some: { moduleId: null } } },
+  private async nextOrder(courseId: string) {
+    const max = await this.prisma.module.aggregate({ where: { courseId }, _max: { orderIndex: true } });
+    return (max._max.orderIndex ?? -1) + 1;
+  }
+
+  private async assertOrderFree(courseId: string, orderIndex: number, exceptId?: string) {
+    const clash = await this.prisma.module.findFirst({
+      where: { courseId, orderIndex, NOT: exceptId ? { id: exceptId } : undefined },
       select: { id: true },
     });
-    let coursesTouched = 0;
-    let lessonsLinked = 0;
-    for (const c of courses) {
-      const existing = await this.prisma.module.findFirst({
-        where: { courseId: c.id, titleUz: 'Umumiy' },
-      });
-      let moduleId = existing?.id;
-      if (!moduleId) {
-        const next =
-          ((
-            await this.prisma.module.aggregate({
-              where: { courseId: c.id },
-              _max: { orderIndex: true },
-            })
-          )._max.orderIndex ?? -1) + 1;
-        const row = await this.prisma.module.create({
-          data: {
-            id: uuidv7(),
-            courseId: c.id,
-            orderIndex: next,
-            titleUz: 'Umumiy',
-            isPublished: true,
-          },
-        });
-        moduleId = row.id;
-      }
-      const res = await this.prisma.lesson.updateMany({
-        where: { courseId: c.id, moduleId: null },
-        data: { moduleId },
-      });
-      coursesTouched += 1;
-      lessonsLinked += res.count;
+    if (clash) throw new ConflictException(`#${orderIndex} tartibli modul mavjud`);
+  }
+
+  private async withOrderConflict<T>(orderIndex: number, fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (err) {
+      if (isUniqueViolation(err)) throw new ConflictException(`#${orderIndex} tartibli modul mavjud`);
+      throw err;
     }
-    return { coursesTouched, lessonsLinked };
   }
 }

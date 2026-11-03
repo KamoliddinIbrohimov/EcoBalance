@@ -1,24 +1,31 @@
 import { Module } from '@nestjs/common';
 
-import { AuthModule } from '../auth/auth.module';
-import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
+import { PlatformModule } from '../platform/platform.module';
+import { AiService } from './ai.service';
+import { ChatService } from './chat.service';
 import { ChatbotController } from './chatbot.controller';
-import { ChatbotService } from './chatbot.service';
-import { AI_PROVIDER } from './providers/ai-provider.interface';
-import { AiRouterProvider } from './providers/ai-router.provider';
+import { ConversationsService } from './conversations.service';
+import { KnowledgeService } from './knowledge.service';
+import { AI_PROVIDERS, type AiProviderRegistry } from './providers/ai-provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { GeminiProvider } from './providers/gemini.provider';
 
 @Module({
-  imports: [AuthModule, PlatformSettingsModule],
+  imports: [PlatformModule],
   controllers: [ChatbotController],
   providers: [
-    ChatbotService,
+    ConversationsService,
+    ChatService,
+    KnowledgeService,
+    AiService,
     AnthropicProvider,
     GeminiProvider,
-    AiRouterProvider,
-    { provide: AI_PROVIDER, useExisting: AiRouterProvider },
+    {
+      provide: AI_PROVIDERS,
+      useFactory: (anthropic: AnthropicProvider, gemini: GeminiProvider): AiProviderRegistry => ({ anthropic, gemini }),
+      inject: [AnthropicProvider, GeminiProvider],
+    },
   ],
-  exports: [ChatbotService],
+  exports: [KnowledgeService],
 })
 export class ChatbotModule {}

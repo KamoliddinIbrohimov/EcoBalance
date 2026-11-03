@@ -1,0 +1,788 @@
+{
+  "cognitive": [
+    {
+      "textUz": "Pedagogik dasturiy vositaning asosiy vazifasi qaysi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat matn saqlash",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Ta’lim maqsadiga xizmat qiluvchi elektron o‘quv faoliyatini tashkil etish",
+          "isCorrect": true
+        },
+        {
+          "key": "C",
+          "textUz": "Faqat video ko‘rsatish",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Faqat baho qo‘yish",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Elektron darslikning oddiy elektron matndan asosiy farqi nimada?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat rangli bo‘lishida",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Hajmi katta bo‘lishida",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Mazmun, navigatsiya, interaktivlik, nazorat va teskari aloqaning integratsiyasida",
+          "isCorrect": true
+        },
+        {
+          "key": "D",
+          "textUz": "Faqat internetda ishlashida",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Pedagogik dasturiy vositani loyihalashning birinchi bosqichi qaysi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Dasturlash",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Rang tanlash",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Faylni eksport qilish",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Pedagogik muammo va foydalanuvchi ehtiyojini aniqlash",
+          "isCorrect": true
+        }
+      ]
+    },
+    {
+      "textUz": "Didaktik talab nimani ifodalaydi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "O‘quv maqsadi, mazmuni va faoliyatining pedagogik muvofiqligini",
+          "isCorrect": true
+        },
+        {
+          "key": "B",
+          "textUz": "Kompyuter narxini",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Internet tezligini",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Faqat shrift o‘lchamini",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Ergonomik talabning asosiy mazmuni qaysi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Ko‘proq animatsiya",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Foydalanuvchi uchun qulay va tushunarli interfeys",
+          "isCorrect": true
+        },
+        {
+          "key": "C",
+          "textUz": "Ko‘proq matn",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Faqat audio",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Elektron diagnostikaning vazifasi nima?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat yakuniy baho chiqarish",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Faqat davomatni aniqlash",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "O‘zlashtirish holati va qiyinchiliklarni aniqlash",
+          "isCorrect": true
+        },
+        {
+          "key": "D",
+          "textUz": "Faqat sertifikat berish",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Teskari aloqa nima uchun zarur?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat o‘qituvchi uchun",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Dastur hajmini oshirish uchun",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Dizaynni bezash uchun",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Talabaga xato va keyingi harakat haqida ma’lumot berish uchun",
+          "isCorrect": true
+        }
+      ]
+    },
+    {
+      "textUz": "Interaktiv topshiriqning muhim xususiyati qaysi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Talabani faol harakat va qaror qabul qilishga jalb etishi",
+          "isCorrect": true
+        },
+        {
+          "key": "B",
+          "textUz": "Faqat o‘qilishi",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Faqat chop etilishi",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Faqat rasm bo‘lishi",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Virtual laboratoriyaning didaktik afzalligi qaysi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat matn yozish",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Tajriba jarayonini xavfsiz va takroriy modellashtirish imkoniyati",
+          "isCorrect": true
+        },
+        {
+          "key": "C",
+          "textUz": "Faqat test olish",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Faqat fayl saqlash",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "AR texnologiyasi nimani anglatadi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat audio yozish",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Faqat statistik hisoblash",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Real muhitga raqamli obyektlarni qo‘shib aks ettirish",
+          "isCorrect": true
+        },
+        {
+          "key": "D",
+          "textUz": "Matn muharriri",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "VR texnologiyasining xususiyati qaysi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat jadval yaratish",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Faqat elektron pochta",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Faqat rasm kesish",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Immersiv virtual muhit yaratish",
+          "isCorrect": true
+        }
+      ]
+    },
+    {
+      "textUz": "Camtasia va Bandicam asosan nima uchun qo‘llanadi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Ekran va o‘quv video yozish uchun",
+          "isCorrect": true
+        },
+        {
+          "key": "B",
+          "textUz": "Ma’lumotlar bazasi yaratish uchun",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Faqat test tuzish uchun",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "LMS boshqarish uchun",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Sifatli o‘quv videosi qanday bo‘lishi kerak?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Iloji boricha uzun",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Maqsadli, qisqa va mantiqiy",
+          "isCorrect": true
+        },
+        {
+          "key": "C",
+          "textUz": "Faqat effektlardan iborat",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Ovozsiz va izohsiz",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Elektron test savoli nimaga mos bo‘lishi kerak?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat dizaynga",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Faqat savollar soniga",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "O‘quv natijasi va mazmunga",
+          "isCorrect": true
+        },
+        {
+          "key": "D",
+          "textUz": "Kompyuter modeliga",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "iSpring vositasining ta’limdagi vazifasi qaysi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Operatsion tizim o‘rnatish",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Antivirus yaratish",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Tarmoq kabelini sozlash",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Interaktiv elektron o‘quv resurslarini yaratish",
+          "isCorrect": true
+        }
+      ]
+    },
+    {
+      "textUz": "Elektron glossariy nima uchun xizmat qiladi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Tayanch tushunchalarni tizimli izohlash uchun",
+          "isCorrect": true
+        },
+        {
+          "key": "B",
+          "textUz": "Faqat rasm saqlash uchun",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Faqat baho qo‘yish uchun",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Video montaj uchun",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Timeline qaysi mazmun uchun ayniqsa qulay?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat test",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Ketma-ket rivojlanish va voqealarni ko‘rsatish",
+          "isCorrect": true
+        },
+        {
+          "key": "C",
+          "textUz": "Faqat formulalar",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Parol saqlash",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "CMSning asosiy vazifasi nima?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat video yozish",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Statistik test o‘tkazish",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Elektron kontentni yaratish va boshqarish",
+          "isCorrect": true
+        },
+        {
+          "key": "D",
+          "textUz": "Kompyuterni ta’mirlash",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "LMSning asosiy vazifasi qaysi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat sayt rangini o‘zgartirish",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Faqat fayl siqish",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Faqat audio yozish",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Ta’lim jarayoni, kurs, topshiriq va natijalarni boshqarish",
+          "isCorrect": true
+        }
+      ]
+    },
+    {
+      "textUz": "Moodle qaysi turdagi tizimga kiradi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "LMS",
+          "isCorrect": true
+        },
+        {
+          "key": "B",
+          "textUz": "Video muharrir",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Grafik muharrir",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Operatsion tizim",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "MOOC tushunchasi nimani anglatadi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Mahalliy oflayn kurs",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Ommaviy ochiq onlayn kurs",
+          "isCorrect": true
+        },
+        {
+          "key": "C",
+          "textUz": "Grafik muharrir",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Elektron jadval",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Pedagogik ekspert baholashda qaysi mezonlar qo‘llanishi mumkin?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat narx",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Faqat fayl hajmi",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Didaktik, metodik, psixologik, estetik, ergonomik, funksional",
+          "isCorrect": true
+        },
+        {
+          "key": "D",
+          "textUz": "Faqat rang",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Tadqiqot savoli qanday bo‘lishi kerak?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Juda umumiy va o‘lchanmaydigan",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Javobi oldindan aniq",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Mavzuga aloqasiz",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Muammo bilan bog‘liq va tekshiriladigan",
+          "isCorrect": true
+        }
+      ]
+    },
+    {
+      "textUz": "Gipoteza nima?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Tadqiqotda tekshiriladigan ilmiy faraz",
+          "isCorrect": true
+        },
+        {
+          "key": "B",
+          "textUz": "Yakuniy isbotlangan qonun",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Adabiyotlar ro‘yxati",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Faqat savol",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Tajriba natijalarini tahlil qilishning vazifasi nima?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat jadvalni bezash",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Dalillar asosida ilmiy xulosa chiqarish",
+          "isCorrect": true
+        },
+        {
+          "key": "C",
+          "textUz": "Natijani yashirish",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Faqat fayl nomlash",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "O‘rtacha qiymat nimani ko‘rsatadi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Eng katta qiymatni",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Faqat xatolar sonini",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Natijalar to‘plamining markaziy umumlashgan ko‘rsatkichini",
+          "isCorrect": true
+        },
+        {
+          "key": "D",
+          "textUz": "Savollar sonini",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Kirish va yakuniy diagnostikani taqqoslash nima beradi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat davomatni",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Faqat fayl hajmini",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Dizayn sifatini",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Rivojlanish dinamikasini ko‘rish imkonini",
+          "isCorrect": true
+        }
+      ]
+    },
+    {
+      "textUz": "Refleksiya nimani anglatadi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "O‘z faoliyati va natijasini tahlil qilib baholashni",
+          "isCorrect": true
+        },
+        {
+          "key": "B",
+          "textUz": "Faqat test ishlashni",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Faqat ma’ruza tinglashni",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Fayl yuklashni",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "Korreksiya jarayonining vazifasi qaysi?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Natijani o‘zgartirmaslik",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Aniqlangan kamchiliklar asosida faoliyat yoki mahsulotni takomillashtirish",
+          "isCorrect": true
+        },
+        {
+          "key": "C",
+          "textUz": "Faqat nusxa olish",
+          "isCorrect": false
+        },
+        {
+          "key": "D",
+          "textUz": "Faqat bahoni oshirish",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "textUz": "PedResearch Lab platformasidan “Pedagogik dasturiy vositalar” fanida qanday foydalanish maqsadga muvofiq?",
+      "options": [
+        {
+          "key": "A",
+          "textUz": "Faqat ekologik rasm albomi sifatida",
+          "isCorrect": false
+        },
+        {
+          "key": "B",
+          "textUz": "Faqat yangiliklar sayti sifatida",
+          "isCorrect": false
+        },
+        {
+          "key": "C",
+          "textUz": "Real elektron o‘quv-tadqiqot muhiti sifatida",
+          "isCorrect": true
+        },
+        {
+          "key": "D",
+          "textUz": "Faqat fayl ombori sifatida",
+          "isCorrect": false
+        }
+      ]
+    }
+  ],
+  "motivational": [
+    "Pedagogik muammolarni ilmiy yo‘l bilan o‘rganishga qiziqaman.",
+    "Yangi elektron ta’lim vositalarini o‘rganish men uchun kasbiy ahamiyatga ega.",
+    "Tadqiqot olib borish bo‘lajak o‘qituvchi uchun zarur deb hisoblayman.",
+    "Pedagogik muammoning sababini mustaqil izlashga intilaman.",
+    "Elektron o‘quv mahsuloti yaratishda uning pedagogik samaradorligini tekshirishga qiziqaman.",
+    "Ilmiy manbalarni izlash va o‘rganish menga qiziq.",
+    "Muammoli topshiriqlar meni yangi yechim izlashga undaydi.",
+    "Tadqiqot natijalarini dalillar bilan asoslashni muhim deb bilaman.",
+    "Elektron platformada tadqiqot topshiriqlarini bajarishga tayyorman.",
+    "Pedagogik yangiliklarni tajribada sinab ko‘rishga qiziqaman.",
+    "O‘z fikrimni ilmiy dalillar bilan himoya qilishga intilaman.",
+    "Tadqiqot davomida yuzaga kelgan qiyinchiliklar meni izlanishni davom ettirishga undaydi.",
+    "Elektron ta’lim vositalarining sifatini baholashni kasbiy ko‘nikma deb bilaman.",
+    "Talabalarning o‘quv natijalarini tahlil qilishga qiziqaman.",
+    "Pedagogik qaror qabul qilishda ma’lumot va dalillarga tayanishni muhim deb hisoblayman.",
+    "Yaratgan elektron mahsulotimni ekspert fikri asosida takomillashtirishga tayyorman.",
+    "Jamoaviy tadqiqot va fikr almashish men uchun foydali.",
+    "Tadqiqot natijalarini taqdim etish va muhokama qilishga qiziqaman.",
+    "PedResearch Lab kabi real elektron muhitda tadqiqot olib borish mening kasbiy rivojlanishimga yordam beradi.",
+    "Kelajakdagi pedagogik faoliyatimda tadqiqotchilik yondashuvidan foydalanishni rejalashtiraman."
+  ],
+  "reflexive": [
+    "Tadqiqot topshirig‘ini bajargach, natijamni o‘zim tahlil qilaman.",
+    "Yo‘l qo‘ygan xatolarimning sababini aniqlashga harakat qilaman.",
+    "Olingan teskari aloqani keyingi faoliyatimda hisobga olaman.",
+    "Natijam kutilganidan past bo‘lsa, ishlash usulimni o‘zgartiraman.",
+    "Tadqiqot savolim va gipotezamning qanchalik to‘g‘ri tuzilganini qayta ko‘rib chiqaman.",
+    "Yig‘ilgan ma’lumotlar xulosamni yetarlicha asoslayaptimi, deb tekshiraman.",
+    "Elektron mahsulotimni foydalanuvchi va ekspert baholari asosida takomillashtiraman.",
+    "O‘z kuchli va rivojlantirilishi kerak bo‘lgan tomonlarimni aniqlay olaman.",
+    "Tadqiqot yakunida keyingi ishlarim uchun aniq korreksiya rejasini tuzaman.",
+    "Bir xil vazifani qayta bajarsam, nimalarni boshqacha qilishim kerakligini tushuntira olaman."
+  ]
+}

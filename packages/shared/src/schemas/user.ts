@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ROLE } from '../constants/roles';
 import { ORGANIZATION_TYPE } from '../constants/organizations';
-import { paginationQuerySchema } from './pagination';
+import { paginationQuerySchema, queryBoolean } from './pagination';
 import { passwordSchema } from './auth';
 
 export const userSchema = z.object({
@@ -84,7 +84,7 @@ export type AdminUserDto = z.infer<typeof adminUserSchema>;
 export const userQuerySchema = paginationQuerySchema.extend({
   organizationId: z.string().uuid().optional(),
   role: z.nativeEnum(ROLE).optional(),
-  isActive: z.coerce.boolean().optional(),
+  isActive: queryBoolean,
 });
 export type UserQuery = z.infer<typeof userQuerySchema>;
 

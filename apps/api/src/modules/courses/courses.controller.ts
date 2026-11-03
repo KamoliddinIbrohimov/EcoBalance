@@ -1,258 +1,112 @@
+import { Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Ip,
-  Param,
-  ParseUUIDPipe,
-  Patch,
-  Post,
-  Put,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PERMISSION } from '@eco/shared';
-import type { Request } from 'express';
+  type CourseQuery,
+  type CreateCourseInput,
+  type CreateLessonInput,
+  type UpdateCourseInput,
+  type UpdateLessonInput,
+  courseQuerySchema,
+  createCourseSchema,
+  createLessonSchema,
+  updateCourseSchema,
+  updateLessonSchema,
+} from '@eco/shared';
 
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { PermissionsGuard } from '../auth/authorization/permissions.guard';
-import { RequirePermissions } from '../auth/authorization/permissions.decorator';
-import type { AuthenticatedUser } from '../auth/strategies/jwt-access.strategy';
+import { ZBody, ZQuery } from '../../common/http/zod.pipe';
+import { type Actor, Client, type ClientInfo, CurrentActor, Roles } from '../auth/actor';
 import { CoursesService } from './courses.service';
-import { CreateCourseDto } from './dto/create-course.dto';
-import {
-  CreateLessonDto,
-  QueryLessonDto,
-  UpdateLessonDto,
-} from './dto/create-lesson.dto';
-import { QueryCourseDto } from './dto/query-course.dto';
-import { UpdateCourseDto } from './dto/update-course.dto';
+import { LessonsService } from './lessons.service';
 
-@ApiTags('Courses')
-@ApiBearerAuth('access-token')
-@Controller({ path: 'courses', version: '1' })
-@UseGuards(PermissionsGuard)
+@Controller('courses')
 export class CoursesController {
-  constructor(private readonly courses: CoursesService) {}
-
-  // ---- Courses ----
+  constructor(
+    private readonly courses: CoursesService,
+    private readonly lessons: LessonsService,
+  ) {}
 
   @Get()
-  @RequirePermissions(PERMISSION.COURSES_READ)
-  @ApiOperation({ summary: 'Kurslar ro‘yxati (STUDENT faqat published)' })
-  async list(@Query() query: QueryCourseDto, @CurrentUser() actor: AuthenticatedUser) {
-    return this.courses.listCourses(query, actor.roles, actor.id);
+  list(@ZQuery(courseQuerySchema) q: CourseQuery, @CurrentActor() actor: Actor) {
+    return this.courses.list(q, actor);
   }
 
   @Get('slug/:slug')
-  @RequirePermissions(PERMISSION.COURSES_READ)
-  @ApiOperation({ summary: 'Kursni slug bo‘yicha topish (STUDENT faqat published)' })
-  async detailBySlug(@Param('slug') slug: string, @CurrentUser() actor: AuthenticatedUser) {
-    return this.courses.findCourseBySlug(slug, actor.roles, actor.id);
+  bySlug(@Param('slug') slug: string, @CurrentActor() actor: Actor) {
+    return this.courses.bySlug(slug, actor);
   }
 
   @Get(':id')
-  @RequirePermissions(PERMISSION.COURSES_READ)
-  @ApiOperation({ summary: 'Kurs tafsilotlari (STUDENT faqat published)' })
-  async detail(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.courses.findCourseById(id, actor.roles, actor.id);
+  detail(@Param('id', ParseUUIDPipe) id: string, @CurrentActor() actor: Actor) {
+    return this.courses.byId(id, actor);
   }
 
   @Get(':id/lessons')
-  @RequirePermissions(PERMISSION.COURSES_READ)
-  @ApiOperation({ summary: 'Kursning barcha darslari (tartib bo‘yicha)' })
-  async lessons(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.courses.listLessonsByCourse(id, actor.roles, actor.id);
-  }
-
-  @Put(':id/lessons/order')
-  @RequirePermissions(PERMISSION.LESSONS_MANAGE)
-  @ApiOperation({ summary: 'Darslar tartibini bir yo‘la qayta tartiblash' })
-  async reorderLessons(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() body: { lessonIds: string[] },
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() req: Request,
-    @Ip() ip: string,
-  ) {
-    return this.courses.reorderLessons(
-      id,
-      body.lessonIds,
-      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
-      actor.roles,
-    );
+  courseLessons(@Param('id', ParseUUIDPipe) id: string, @CurrentActor() actor: Actor) {
+    return this.lessons.listByCourse(id, actor);
   }
 
   @Post()
-  @RequirePermissions(PERMISSION.COURSES_CREATE)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Yangi kurs yaratish' })
-  async create(
-    @Body() dto: CreateCourseDto,
-    @CurrentUser('id') actorId: string,
-    @Req() req: Request,
-    @Ip() ip: string,
-  ) {
-    return this.courses.createCourse(dto, { actorId, ip, userAgent: req.headers['user-agent'] });
-  }
-
-  @Post(':id/clone')
-  @RequirePermissions(PERMISSION.COURSES_CREATE)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Kursni nusxalash (LIBRARY yoki o‘z kurs)' })
-  async clone(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() req: Request,
-    @Ip() ip: string,
-  ) {
-    return this.courses.cloneCourse(
-      id,
-      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
-      actor.roles,
-    );
-  }
-
-  @Get(':id/removal-impact')
-  @RequirePermissions(PERMISSION.COURSES_DELETE)
-  @ApiOperation({ summary: 'Kursni o‘chirish ta‘sir hisoboti' })
-  async courseRemovalImpact(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.courses.courseRemovalImpact(id, actor.roles, actor.id);
+  @Roles('SUPER_ADMIN', 'TEACHER')
+  create(@ZBody(createCourseSchema) body: CreateCourseInput, @CurrentActor() actor: Actor, @Client() client: ClientInfo) {
+    return this.courses.create(body, actor, client);
   }
 
   @Patch(':id')
-  @RequirePermissions(PERMISSION.COURSES_UPDATE)
-  @ApiOperation({ summary: 'Kursni tahrirlash (TEACHER faqat o‘ziniki)' })
-  async update(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: UpdateCourseDto,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() req: Request,
-    @Ip() ip: string,
+  @Roles('SUPER_ADMIN', 'TEACHER')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ZBody(updateCourseSchema) body: UpdateCourseInput,
+    @CurrentActor() actor: Actor,
+    @Client() client: ClientInfo,
   ) {
-    return this.courses.updateCourse(
-      id,
-      dto,
-      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
-      actor.roles,
-    );
+    return this.courses.update(id, body, actor, client);
   }
 
   @Delete(':id')
-  @RequirePermissions(PERMISSION.COURSES_DELETE)
-  @ApiOperation({ summary: 'Kursni o‘chirish (TEACHER faqat o‘ziniki)' })
-  async remove(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() req: Request,
-    @Ip() ip: string,
-  ) {
-    return this.courses.removeCourse(
-      id,
-      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
-      actor.roles,
-    );
+  @Roles('SUPER_ADMIN')
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentActor() actor: Actor, @Client() client: ClientInfo) {
+    return this.courses.remove(id, actor, client);
   }
 }
 
-@ApiTags('Lessons')
-@ApiBearerAuth('access-token')
-@Controller({ path: 'lessons', version: '1' })
-@UseGuards(PermissionsGuard)
+/**
+ * Faqat `/lessons/:id` (bitta segment). Progress yo'llari
+ * (`/lessons/progress/me`, `/lessons/:id/progress|heartbeat`) learning modulida.
+ */
+@Controller('lessons')
 export class LessonsController {
-  constructor(private readonly courses: CoursesService) {}
-
-  @Get()
-  @RequirePermissions(PERMISSION.COURSES_READ)
-  @ApiOperation({ summary: 'Darslar ro‘yxati (kurs / tur bo‘yicha filtr)' })
-  async list(@Query() query: QueryLessonDto, @CurrentUser() actor: AuthenticatedUser) {
-    return this.courses.listLessons(query, actor.roles, actor.id);
-  }
+  constructor(private readonly lessons: LessonsService) {}
 
   @Get(':id')
-  @RequirePermissions(PERMISSION.COURSES_READ)
-  @ApiOperation({ summary: 'Dars tafsilotlari (kurs bilan birga)' })
-  async detail(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.courses.findLessonById(id, actor.roles, actor.id);
+  detail(@Param('id', ParseUUIDPipe) id: string, @CurrentActor() actor: Actor) {
+    return this.lessons.byId(id, actor);
   }
 
   @Post()
-  @RequirePermissions(PERMISSION.LESSONS_MANAGE)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Kursga yangi dars qo‘shish' })
-  async create(
-    @Body() dto: CreateLessonDto,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() req: Request,
-    @Ip() ip: string,
-  ) {
-    return this.courses.createLesson(
-      dto,
-      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
-      actor.roles,
-    );
+  @Roles('SUPER_ADMIN', 'TEACHER')
+  create(@ZBody(createLessonSchema) body: CreateLessonInput, @CurrentActor() actor: Actor, @Client() client: ClientInfo) {
+    return this.lessons.create(body, actor, client);
   }
 
   @Patch(':id')
-  @RequirePermissions(PERMISSION.LESSONS_MANAGE)
-  @ApiOperation({ summary: 'Darsni tahrirlash' })
-  async update(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: UpdateLessonDto,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() req: Request,
-    @Ip() ip: string,
+  @Roles('SUPER_ADMIN', 'TEACHER')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ZBody(updateLessonSchema) body: UpdateLessonInput,
+    @CurrentActor() actor: Actor,
+    @Client() client: ClientInfo,
   ) {
-    return this.courses.updateLesson(
-      id,
-      dto,
-      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
-      actor.roles,
-    );
+    return this.lessons.update(id, body, actor, client);
   }
 
+  /** Standart — arxivlash; `?hard=true` — butunlay o'chirish. */
   @Delete(':id')
-  @RequirePermissions(PERMISSION.LESSONS_MANAGE)
-  @ApiOperation({ summary: 'Darsni arxivlash (?hard=true bilan to‘liq o‘chirish)' })
-  async remove(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() req: Request,
-    @Ip() ip: string,
-    @Query('hard') hard?: string,
+  @Roles('SUPER_ADMIN', 'TEACHER')
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('hard') hard: string | undefined,
+    @CurrentActor() actor: Actor,
+    @Client() client: ClientInfo,
   ) {
-    return this.courses.removeLesson(
-      id,
-      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
-      actor.roles,
-      hard === 'true',
-    );
-  }
-
-  @Get(':id/removal-impact')
-  @RequirePermissions(PERMISSION.LESSONS_MANAGE)
-  @ApiOperation({ summary: 'Darsni o‘chirish ta‘sir hisoboti' })
-  async removalImpact(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.courses.lessonRemovalImpact(id, actor.roles, actor.id);
+    return this.lessons.remove(id, hard === 'true', actor, client);
   }
 }

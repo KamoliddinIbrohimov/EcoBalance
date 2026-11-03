@@ -2,101 +2,52 @@ import {
   Controller,
   Delete,
   Get,
-  HttpCode,
-  HttpStatus,
-  Ip,
   Param,
   ParseUUIDPipe,
   Post,
-  Query,
-  Req,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PERMISSION } from '@eco/shared';
-import type { Request } from 'express';
+import { z } from 'zod';
 
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { PermissionsGuard } from '../auth/authorization/permissions.guard';
-import { RequirePermissions } from '../auth/authorization/permissions.decorator';
-import type { AuthenticatedUser } from '../auth/strategies/jwt-access.strategy';
-import { MaterialsService } from './materials.service';
+import { ZQuery } from '../../common/http/zod.pipe';
+import { type Actor, Client, type ClientInfo, CurrentActor, Roles } from '../auth/actor';
+import { MATERIAL_MAX_BYTES, MaterialsService } from './materials.service';
 
-@ApiTags('Course Materials')
-@ApiBearerAuth('access-token')
-@Controller({ version: '1' })
-@UseGuards(PermissionsGuard)
+const uploadQuerySchema = z.object({ lessonId: z.string().uuid().optional() });
+
+@Controller()
 export class MaterialsController {
   constructor(private readonly materials: MaterialsService) {}
 
   @Get('courses/:courseId/materials')
-  @RequirePermissions(PERMISSION.COURSES_READ)
-  @ApiOperation({ summary: 'Kursning darslik fayllari ro‘yxati' })
-  async list(
-    @Param('courseId', new ParseUUIDPipe()) courseId: string,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.materials.listForCourse(courseId, { id: actor.id, roles: actor.roles });
+  list(@Param('courseId', ParseUUIDPipe) courseId: string, @CurrentActor() actor: Actor) {
+    return this.materials.listForCourse(courseId, actor);
   }
 
+  /** Multer limiti xotiraga yuklashdan oldin ishlaydi (oshsa 413). */
   @Post('courses/:courseId/materials')
-  @RequirePermissions(PERMISSION.MATERIALS_MANAGE)
-  @UseInterceptors(
-    FileInterceptor('file', {
-      // Multer darajasidagi qattiq chegara — 30 MB. Bu memoriyga yuklashdan
-      // oldin ishga tushadi va DoS'ga qarshi asosiy himoya.
-      limits: { fileSize: 30 * 1024 * 1024 },
-    }),
-  )
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Kursga (yoki uning darsiga) darslik fayl yuklash' })
-  @HttpCode(HttpStatus.CREATED)
-  async upload(
-    @Param('courseId', new ParseUUIDPipe()) courseId: string,
-    @UploadedFile() file: Express.Multer.File,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Query('lessonId') lessonId: string | undefined,
-    @Req() req: Request,
-    @Ip() ip: string,
+  @Roles('SUPER_ADMIN', 'TEACHER')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MATERIAL_MAX_BYTES } }))
+  upload(
+    @Param('courseId', ParseUUIDPipe) courseId: string,
+    @ZQuery(uploadQuerySchema) q: { lessonId?: string },
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentActor() actor: Actor,
+    @Client() client: ClientInfo,
   ) {
-    return this.materials.upload({
-      courseId,
-      lessonId,
-      file,
-      actorId: actor.id,
-      actorRoles: actor.roles,
-      ip,
-      userAgent: req.headers['user-agent'],
-    });
+    return this.materials.upload(courseId, q.lessonId, file, actor, client);
   }
 
   @Get('materials/:id/download')
-  @RequirePermissions(PERMISSION.COURSES_READ)
-  @ApiOperation({ summary: 'Faylni yuklab olish (short-lived signed URL qaytadi)' })
-  async download(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.materials.getDownloadUrl(id, { id: actor.id, roles: actor.roles });
+  download(@Param('id', ParseUUIDPipe) id: string, @CurrentActor() actor: Actor) {
+    return this.materials.downloadUrl(id, actor);
   }
 
   @Delete('materials/:id')
-  @RequirePermissions(PERMISSION.MATERIALS_MANAGE)
-  @ApiOperation({ summary: 'Faylni o‘chirish' })
-  async remove(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() req: Request,
-    @Ip() ip: string,
-  ) {
-    return this.materials.remove(id, {
-      actorId: actor.id,
-      actorRoles: actor.roles,
-      ip,
-      userAgent: req.headers['user-agent'],
-    });
+  @Roles('SUPER_ADMIN', 'TEACHER')
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentActor() actor: Actor, @Client() client: ClientInfo) {
+    return this.materials.remove(id, actor, client);
   }
 }

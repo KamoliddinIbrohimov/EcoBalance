@@ -1,86 +1,45 @@
 import 'reflect-metadata';
 
-import { VersioningType } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
-import { ZodValidationPipe } from 'nestjs-zod';
 
 import { AppModule } from './app.module';
-import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
-import { ResponseTransformInterceptor } from './common/interceptors/response-transform.interceptor';
+import { loadEnv } from './config/env';
 
-// NOTE(phase-0): patchNestJsSwagger() removed due to nestjs-zod@4 / @nestjs/swagger@11 incompat.
-// Swagger UI still works; Zod DTOs just render as generic bodies. Fix in Phase 1.
-
-async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    bufferLogs: true,
-    bodyParser: false,
-  });
-
-  const config = app.get(ConfigService);
-  app.useLogger(app.get(Logger));
-
+/** HTTP ilovani sozlaydi — main va e2e testlar bir xil konfiguratsiyadan foydalanadi. */
+export function configureApp(app: NestExpressApplication) {
+  const env = loadEnv();
   app.set('trust proxy', 1);
-  app.setGlobalPrefix('api');
-  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
-
-  // Payload hajmi cheklanadi — ulkan so'rov 500 o'rniga 413 (Payload Too Large) qaytarishi uchun
-  const { default: express } = await import('express');
-  app.use(express.json({ limit: '1mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
-
+  app.setGlobalPrefix('api/v1');
+  app.useBodyParser('json', { limit: '1mb' });
+  app.useBodyParser('urlencoded', { extended: true, limit: '1mb' });
   app.use(cookieParser());
+  // CSP, X-Frame va nosniff'ni Caddy qo'yadi.
   app.use(
     helmet({
-      // Caddy manbaa (CSP, X-Frame, nosniff) — helmet'da takrorlanmasin
       contentSecurityPolicy: false,
       crossOriginResourcePolicy: { policy: 'cross-origin' },
       frameguard: false,
       noSniff: false,
     }),
   );
-
-  const allowedOrigins = config
-    .get<string>('CORS_ALLOWED_ORIGINS', 'http://localhost')
-    .split(',')
-    .map((o) => o.trim());
-
   app.enableCors({
-    origin: allowedOrigins,
+    origin: env.CORS_ALLOWED_ORIGINS.split(',').map((o) => o.trim()),
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   });
-
-  app.useGlobalPipes(new ZodValidationPipe());
-  app.useGlobalInterceptors(new ResponseTransformInterceptor());
-  app.useGlobalFilters(new GlobalExceptionFilter());
-
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('PedResearch Lab API')
-    .setDescription('Government-grade ecological monitoring platform — REST API')
-    .setVersion('1.0.0')
-    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
-    .addCookieAuth('refresh_token')
-    .addServer('/api')
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: { persistAuthorization: true },
-  });
-
-  const port = config.get<number>('API_PORT', 4000);
-  await app.listen(port, '0.0.0.0');
-
-  const logger = app.get(Logger);
-  logger.log(`🌱 PedResearch Lab API listening on http://0.0.0.0:${port}`);
-  logger.log(`📚 Swagger UI:  http://0.0.0.0:${port}/api/docs`);
+  app.enableShutdownHooks();
+  return env;
 }
 
-void bootstrap();
+async function bootstrap() {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
+  const env = configureApp(app);
+  await app.listen(env.API_PORT, '0.0.0.0');
+  app.get(Logger).log(`API: http://0.0.0.0:${env.API_PORT}/api/v1`);
+}
+
+if (require.main === module) void bootstrap();

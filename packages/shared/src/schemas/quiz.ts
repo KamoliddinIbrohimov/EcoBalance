@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { paginationQuerySchema } from './pagination';
+import { paginationQuerySchema, queryBoolean } from './pagination';
 
 export const QUIZ_QUESTION_TYPE = {
   SINGLE_CHOICE: 'SINGLE_CHOICE',
@@ -234,8 +234,8 @@ export type QuizSubmissionWithUserDto = z.infer<typeof quizSubmissionWithUserSch
 export const quizQuerySchema = paginationQuerySchema.extend({
   lessonId: z.string().uuid().optional(),
   /** true — faqat standalone (Monitoring) testlar; false — faqat darsga biriktirilgan. */
-  standaloneOnly: z.coerce.boolean().optional(),
-  isPublished: z.coerce.boolean().optional(),
+  standaloneOnly: queryBoolean,
+  isPublished: queryBoolean,
 });
 export type QuizQuery = z.infer<typeof quizQuerySchema>;
 

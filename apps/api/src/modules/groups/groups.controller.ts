@@ -1,309 +1,86 @@
+import { Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  ParseUUIDPipe,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PERMISSION } from '@eco/shared';
+  type AddGroupMemberInput,
+  type CreateGroupInput,
+  type GroupQuery,
+  type UpdateGroupInput,
+  addGroupMemberSchema,
+  createGroupSchema,
+  groupQuerySchema,
+  updateGroupSchema,
+} from '@eco/shared';
 
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { PermissionsGuard } from '../auth/authorization/permissions.guard';
-import { RequirePermissions } from '../auth/authorization/permissions.decorator';
-import type { AuthenticatedUser } from '../auth/strategies/jwt-access.strategy';
-import {
-  AddGroupMemberDto,
-  CreateGroupDto,
-  QueryGroupDto,
-  UpdateGroupDto,
-} from './dto/create-group.dto';
+import { ZBody, ZQuery } from '../../common/http/zod.pipe';
+import { type Actor, Client, type ClientInfo, CurrentActor, Roles } from '../auth/actor';
 import { GroupsService } from './groups.service';
+import { MembersService } from './members.service';
 
-@ApiTags('Groups')
-@ApiBearerAuth('access-token')
-@Controller({ path: 'groups', version: '1' })
-@UseGuards(PermissionsGuard)
+const Id = (name = 'id') => Param(name, ParseUUIDPipe);
+
+@Controller('groups')
+@Roles('SUPER_ADMIN', 'TEACHER')
 export class GroupsController {
-  constructor(private readonly groups: GroupsService) {}
+  constructor(
+    private readonly groups: GroupsService,
+    private readonly members: MembersService,
+  ) {}
 
   @Get()
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @ApiOperation({ summary: 'Guruhlar ro‘yxati (TEACHER o‘ziniki, SA hammasi)' })
-  async list(@CurrentUser() actor: AuthenticatedUser, @Query() query: QueryGroupDto) {
-    return this.groups.list(query, { id: actor.id, roles: actor.roles });
+  list(@ZQuery(groupQuerySchema) q: GroupQuery, @CurrentActor() actor: Actor) {
+    return this.groups.list(q, actor);
   }
 
   @Get(':id')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @ApiOperation({ summary: 'Guruh tafsilotlari' })
-  async detail(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-  ) {
-    return this.groups.detail(id, { id: actor.id, roles: actor.roles });
+  detail(@Id() id: string, @CurrentActor() actor: Actor) {
+    return this.groups.detail(id, actor);
   }
 
   @Post()
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Yangi guruh yaratish' })
-  async create(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Body() dto: CreateGroupDto,
-  ) {
-    return this.groups.create(dto, { id: actor.id, roles: actor.roles });
+  create(@ZBody(createGroupSchema) body: CreateGroupInput, @CurrentActor() actor: Actor, @Client() client: ClientInfo) {
+    return this.groups.create(body, actor, client);
   }
 
   @Patch(':id')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @ApiOperation({ summary: 'Guruhni tahrirlash' })
-  async update(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: UpdateGroupDto,
+  update(
+    @Id() id: string,
+    @ZBody(updateGroupSchema) body: UpdateGroupInput,
+    @CurrentActor() actor: Actor,
+    @Client() client: ClientInfo,
   ) {
-    return this.groups.update(id, dto, { id: actor.id, roles: actor.roles });
+    return this.groups.update(id, body, actor, client);
   }
 
   @Delete(':id')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Guruhni o‘chirish' })
-  async remove(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-  ) {
-    await this.groups.remove(id, { id: actor.id, roles: actor.roles });
+  async remove(@Id() id: string, @CurrentActor() actor: Actor, @Client() client: ClientInfo) {
+    await this.groups.remove(id, actor, client);
   }
 
-  // ---- Members ----
+  // ---- A'zolar ----
 
   @Get(':id/members')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @ApiOperation({ summary: 'Guruh a‘zolari ro‘yxati' })
-  async members(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-  ) {
-    return this.groups.listMembers(id, { id: actor.id, roles: actor.roles });
+  listMembers(@Id() id: string, @CurrentActor() actor: Actor) {
+    return this.members.list(id, actor);
   }
 
   @Post(':id/members')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Guruhga talaba qo‘shish' })
-  async addMember(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: AddGroupMemberDto,
+  addMember(
+    @Id() id: string,
+    @ZBody(addGroupMemberSchema) body: AddGroupMemberInput,
+    @CurrentActor() actor: Actor,
+    @Client() client: ClientInfo,
   ) {
-    return this.groups.addMember(id, dto, { id: actor.id, roles: actor.roles });
+    return this.members.add(id, body.studentId, actor, client);
   }
 
   @Delete(':id/members/:studentId')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Guruhdan talabani chiqarish' })
   async removeMember(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Param('studentId', new ParseUUIDPipe()) studentId: string,
+    @Id() id: string,
+    @Id('studentId') studentId: string,
+    @CurrentActor() actor: Actor,
+    @Client() client: ClientInfo,
   ) {
-    await this.groups.removeMember(id, studentId, { id: actor.id, roles: actor.roles });
-  }
-
-  @Post(':id/members/:studentId/transfer')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Talabani boshqa guruhga ko‘chirish' })
-  async transferMember(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Param('studentId', new ParseUUIDPipe()) studentId: string,
-    @Body() body: { toGroupId: string },
-  ) {
-    await this.groups.transferMember(id, studentId, body.toGroupId, {
-      id: actor.id,
-      roles: actor.roles,
-    });
-  }
-
-  // ---- Course bindings ----
-
-  @Get(':id/courses')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @ApiOperation({ summary: 'Guruhga biriktirilgan kurslar' })
-  async listCourseBindings(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-  ) {
-    return this.groups.listCourseBindings(id, { id: actor.id, roles: actor.roles });
-  }
-
-  @Post(':id/courses/:courseId')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Guruhga kurs biriktirish' })
-  async bindCourse(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Param('courseId', new ParseUUIDPipe()) courseId: string,
-  ) {
-    return this.groups.bindCourse(id, courseId, { id: actor.id, roles: actor.roles });
-  }
-
-  @Delete(':id/courses/:courseId')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Guruhdan kursni ajratish' })
-  async unbindCourse(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Param('courseId', new ParseUUIDPipe()) courseId: string,
-  ) {
-    await this.groups.unbindCourse(id, courseId, { id: actor.id, roles: actor.roles });
-  }
-
-  // ---- Quiz bindings ----
-
-  @Get(':id/quizzes')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @ApiOperation({ summary: 'Guruhga biriktirilgan testlar' })
-  async listQuizBindings(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-  ) {
-    return this.groups.listQuizBindings(id, { id: actor.id, roles: actor.roles });
-  }
-
-  @Post(':id/quizzes/:quizId')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Guruhga test biriktirish (ochilish/maxAttempts/timeLimit sozlamalari bilan)' })
-  async bindQuiz(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Param('quizId', new ParseUUIDPipe()) quizId: string,
-    @Body() body: {
-      opensAt?: string | null;
-      closesAt?: string | null;
-      maxAttempts?: number | null;
-      timeLimitMinutes?: number | null;
-    },
-  ) {
-    return this.groups.bindQuiz(id, quizId, { id: actor.id, roles: actor.roles }, {
-      opensAt: body?.opensAt ? new Date(body.opensAt) : null,
-      closesAt: body?.closesAt ? new Date(body.closesAt) : null,
-      maxAttempts: body?.maxAttempts ?? null,
-      timeLimitMinutes: body?.timeLimitMinutes ?? null,
-    });
-  }
-
-  @Patch(':id/quizzes/:quizId')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @ApiOperation({ summary: 'Guruh-test biriktirmasi sozlamalarini yangilash (partial PATCH)' })
-  async updateQuizBinding(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Param('quizId', new ParseUUIDPipe()) quizId: string,
-    @Body() body: {
-      opensAt?: string | null;
-      closesAt?: string | null;
-      maxAttempts?: number | null;
-      timeLimitMinutes?: number | null;
-    },
-  ) {
-    // N10: PATCH endi FAQAT kelgan maydonlarni uzatadi; yuborilmagan maydonlar o'z joyida
-    const settings: {
-      opensAt?: Date | null;
-      closesAt?: Date | null;
-      maxAttempts?: number | null;
-      timeLimitMinutes?: number | null;
-    } = {};
-    if (body && 'opensAt' in body)
-      settings.opensAt = body.opensAt ? new Date(body.opensAt) : null;
-    if (body && 'closesAt' in body)
-      settings.closesAt = body.closesAt ? new Date(body.closesAt) : null;
-    if (body && 'maxAttempts' in body) settings.maxAttempts = body.maxAttempts ?? null;
-    if (body && 'timeLimitMinutes' in body)
-      settings.timeLimitMinutes = body.timeLimitMinutes ?? null;
-    return this.groups.updateQuizBindingSettings(
-      id,
-      quizId,
-      { id: actor.id, roles: actor.roles },
-      settings,
-    );
-  }
-
-  @Delete(':id/quizzes/:quizId')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Guruhdan testni ajratish' })
-  async unbindQuiz(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Param('quizId', new ParseUUIDPipe()) quizId: string,
-  ) {
-    await this.groups.unbindQuiz(id, quizId, { id: actor.id, roles: actor.roles });
-  }
-
-  // ---- Lesson/Module releases (F3) ----
-
-  @Get(':id/releases')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @ApiOperation({ summary: 'Guruh dars/modul ochilish rejalari' })
-  async listReleases(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-  ) {
-    return this.groups.listReleases(id, { id: actor.id, roles: actor.roles });
-  }
-
-  @Post(':id/releases')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Dars/modul ochilishini belgilash (upsert)' })
-  async upsertRelease(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() body: {
-      lessonId?: string;
-      moduleId?: string;
-      opensAt?: string | null;
-      closesAt?: string | null;
-      status?: 'LOCKED' | 'SCHEDULED' | 'OPEN';
-    },
-  ) {
-    return this.groups.upsertRelease(
-      id,
-      {
-        lessonId: body.lessonId,
-        moduleId: body.moduleId,
-        opensAt: body.opensAt ? new Date(body.opensAt) : null,
-        closesAt: body.closesAt ? new Date(body.closesAt) : null,
-        status: body.status ?? 'LOCKED',
-      },
-      { id: actor.id, roles: actor.roles },
-    );
-  }
-
-  @Delete(':id/releases/:releaseId')
-  @RequirePermissions(PERMISSION.GROUPS_MANAGE)
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Release olib tashlash (default — dars ochiq)' })
-  async removeRelease(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Param('releaseId', new ParseUUIDPipe()) releaseId: string,
-  ) {
-    await this.groups.removeRelease(id, releaseId, { id: actor.id, roles: actor.roles });
+    await this.members.remove(id, studentId, actor, client);
   }
 }

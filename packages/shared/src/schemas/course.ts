@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { paginationQuerySchema } from './pagination';
+import { paginationQuerySchema, queryBoolean } from './pagination';
 
 export const LESSON_TYPE = {
   MARUZA: 'MARUZA',
@@ -129,7 +129,8 @@ export const createCourseSchema = z.object({
   slug: courseSlugSchema,
   nameUz: z.string().min(2, 'Kamida 2 belgi').max(255),
   descriptionUz: z.string().max(4000).nullable().optional(),
-  educationLevel: educationLevelSlugField,
+  /** Darajalar olib tashlangan — e'tiborsiz qoldiriladi, kurs doim oliy ta'lim. */
+  educationLevel: educationLevelSlugField.optional(),
   isPublished: z.boolean().default(false),
   visibility: contentVisibilitySchema.default('PRIVATE'),
 });
@@ -146,7 +147,7 @@ export const updateCourseSchema = z.object({
 export type UpdateCourseInput = z.infer<typeof updateCourseSchema>;
 
 export const courseQuerySchema = paginationQuerySchema.extend({
-  isPublished: z.coerce.boolean().optional(),
+  isPublished: queryBoolean,
   educationLevel: educationLevelSlugField.optional(),
 });
 export type CourseQuery = z.infer<typeof courseQuerySchema>;

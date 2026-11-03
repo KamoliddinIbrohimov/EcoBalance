@@ -1,96 +1,66 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  ParseUUIDPipe,
-  Post,
-  Query,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, UseFilters } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import {
+  type ConversationQuery,
+  type CreateConversationInput,
+  type SendMessageInput,
+  conversationQuerySchema,
+  createConversationSchema,
+  sendMessageSchema,
+} from '@eco/shared';
 
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { ChatbotService } from './chatbot.service';
-import { CreateConversationDto } from './dto/create-conversation.dto';
-import { QueryConversationDto } from './dto/query-conversation.dto';
-import { SendMessageDto } from './dto/send-message.dto';
+import { ZBody, ZQuery } from '../../common/http/zod.pipe';
+import { type Actor, CurrentActor } from '../auth/actor';
+import { AiUnavailableFilter } from './ai-unavailable';
+import { ChatService } from './chat.service';
+import { ConversationsService } from './conversations.service';
 
-@ApiTags('Chatbot')
-@ApiBearerAuth('access-token')
-@Controller({ path: 'chatbot', version: '1' })
+/** AI token sarfini cheklash — har foydalanuvchi IP'si uchun daqiqasiga 20 xabar. */
+const MESSAGE_THROTTLE = { default: { limit: 20, ttl: 60_000 } };
+
+@Controller('chatbot')
+@UseFilters(AiUnavailableFilter)
 export class ChatbotController {
-  constructor(private readonly chatbot: ChatbotService) {}
+  constructor(
+    private readonly conversations: ConversationsService,
+    private readonly chat: ChatService,
+  ) {}
 
   @Get('conversations')
-  @ApiOperation({ summary: 'Foydalanuvchining barcha suhbatlari (yangilanish bo‘yicha tartiblangan)' })
-  async list(
-    @CurrentUser('id') userId: string,
-    @Query() query: QueryConversationDto,
-  ) {
-    return this.chatbot.listConversations(userId, query);
-  }
-
-  @Post('conversations')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Yangi bo‘sh suhbat yaratish' })
-  async create(
-    @CurrentUser('id') userId: string,
-    @Body() dto: CreateConversationDto,
-  ) {
-    return this.chatbot.createConversation(userId, dto.title);
+  list(@ZQuery(conversationQuerySchema) q: ConversationQuery, @CurrentActor() actor: Actor) {
+    return this.conversations.list(actor.id, q);
   }
 
   @Get('conversations/:id')
-  @ApiOperation({ summary: 'Suhbatni to‘liq xabarlar bilan olish' })
-  async detail(
-    @CurrentUser('id') userId: string,
-    @Param('id', new ParseUUIDPipe()) id: string,
-  ) {
-    return this.chatbot.getConversation(userId, id);
+  detail(@Param('id', ParseUUIDPipe) id: string, @CurrentActor() actor: Actor) {
+    return this.conversations.detail(actor.id, id);
+  }
+
+  @Post('conversations')
+  create(@ZBody(createConversationSchema.default({})) body: CreateConversationInput, @CurrentActor() actor: Actor) {
+    return this.conversations.create(actor.id, body.title);
   }
 
   @Delete('conversations/:id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Suhbatni o‘chirish (faqat egasi)' })
-  async remove(
-    @CurrentUser('id') userId: string,
-    @Param('id', new ParseUUIDPipe()) id: string,
-  ) {
-    await this.chatbot.removeConversation(userId, id);
+  @HttpCode(204)
+  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentActor() actor: Actor) {
+    await this.conversations.remove(actor.id, id);
   }
 
-  /**
-   * Send a message. If `:id` is provided, appends to that conversation;
-   * otherwise a new conversation is created (title derived from the first
-   * message). Uses the `chatbot` throttler bucket so AI-token spend can be
-   * rate-limited independently of the default bucket.
-   */
   @Post('conversations/:id/messages')
-  @HttpCode(HttpStatus.CREATED)
-  @Throttle({ chatbot: { limit: Number(process.env.RATE_LIMIT_CHATBOT ?? 20), ttl: 60_000 } })
-  @ApiOperation({ summary: 'Suhbatga yangi xabar yuborish (AI javob bilan)' })
-  async sendToConversation(
-    @CurrentUser('id') userId: string,
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: SendMessageDto,
+  @Throttle(MESSAGE_THROTTLE)
+  send(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ZBody(sendMessageSchema) body: SendMessageInput,
+    @CurrentActor() actor: Actor,
   ) {
-    return this.chatbot.sendMessage(userId, id, dto.content);
+    return this.chat.send(actor.id, id, body.content);
   }
 
+  /** Yangi suhbat ochib xabar yuborish (sarlavha birinchi xabardan). */
   @Post('messages')
-  @HttpCode(HttpStatus.CREATED)
-  @Throttle({ chatbot: { limit: Number(process.env.RATE_LIMIT_CHATBOT ?? 20), ttl: 60_000 } })
-  @ApiOperation({
-    summary: 'Yangi suhbat ochib xabar yuborish (birinchi xabardan sarlavha olinadi)',
-  })
-  async sendNew(
-    @CurrentUser('id') userId: string,
-    @Body() dto: SendMessageDto,
-  ) {
-    return this.chatbot.sendMessage(userId, null, dto.content);
+  @Throttle(MESSAGE_THROTTLE)
+  sendNew(@ZBody(sendMessageSchema) body: SendMessageInput, @CurrentActor() actor: Actor) {
+    return this.chat.send(actor.id, null, body.content);
   }
 }

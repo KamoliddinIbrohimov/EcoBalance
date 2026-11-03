@@ -55,6 +55,6 @@ WORKDIR /workspace/apps/api
 
 EXPOSE 4000
 ENTRYPOINT ["/sbin/tini", "--"]
-# Runs prisma db push + start on first boot (safe idempotent); switches to migrate deploy once
-# the prisma/migrations/ folder is populated (Phase 1+).
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss --skip-generate && (npx prisma db seed || true) && node dist/main.js"]
+# Har startda: (bir martalik) baseline → faqat yangi migratsiyalar → idempotent seed.
+# `db push --accept-data-loss` endi ishlatilmaydi — ma'lumot hech qachon tashlab yuborilmaydi.
+CMD ["sh", "-c", "node prisma/baseline.mjs && npx prisma migrate deploy && (npx prisma db seed || echo 'seed failed, continuing') && node dist/main.js"]

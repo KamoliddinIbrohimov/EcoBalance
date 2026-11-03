@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { paginationQuerySchema } from './pagination';
+import { paginationQuerySchema, queryBoolean } from './pagination';
 
 // ---------------------------------------------------------------
 // Group
@@ -64,7 +64,7 @@ export type GroupMemberDto = z.infer<typeof groupMemberSchema>;
 
 export const groupQuerySchema = paginationQuerySchema.extend({
   teacherId: z.string().uuid().optional(),
-  isActive: z.coerce.boolean().optional(),
+  isActive: queryBoolean,
 });
 export type GroupQuery = z.infer<typeof groupQuerySchema>;
 

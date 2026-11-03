@@ -1,114 +1,61 @@
+import { Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Ip,
-  Param,
-  ParseUUIDPipe,
-  Patch,
-  Post,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PERMISSION } from '@eco/shared';
-import type { Request } from 'express';
+  type CreateUserInput,
+  type UpdateUserInput,
+  type UserQuery,
+  createUserSchema,
+  updateUserSchema,
+  userQuerySchema,
+} from '@eco/shared';
 
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { PermissionsGuard } from '../auth/authorization/permissions.guard';
-import { RequirePermissions } from '../auth/authorization/permissions.decorator';
-import type { AuthenticatedUser } from '../auth/strategies/jwt-access.strategy';
-import { CreateUserDto } from './dto/create-user.dto';
-import { QueryUserDto } from './dto/query-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { ZBody, ZQuery } from '../../common/http/zod.pipe';
+import { type Actor, Client, type ClientInfo, CurrentActor, Roles } from '../auth/actor';
 import { UsersService } from './users.service';
 
-@ApiTags('Users')
-@ApiBearerAuth('access-token')
-@Controller({ path: 'users', version: '1' })
+@Controller('users')
+@Roles('SUPER_ADMIN', 'TEACHER')
 export class UsersController {
   constructor(private readonly users: UsersService) {}
 
-  @Get('me/profile')
-  @ApiOperation({ summary: 'Joriy foydalanuvchi qisqa profili (dashboard shell uchun)' })
-  async myProfile(@CurrentUser() user: AuthenticatedUser) {
-    return this.users.findById(user.id);
-  }
-
   @Get()
-  @UseGuards(PermissionsGuard)
-  @RequirePermissions(PERMISSION.USERS_READ)
-  @ApiOperation({ summary: 'Foydalanuvchilar ro‘yxati (TEACHER o‘zi yaratganlarini, SA hammasini)' })
-  async list(@Query() query: QueryUserDto, @CurrentUser() actor: AuthenticatedUser) {
-    return this.users.list(query, actor.roles, actor.id);
+  list(@ZQuery(userQuerySchema) q: UserQuery, @CurrentActor() actor: Actor) {
+    return this.users.list(q, actor);
   }
 
   @Get(':id')
-  @UseGuards(PermissionsGuard)
-  @RequirePermissions(PERMISSION.USERS_READ)
-  @ApiOperation({ summary: 'Foydalanuvchi tafsilotlari (TEACHER faqat o‘ziniki)' })
-  async detail(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.users.findAdminDetail(id, actor.roles, actor.id);
+  detail(@Param('id', ParseUUIDPipe) id: string, @CurrentActor() actor: Actor) {
+    return this.users.detail(id, actor);
   }
 
   @Post()
-  @UseGuards(PermissionsGuard)
-  @RequirePermissions(PERMISSION.USERS_CREATE)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Yangi foydalanuvchi yaratish (SUPER_ADMIN: har qanday rol; TEACHER: faqat STUDENT)' })
-  async create(
-    @Body() dto: CreateUserDto,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() req: Request,
-    @Ip() ip: string,
-  ) {
-    return this.users.create(
-      dto,
-      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
-      actor.roles,
-    );
+  create(@ZBody(createUserSchema) body: CreateUserInput, @CurrentActor() actor: Actor, @Client() client: ClientInfo) {
+    return this.users.create(body, actor, client);
   }
 
   @Patch(':id')
-  @UseGuards(PermissionsGuard)
-  @RequirePermissions(PERMISSION.USERS_UPDATE)
-  @ApiOperation({ summary: 'Foydalanuvchini tahrirlash (TEACHER faqat o‘zi yaratganlarini)' })
-  async update(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: UpdateUserDto,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() req: Request,
-    @Ip() ip: string,
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ZBody(updateUserSchema) body: UpdateUserInput,
+    @CurrentActor() actor: Actor,
+    @Client() client: ClientInfo,
   ) {
-    return this.users.update(
-      id,
-      dto,
-      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
-      actor.roles,
-    );
+    return this.users.update(id, body, actor, client);
   }
 
   @Delete(':id')
-  @UseGuards(PermissionsGuard)
-  @RequirePermissions(PERMISSION.USERS_DELETE)
-  @ApiOperation({ summary: 'Foydalanuvchini faolsizlantirish (TEACHER faqat o‘zi yaratganlarini)' })
-  async deactivate(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() req: Request,
-    @Ip() ip: string,
-  ) {
-    return this.users.deactivate(
-      id,
-      { actorId: actor.id, ip, userAgent: req.headers['user-agent'] },
-      actor.roles,
-    );
+  @Roles('SUPER_ADMIN')
+  deactivate(@Param('id', ParseUUIDPipe) id: string, @CurrentActor() actor: Actor, @Client() client: ClientInfo) {
+    return this.users.deactivate(id, actor, client);
+  }
+}
+
+@Controller('roles')
+@Roles('SUPER_ADMIN', 'TEACHER')
+export class RolesController {
+  constructor(private readonly users: UsersService) {}
+
+  @Get()
+  list() {
+    return this.users.roles();
   }
 }

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { paginationQuerySchema } from './pagination';
+import { paginationQuerySchema, queryBoolean } from './pagination';
 
 export const newsSchema = z.object({
   id: z.string().uuid(),
@@ -42,6 +42,6 @@ export const updateNewsSchema = z.object({
 export type UpdateNewsInput = z.infer<typeof updateNewsSchema>;
 
 export const newsQuerySchema = paginationQuerySchema.extend({
-  isPublished: z.coerce.boolean().optional(),
+  isPublished: queryBoolean,
 });
 export type NewsQuery = z.infer<typeof newsQuerySchema>;

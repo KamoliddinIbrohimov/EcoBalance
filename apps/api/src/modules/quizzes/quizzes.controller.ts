@@ -1,219 +1,137 @@
+import { Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  ParseUUIDPipe,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PERMISSION } from '@eco/shared';
+  type CreateQuestionInput,
+  type CreateQuizInput,
+  type QuizQuery,
+  type ReorderQuestionsInput,
+  type SubmissionQuery,
+  type SubmitQuizInput,
+  type UpdateQuestionInput,
+  type UpdateQuizInput,
+  createQuestionSchema,
+  createQuizSchema,
+  quizQuerySchema,
+  reorderQuestionsSchema,
+  submissionQuerySchema,
+  submitQuizSchema,
+  updateQuestionSchema,
+  updateQuizSchema,
+} from '@eco/shared';
 
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../auth/strategies/jwt-access.strategy';
-import { PermissionsGuard } from '../auth/authorization/permissions.guard';
-import { RequirePermissions } from '../auth/authorization/permissions.decorator';
-import { CreateQuestionDto, ReorderQuestionsDto, UpdateQuestionDto } from './dto/question.dto';
-import { CreateQuizDto } from './dto/create-quiz.dto';
-import { QueryQuizDto, QuerySubmissionDto } from './dto/query-quiz.dto';
-import { SubmitQuizDto } from './dto/submit-quiz.dto';
-import { UpdateQuizDto } from './dto/update-quiz.dto';
+import { ZBody, ZQuery } from '../../common/http/zod.pipe';
+import { type Actor, Client, type ClientInfo, CurrentActor, Roles } from '../auth/actor';
+import { AttemptsService } from './attempts.service';
+import { QuestionsService } from './questions.service';
 import { QuizzesService } from './quizzes.service';
 
-/**
- * Admin endpointlari — `QUIZZES_MANAGE` kerak. Testlarni yaratish/tahrir va
- * barcha foydalanuvchilarning topshiriqlarini ko'rish uchun.
- */
-@ApiTags('Quizzes (admin)')
-@ApiBearerAuth('access-token')
-@Controller({ path: 'quizzes', version: '1' })
-@UseGuards(PermissionsGuard)
-export class QuizzesAdminController {
-  constructor(private readonly quizzes: QuizzesService) {}
+const Id = (name = 'id') => Param(name, ParseUUIDPipe);
 
-  @Get()
-  @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
-  @ApiOperation({ summary: 'Testlar ro‘yxati (sahifalash, filtr: lessonId/isPublished)' })
-  async list(@Query() query: QueryQuizDto, @CurrentUser() actor: AuthenticatedUser) {
-    return this.quizzes.list(query, { id: actor.id, roles: actor.roles });
-  }
-
-  @Get(':id')
-  @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
-  @ApiOperation({ summary: 'Testning to‘liq tahrirlanishi (savollar + to‘g‘ri javoblar bilan)' })
-  async detail(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.quizzes.getAdminDetail(id, { id: actor.id, roles: actor.roles });
-  }
-
-  @Post()
-  @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Darsga yangi test qo‘shish' })
-  async create(@Body() dto: CreateQuizDto, @CurrentUser() actor: AuthenticatedUser) {
-    return this.quizzes.create(dto, actor.id);
-  }
-
-  @Patch(':id')
-  @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
-  @ApiOperation({ summary: 'Test meta ma‘lumotini tahrirlash (sarlavha/foiz/publish)' })
-  async update(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: UpdateQuizDto,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.quizzes.update(id, dto, { id: actor.id, roles: actor.roles });
-  }
-
-  @Delete(':id')
-  @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Testni o‘chirish (savollar va topshiriqlar bilan)' })
-  async remove(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    await this.quizzes.remove(id, { id: actor.id, roles: actor.roles });
-  }
-
-  // -------- Questions --------
-
-  @Post(':id/questions')
-  @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Testga savol qo‘shish' })
-  async addQuestion(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: CreateQuestionDto,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.quizzes.addQuestion(id, dto, { id: actor.id, roles: actor.roles });
-  }
-
-  @Patch(':id/questions/reorder')
-  @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
-  @ApiOperation({ summary: 'Savollar tartibini qayta tartiblash' })
-  async reorderQuestions(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: ReorderQuestionsDto,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    await this.quizzes.reorderQuestions(id, dto, { id: actor.id, roles: actor.roles });
-    return { ok: true };
-  }
+/** O'qituvchi/SA: testlar va savollarni boshqarish. Literal yo'llar `:id` dan oldin. */
+@Controller('quizzes')
+@Roles('SUPER_ADMIN', 'TEACHER')
+export class QuizzesController {
+  constructor(
+    private readonly quizzes: QuizzesService,
+    private readonly questions: QuestionsService,
+  ) {}
 
   @Patch('questions/:questionId')
-  @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
-  @ApiOperation({ summary: 'Savolni tahrirlash' })
-  async updateQuestion(
-    @Param('questionId', new ParseUUIDPipe()) questionId: string,
-    @Body() dto: UpdateQuestionDto,
-    @CurrentUser() actor: AuthenticatedUser,
+  updateQuestion(
+    @Id('questionId') questionId: string,
+    @ZBody(updateQuestionSchema) body: UpdateQuestionInput,
+    @CurrentActor() actor: Actor,
   ) {
-    return this.quizzes.updateQuestion(questionId, dto, { id: actor.id, roles: actor.roles });
+    return this.questions.update(questionId, body, actor);
   }
 
   @Delete('questions/:questionId')
-  @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Savolni o‘chirish' })
-  async removeQuestion(
-    @Param('questionId', new ParseUUIDPipe()) questionId: string,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    await this.quizzes.removeQuestion(questionId, { id: actor.id, roles: actor.roles });
+  async removeQuestion(@Id('questionId') questionId: string, @CurrentActor() actor: Actor) {
+    await this.questions.remove(questionId, actor);
   }
 
-  // -------- Submissions (admin view) --------
+  @Get()
+  list(@ZQuery(quizQuerySchema) q: QuizQuery, @CurrentActor() actor: Actor) {
+    return this.quizzes.list(q, actor);
+  }
+
+  @Get(':id')
+  detail(@Id() id: string, @CurrentActor() actor: Actor) {
+    return this.quizzes.detail(id, actor);
+  }
+
+  @Post()
+  create(@ZBody(createQuizSchema) body: CreateQuizInput, @CurrentActor() actor: Actor, @Client() client: ClientInfo) {
+    return this.quizzes.create(body, actor, client);
+  }
+
+  @Patch(':id')
+  update(
+    @Id() id: string,
+    @ZBody(updateQuizSchema) body: UpdateQuizInput,
+    @CurrentActor() actor: Actor,
+    @Client() client: ClientInfo,
+  ) {
+    return this.quizzes.update(id, body, actor, client);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(@Id() id: string, @CurrentActor() actor: Actor, @Client() client: ClientInfo) {
+    await this.quizzes.remove(id, actor, client);
+  }
+
+  @Post(':id/questions')
+  addQuestion(@Id() id: string, @ZBody(createQuestionSchema) body: CreateQuestionInput, @CurrentActor() actor: Actor) {
+    return this.questions.add(id, body, actor);
+  }
+
+  @Patch(':id/questions/reorder')
+  reorder(@Id() id: string, @ZBody(reorderQuestionsSchema) body: ReorderQuestionsInput, @CurrentActor() actor: Actor) {
+    return this.questions.reorder(id, body, actor);
+  }
 
   @Get(':id/submissions')
-  @RequirePermissions(PERMISSION.QUIZZES_MANAGE)
-  @ApiOperation({ summary: 'Shu testga tegishli barcha topshiriqlar (admin)' })
-  async submissionsAdmin(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Query() query: QuerySubmissionDto,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.quizzes.listSubmissionsAdmin(id, query, { id: actor.id, roles: actor.roles });
+  submissions(@Id() id: string, @ZQuery(submissionQuerySchema) q: SubmissionQuery, @CurrentActor() actor: Actor) {
+    return this.quizzes.submissions(id, q, actor);
   }
 }
 
 /**
- * Foydalanuvchi endpointlari — `QUIZZES_TAKE` kerak. Dars tagidagi published
- * testlarni ko'rish/yechish uchun. Bu alohida controller — chunki bazoviy
- * yo'l `my-quizzes`, admin controllerida esa `/quizzes` saqlanadi.
+ * Test yechish. Rol cheklovi yo'q — kirish talabaning guruhi orqali
+ * tekshiriladi (o'qituvchi dars sahifasida ham shu yo'lni chaqiradi).
  */
-@ApiTags('Quizzes (user)')
-@ApiBearerAuth('access-token')
-@Controller({ path: 'my-quizzes', version: '1' })
-@UseGuards(PermissionsGuard)
-export class QuizzesUserController {
-  constructor(private readonly quizzes: QuizzesService) {}
+@Controller('my-quizzes')
+export class MyQuizzesController {
+  constructor(private readonly attempts: AttemptsService) {}
 
   @Get('by-lesson/:lessonId')
-  @RequirePermissions(PERMISSION.QUIZZES_TAKE)
-  @ApiOperation({ summary: 'Dars tagidagi nashr etilgan testlar ro‘yxati' })
-  async listForLesson(
-    @Param('lessonId', new ParseUUIDPipe()) lessonId: string,
-    @CurrentUser('id') userId: string,
-  ) {
-    return this.quizzes.listForLessonPublic(lessonId, userId);
+  byLesson(@Id('lessonId') lessonId: string, @CurrentActor() actor: Actor) {
+    return this.attempts.byLesson(lessonId, actor);
   }
 
   @Get('ekologik')
-  @RequirePermissions(PERMISSION.QUIZZES_TAKE)
-  @ApiOperation({ summary: 'Ekologik monitoring bo‘limidagi barcha nashr etilgan testlar' })
-  async listMonitoringTests(@CurrentUser('id') userId: string) {
-    return this.quizzes.listPublishedStandalone(userId);
-  }
-
-  @Get(':id/take')
-  @RequirePermissions(PERMISSION.QUIZZES_TAKE)
-  @ApiOperation({ summary: 'Testni yechish uchun savollarni olish (to‘g‘ri javoblarsiz)' })
-  async takeDetail(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser('id') userId: string,
-  ) {
-    return this.quizzes.getPublicDetail(id, userId);
-  }
-
-  @Post(':id/submissions')
-  @RequirePermissions(PERMISSION.QUIZZES_TAKE)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Testni topshirish — baholanadi va super adminga xabar yuboriladi' })
-  async submit(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser('id') userId: string,
-    @Body() dto: SubmitQuizDto,
-  ) {
-    return this.quizzes.submit(id, userId, dto);
-  }
-
-  @Get(':id/my-submissions')
-  @RequirePermissions(PERMISSION.QUIZZES_TAKE)
-  @ApiOperation({ summary: 'O‘z topshirishlarim shu test bo‘yicha' })
-  async myHistory(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser('id') userId: string,
-  ) {
-    return this.quizzes.listMySubmissions(id, userId);
+  standalone(@CurrentActor() actor: Actor) {
+    return this.attempts.standalone(actor);
   }
 
   @Get('submissions/:submissionId')
-  @RequirePermissions(PERMISSION.QUIZZES_TAKE)
-  @ApiOperation({ summary: 'Bitta topshiriq (javoblar bilan) — faqat egasi ko‘ra oladi' })
-  async submissionDetail(
-    @Param('submissionId', new ParseUUIDPipe()) submissionId: string,
-    @CurrentUser('id') userId: string,
-  ) {
-    return this.quizzes.getSubmissionForUser(submissionId, userId);
+  submission(@Id('submissionId') submissionId: string, @CurrentActor() actor: Actor) {
+    return this.attempts.submission(submissionId, actor);
+  }
+
+  @Get(':id/take')
+  take(@Id() id: string, @CurrentActor() actor: Actor) {
+    return this.attempts.take(id, actor);
+  }
+
+  @Post(':id/submissions')
+  submit(@Id() id: string, @ZBody(submitQuizSchema) body: SubmitQuizInput, @CurrentActor() actor: Actor) {
+    return this.attempts.submit(id, body, actor);
+  }
+
+  @Get(':id/my-submissions')
+  mySubmissions(@Id() id: string, @CurrentActor() actor: Actor) {
+    return this.attempts.mySubmissions(id, actor);
   }
 }

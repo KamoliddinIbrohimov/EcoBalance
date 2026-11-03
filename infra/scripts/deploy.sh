@@ -37,7 +37,9 @@ warn() { printf '%s! %s%s\n' "$C_YELLOW" "$*" "$C_RESET" >&2; }
 ok()   { printf '%s✓ %s%s\n' "$C_GREEN"  "$*" "$C_RESET"; }
 die()  { printf '%s✗ %s%s\n' "$C_RED"    "$*" "$C_RESET" >&2; exit 1; }
 
+# Serverda compose fayli ildizda yoki infra/ ichida bo'lishi mumkin.
 COMPOSE_FILE="docker-compose.prod.yml"
+[[ -f "$COMPOSE_FILE" ]] || COMPOSE_FILE="infra/docker-compose.prod.yml"
 ENV_FILE=".env"
 
 [[ -f "$COMPOSE_FILE" ]] || die "Missing $APP_DIR/$COMPOSE_FILE"
@@ -90,8 +92,8 @@ ok "images up to date"
 # -----------------------------------------------------------------------------
 # 4) Start / update infra services first (they don't depend on new app images)
 # -----------------------------------------------------------------------------
-log "starting infra services: caddy, postgres, redis, minio"
-"${COMPOSE[@]}" up -d caddy postgres redis minio
+log "starting infra services: caddy, postgres, minio"
+"${COMPOSE[@]}" up -d caddy postgres minio
 ok "infra services running"
 
 # -----------------------------------------------------------------------------
@@ -115,11 +117,21 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# 6) Prisma schema sync
+# 6) Backup + migratsiyalar
 # -----------------------------------------------------------------------------
-log "syncing Prisma schema (prisma db push --accept-data-loss)"
-"${COMPOSE[@]}" run --rm api npx prisma db push --accept-data-loss --skip-generate
-ok "database schema synced"
+# Har deploy'dan oldin to'liq dump — migratsiya kutilmagan natija bersa qaytish uchun.
+mkdir -p backups
+BACKUP="backups/pre-deploy-$(date +%Y%m%d-%H%M%S)-${IMAGE_TAG}.sql.gz"
+log "backing up database → $BACKUP"
+"${COMPOSE[@]}" exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > "$BACKUP"
+[[ -s "$BACKUP" ]] || die "backup is empty — aborting before migrations"
+ok "backup written ($(du -h "$BACKUP" | cut -f1))"
+
+# baseline.mjs: eski `db push` bazasida 0_init'ni qo'llangan deb belgilaydi
+# (bir martalik, ma'lumotga tegmaydi). Keyin faqat yangi migratsiyalar qo'llanadi.
+log "applying Prisma migrations"
+"${COMPOSE[@]}" run --rm api sh -c 'node prisma/baseline.mjs && npx prisma migrate deploy'
+ok "database migrated"
 
 # -----------------------------------------------------------------------------
 # 7) Roll out the app containers with the new image tag

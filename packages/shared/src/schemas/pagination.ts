@@ -1,6 +1,15 @@
 import { z } from 'zod';
 
 /**
+ * Query-string boolean: faqat "true"/"false" (yoki haqiqiy boolean).
+ * `z.coerce.boolean()` "false" satrini `true` qilardi — shuning o'rniga.
+ */
+export const queryBoolean = z.preprocess(
+  (v) => (v === 'true' ? true : v === 'false' ? false : v === '' ? undefined : v),
+  z.boolean().optional(),
+);
+
+/**
  * L18: `limit` legacy alias — endi schema'ga rasman qo'shilgan.
  * Konstruktor controller tomondan oddiy ko'rinishda:
  *   const effective = query.perPage ?? query.limit ?? 20;

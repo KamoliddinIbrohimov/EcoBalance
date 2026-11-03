@@ -1,245 +1,178 @@
 import {
-  Body,
   Controller,
   Delete,
   Get,
   HttpCode,
-  HttpStatus,
-  Ip,
   Patch,
   Post,
   Req,
   Res,
   UnauthorizedException,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
-import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { changePasswordSchema, updateProfileSchema } from '@eco/shared';
-import { createZodDto } from 'nestjs-zod';
+import {
+  type ChangePasswordInput,
+  type ForgotPasswordInput,
+  type LoginInput,
+  type ResetPasswordInput,
+  type UpdateProfileInput,
+  changePasswordSchema,
+  forgotPasswordSchema,
+  loginSchema,
+  resetPasswordSchema,
+  updateProfileSchema,
+} from '@eco/shared';
 import type { Request, Response } from 'express';
 
-import { AuthService } from './auth.service';
-import { CurrentUser } from './decorators/current-user.decorator';
-import { Public } from './decorators/public.decorator';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { LoginDto } from './dto/login.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { TokenService } from './services/token.service';
+import { RawResponse } from '../../common/http/envelope.interceptor';
+import { ZBody } from '../../common/http/zod.pipe';
+import {
+  type Actor,
+  AllowWithTempPassword,
+  Client,
+  type ClientInfo,
+  CurrentActor,
+  Public,
+} from './actor';
+import { AVATAR_MAX_BYTES, type AuthResult, AuthService } from './auth.service';
+import { REFRESH_COOKIE, TokenService } from './token.service';
 
-class UpdateProfileDto extends createZodDto(updateProfileSchema) {}
-class ChangePasswordDto extends createZodDto(changePasswordSchema) {}
+// Login IP bo'yicha sanaladi — bitta NAT ortidagi sinf birdan kirishi mumkin.
+const AUTH_LIMIT = { default: { limit: 60, ttl: 60_000 } };
+// Refresh sessiya bo'yicha sanaladi (AppThrottlerGuard) — har sahifa yuklanishi bitta refresh.
+const REFRESH_LIMIT = { default: { limit: 60, ttl: 60_000 } };
 
-const REFRESH_COOKIE = 'refresh_token';
-
-@ApiTags('Auth')
-@Controller({ path: 'auth', version: '1' })
-@UseGuards(JwtAuthGuard)
+@Controller('auth')
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly tokens: TokenService,
   ) {}
 
-  // NOTE: /register endpoint 3-rol LMS modelida olib tashlangan — foydalanuvchi
-  // hisobini faqat SUPER_ADMIN (yoki o'qituvchi talaba uchun) yarata oladi.
-
   @Public()
-  @Throttle({ auth: { limit: 20, ttl: 60_000 } })
+  @Throttle(AUTH_LIMIT)
   @Post('login')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Tizimga kirish' })
+  @HttpCode(200)
   async login(
-    @Body() dto: LoginDto,
-    @Req() req: Request,
+    @ZBody(loginSchema) body: LoginInput,
+    @Client() client: ClientInfo,
     @Res({ passthrough: true }) res: Response,
-    @Ip() ip: string,
   ) {
-    const ua = req.headers['user-agent'];
-    const result = await this.auth.login(dto, { ip, userAgent: ua });
-    this.setRefreshCookie(res, result.refreshToken);
-    return this.stripRefresh(result);
+    return this.respond(res, await this.auth.login(body, client));
   }
 
   @Public()
+  @Throttle(REFRESH_LIMIT)
   @Post('refresh')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Access tokenni yangilash (refresh cookie orqali)' })
+  @HttpCode(200)
   async refresh(
     @Req() req: Request,
+    @Client() client: ClientInfo,
     @Res({ passthrough: true }) res: Response,
-    @Ip() ip: string,
   ) {
-    const raw = req.cookies?.[REFRESH_COOKIE];
-    if (!raw) throw new UnauthorizedException('Refresh token topilmadi');
-
-    const ua = req.headers['user-agent'];
-    const result = await this.auth.refresh(raw, { ip, userAgent: ua });
-    this.setRefreshCookie(res, result.refreshToken);
-    return this.stripRefresh(result);
+    const presented = req.cookies?.[REFRESH_COOKIE] as string | undefined;
+    if (!presented) throw new UnauthorizedException('Sessiya topilmadi');
+    try {
+      return this.respond(res, await this.auth.refresh(presented, client));
+    } catch (err) {
+      if (err instanceof UnauthorizedException) this.clearCookie(res);
+      throw err;
+    }
   }
 
+  /** Ochiq: token eskirgan bo'lsa ham cookie tozalanadi va 204 qaytadi. */
   @Public()
   @SkipThrottle()
   @Post('logout')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({
-    summary:
-      'Tizimdan chiqish (refresh tokenni bekor qiladi). Public: token noto‘g‘ri/eskirgan bo‘lsa ham 204 qaytadi va cookie tozalanadi.',
-  })
+  @HttpCode(204)
   async logout(
     @Req() req: Request,
+    @Client() client: ClientInfo,
     @Res({ passthrough: true }) res: Response,
-    @Ip() ip: string,
   ) {
-    const raw = req.cookies?.[REFRESH_COOKIE];
-    // Refresh cookie'dan foydalanuvchi ID'ni topib, sessiya yozuvini bekor qilamiz.
-    // Cookie yo'q yoki yaroqsiz bo'lsa ham 204 qaytadi — brauzer cookie'ni tozalaydi.
-    await this.auth.logoutByRefresh(raw, { ip, userAgent: req.headers['user-agent'] });
-    this.clearRefreshCookie(res);
+    await this.auth.logout(req.cookies?.[REFRESH_COOKIE], client);
+    this.clearCookie(res);
   }
 
   @Public()
-  @Throttle({ forgot: { limit: 3, ttl: 60 * 60_000 } })
+  @Throttle({ default: { limit: 3, ttl: 60 * 60_000 } })
   @Post('forgot-password')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Parolni tiklash uchun so‘rov yuborish' })
-  async forgotPassword(
-    @Body() dto: ForgotPasswordDto,
-    @Req() req: Request,
-    @Ip() ip: string,
-  ) {
-    return this.auth.forgotPassword(dto, { ip, userAgent: req.headers['user-agent'] });
+  @HttpCode(200)
+  forgotPassword(@ZBody(forgotPasswordSchema) body: ForgotPasswordInput, @Client() client: ClientInfo) {
+    return this.auth.forgotPassword(body, client);
   }
 
   @Public()
-  @Throttle({ auth: { limit: 20, ttl: 60_000 } })
+  @Throttle(AUTH_LIMIT)
   @Post('reset-password')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Parolni yangi qiymatga o‘zgartirish' })
-  async resetPassword(
-    @Body() dto: ResetPasswordDto,
-    @Req() req: Request,
-    @Ip() ip: string,
-  ) {
-    return this.auth.resetPassword(dto, { ip, userAgent: req.headers['user-agent'] });
+  @HttpCode(200)
+  resetPassword(@ZBody(resetPasswordSchema) body: ResetPasswordInput, @Client() client: ClientInfo) {
+    return this.auth.resetPassword(body, client);
   }
 
+  @AllowWithTempPassword()
   @Get('me')
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Joriy foydalanuvchi profili + rollari + ruxsatlari' })
-  async me(@CurrentUser('id') userId: string) {
-    return this.auth.me(userId);
+  me(@CurrentActor() actor: Actor) {
+    return this.auth.profile(actor.id);
   }
 
   @Patch('me')
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Foydalanuvchi profil ma‘lumotlarini tahrirlash' })
-  async updateProfile(
-    @CurrentUser('id') userId: string,
-    @Body() dto: UpdateProfileDto,
-    @Req() req: Request,
-    @Ip() ip: string,
+  updateProfile(
+    @CurrentActor() actor: Actor,
+    @ZBody(updateProfileSchema) body: UpdateProfileInput,
+    @Client() client: ClientInfo,
   ) {
-    return this.auth.updateProfile(userId, dto, {
-      ip,
-      userAgent: req.headers['user-agent'],
-    });
+    return this.auth.updateProfile(actor.id, body, client);
   }
 
   @Post('me/avatar')
-  @ApiBearerAuth('access-token')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      limits: { fileSize: 5 * 1024 * 1024 },
-    }),
-  )
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Profil rasmini yuklash (JPG/PNG/WEBP/GIF, maks 5 MB)' })
-  async uploadAvatar(
-    @CurrentUser('id') userId: string,
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: AVATAR_MAX_BYTES } }))
+  uploadAvatar(
+    @CurrentActor() actor: Actor,
     @UploadedFile() file: Express.Multer.File | undefined,
-    @Req() req: Request,
-    @Ip() ip: string,
+    @Client() client: ClientInfo,
   ) {
-    return this.auth.uploadAvatar(userId, file, {
-      ip,
-      userAgent: req.headers['user-agent'],
-    });
+    return this.auth.setAvatar(actor.id, file, client);
   }
 
   @Delete('me/avatar')
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Profil rasmini o‘chirish' })
-  async removeAvatar(
-    @CurrentUser('id') userId: string,
-    @Req() req: Request,
-    @Ip() ip: string,
-  ) {
-    return this.auth.removeAvatar(userId, {
-      ip,
-      userAgent: req.headers['user-agent'],
-    });
+  removeAvatar(@CurrentActor() actor: Actor, @Client() client: ClientInfo) {
+    return this.auth.removeAvatar(actor.id, client);
   }
 
+  /** Web klient bu javobni o'ramsiz o'qiydi: `{ok, accessToken?, expiresIn?}`. */
+  @AllowWithTempPassword()
+  @Throttle(AUTH_LIMIT)
+  @RawResponse()
   @Post('me/change-password')
-  @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth('access-token')
-  @ApiOperation({
-    summary: 'Parolni o‘zgartirish (joriy parolni verifikatsiya qilib)',
-  })
+  @HttpCode(200)
   async changePassword(
-    @CurrentUser('id') userId: string,
-    @Body() dto: ChangePasswordDto,
+    @CurrentActor() actor: Actor,
+    @ZBody(changePasswordSchema) body: ChangePasswordInput,
     @Req() req: Request,
+    @Client() client: ClientInfo,
     @Res({ passthrough: true }) res: Response,
-    @Ip() ip: string,
   ) {
-    const currentRefresh = req.cookies?.[REFRESH_COOKIE];
-    const result = await this.auth.changePassword(
-      userId,
-      dto,
-      { ip, userAgent: req.headers['user-agent'] },
-      currentRefresh,
-    );
-    // B1: parolni almashtirgan sessiyani saqlab qolamiz — yangi tokenlar
-    // qaytariladi, cookie yangilanadi. Shu tariqa klient "reuse detected"
-    // bilan uchramaydi, qayta kirishga tushib qolmaydi.
-    if (result.tokens) {
-      this.setRefreshCookie(res, result.tokens.refreshToken);
-      return {
-        ok: true,
-        accessToken: result.tokens.accessToken,
-        expiresIn: result.tokens.expiresIn,
-      };
+    const pair = await this.auth.changePassword(actor.id, body, req.cookies?.[REFRESH_COOKIE], client);
+    if (!pair) {
+      this.clearCookie(res);
+      return { ok: true };
     }
-    this.clearRefreshCookie(res);
-    return { ok: true };
+    res.cookie(REFRESH_COOKIE, pair.refreshToken, this.tokens.cookieOptions());
+    return { ok: true, accessToken: pair.accessToken, expiresIn: pair.expiresIn };
   }
 
-  // ---- helpers -----------------------------------------------------
-
-  private setRefreshCookie(res: Response, token: string) {
-    res.cookie(REFRESH_COOKIE, token, this.tokens.getRefreshCookieOptions());
+  private respond(res: Response, result: AuthResult) {
+    const { refreshToken, ...rest } = result;
+    res.cookie(REFRESH_COOKIE, refreshToken, this.tokens.cookieOptions());
+    return { ...rest, tokenType: 'Bearer' as const };
   }
 
-  private clearRefreshCookie(res: Response) {
-    const opts = this.tokens.getRefreshCookieOptions();
-    res.clearCookie(REFRESH_COOKIE, { path: opts.path, domain: opts.domain });
-  }
-
-  private stripRefresh<T extends { accessToken: string; expiresIn: number; refreshToken: string }>(
-    result: T,
-  ) {
-    const { refreshToken: _refreshToken, ...rest } = result;
-    void _refreshToken;
-    return {
-      ...rest,
-      tokenType: 'Bearer' as const,
-    };
+  private clearCookie(res: Response) {
+    const { domain, path } = this.tokens.cookieOptions();
+    res.clearCookie(REFRESH_COOKIE, { domain, path });
   }
 }
