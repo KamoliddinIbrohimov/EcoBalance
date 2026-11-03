@@ -13,6 +13,7 @@ import { ConfirmDialog } from '@/shared/components/ui/confirm-dialog';
 import { UnderDevelopment } from '@/shared/components/layout/under-development';
 import type { ApiError } from '@/shared/lib/api-client';
 import { useAuthStore } from '@/shared/stores/auth-store';
+import { formatDate } from '@/shared/lib/format-date';
 
 function fmtSize(b: number) {
   if (b < 1024) return `${b} B`;
@@ -93,8 +94,8 @@ export default function NewsPage() {
                     {n.authorName ? <span>Muallif: {n.authorName}</span> : null}
                     <span>
                       {n.publishedAt
-                        ? new Date(n.publishedAt).toLocaleDateString('uz-UZ')
-                        : new Date(n.createdAt).toLocaleDateString('uz-UZ')}
+                        ? formatDate(new Date(n.publishedAt))
+                        : formatDate(new Date(n.createdAt))}
                     </span>
                   </div>
                   <p className="whitespace-pre-line text-sm text-foreground">{n.bodyUz}</p>

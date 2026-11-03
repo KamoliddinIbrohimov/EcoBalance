@@ -9,8 +9,8 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
 import { cn } from '@/shared/lib/cn';
+import { quizBackLink } from '@/features/quizzes/lib/back-link';
 
-const BACK_URL = '/monitoring/tests';
 
 export default function QuizResultsPage() {
   const params = useParams<{ quizId: string; submissionId: string }>();
@@ -36,11 +36,11 @@ export default function QuizResultsPage() {
   return (
     <div className="max-w-3xl space-y-5">
       <Link
-        href={BACK_URL}
+        href={quizBackLink(quiz).href}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
-        Ekologik testlar
+        {quizBackLink(quiz).label}
       </Link>
 
       <div className="space-y-2">
@@ -99,7 +99,7 @@ export default function QuizResultsPage() {
             return (
               <li key={q.id} className="rounded-xl border border-border/60 bg-card p-4">
                 <div className="flex items-center gap-2 pb-2">
-                  <Badge variant="outline">#{idx + 1}</Badge>
+                  <Badge variant="outline">{idx + 1}-savol</Badge>
                   <Badge variant="secondary">
                     {q.type === 'SINGLE_CHOICE' ? 'Test' : 'So‘rovnoma'}
                   </Badge>
@@ -117,9 +117,9 @@ export default function QuizResultsPage() {
 
       <div className="flex items-center justify-between">
         <Button asChild variant="outline">
-          <Link href={BACK_URL}>
+          <Link href={quizBackLink(quiz).href}>
             <ArrowLeft className="h-4 w-4" />
-            Testlar ro&apos;yxatiga
+            {quiz.lesson ? 'Darsga qaytish' : 'Testlar ro‘yxatiga'}
           </Link>
         </Button>
         <Button asChild>

@@ -13,7 +13,6 @@ import {
   Building2,
   ClipboardList,
   FileText,
-  Layers,
   Leaf,
   Users,
 } from 'lucide-react';
@@ -21,10 +20,9 @@ import Link from 'next/link';
 
 import { useAnalyticsOverview, useRecentAudit } from '@/features/analytics/hooks/use-analytics';
 import { useEcoReportsList } from '@/features/eco-reports/hooks/use-eco-reports';
-import { useEducationLevels } from '@/features/learning/hooks/use-education-levels';
 import { Badge } from '@/shared/components/ui/badge';
 import { Card } from '@/shared/components/ui/card';
-import { formatDateTime } from '@/shared/lib/format-date';
+import { formatDate, formatDateTime } from '@/shared/lib/format-date';
 import {
   Table,
   TableBody,
@@ -70,7 +68,6 @@ export default function DashboardPage() {
   const { data: overview, isLoading: overviewLoading } = useAnalyticsOverview();
   const { data: audit, isLoading: auditLoading } = useRecentAudit(20);
   const { data: recentReports } = useEcoReportsList({ page: 1, perPage: 5 });
-  const { data: levels } = useEducationLevels();
 
   function formatSize(bytes: number): string {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -86,7 +83,6 @@ export default function DashboardPage() {
     ? [
         { label: 'Foydalanuvchilar', value: String(overview.totals.users), icon: Users, tone: 'primary' },
         { label: 'Tashkilotlar', value: String(overview.totals.organizations), icon: Building2, tone: 'info' },
-        { label: "Ta'lim darajalari", value: String(overview.totals.levels), icon: Layers, tone: 'primary' },
         { label: 'Kurslar', value: String(overview.totals.courses), icon: BookOpen, tone: 'warning' },
         { label: 'Darslar', value: String(overview.totals.lessons), icon: ClipboardList, tone: 'primary' },
         {
@@ -147,46 +143,6 @@ export default function DashboardPage() {
           })
         )}
       </div>
-
-      {/* Ta'lim kontenti — daraja bo'yicha jamlanma */}
-      {overview && (overview.coursesByLevel.length > 0 || overview.lessonsByLevel.length > 0) ? (
-        <Card className="p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Ta&apos;lim kontenti — daraja bo&apos;yicha
-            </h2>
-            <Link href="/learning" className="text-xs font-semibold text-primary hover:underline">
-              Barchasi →
-            </Link>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(levels ?? []).map((lvl) => {
-              const c = overview.coursesByLevel.find((x) => x.level === lvl.slug)?.count ?? 0;
-              const l = overview.lessonsByLevel.find((x) => x.level === lvl.slug)?.count ?? 0;
-              const m = overview.materialsByLevel.find((x) => x.level === lvl.slug)?.count ?? 0;
-              return (
-                <div key={lvl.id} className="rounded-lg border border-border/60 bg-secondary/30 p-4">
-                  <div className="mb-2 text-sm font-semibold text-foreground">{lvl.nameUz}</div>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <div className="text-lg font-bold text-primary">{c}</div>
-                      <div className="text-[10px] uppercase text-muted-foreground">kurs</div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold text-info">{l}</div>
-                      <div className="text-[10px] uppercase text-muted-foreground">dars</div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold text-warning">{m}</div>
-                      <div className="text-[10px] uppercase text-muted-foreground">fayl</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* So'nggi faoliyatlar */}
@@ -278,7 +234,7 @@ export default function DashboardPage() {
                   </div>
                   <p className="line-clamp-2 text-xs text-foreground">{r.descriptionUz}</p>
                   <p className="mt-1 text-[10px] text-muted-foreground">
-                    {new Date(r.createdAt).toLocaleDateString('uz-UZ')}
+                    {formatDate(new Date(r.createdAt))}
                   </p>
                 </li>
               ))}

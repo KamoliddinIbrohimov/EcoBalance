@@ -2,6 +2,7 @@
 
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
 import { EducationCards } from '@/features/dashboard/components/education-cards';
@@ -10,7 +11,12 @@ import { NewsCard } from '@/features/dashboard/components/news-card';
 import { ProjectMapCard } from '@/features/dashboard/components/project-map-card';
 import { QuickFactsCard } from '@/features/dashboard/components/quick-facts-card';
 import { QuickReportsRow } from '@/features/dashboard/components/quick-reports-row';
-import { TrendsChartCard } from '@/features/dashboard/components/trends-chart-card';
+
+// recharts ~100 KB (gzip) — sahifaning qolgan qismi uni kutmasin.
+const TrendsChartCard = dynamic(
+  () => import('@/features/dashboard/components/trends-chart-card').then((m) => m.TrendsChartCard),
+  { ssr: false, loading: () => <div className="h-72 animate-pulse rounded-2xl border border-border/60 bg-card" /> },
+);
 
 /**
  * Eski bosh sahifa kartalari (KPI, xarita, grafik, Tezkor ma'lumotlar,

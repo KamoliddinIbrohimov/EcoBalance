@@ -24,6 +24,7 @@ import {
 } from '@/shared/components/ui/select';
 import { UnderDevelopment } from '@/shared/components/layout/under-development';
 import { useAuthStore } from '@/shared/stores/auth-store';
+import { formatDate } from '@/shared/lib/format-date';
 
 type PeriodDays = 7 | 30 | 90;
 
@@ -104,7 +105,7 @@ export default function ReportsPage() {
       <div className="hidden print:block">
         <h1 className="text-2xl font-bold">Ekologik monitoring hisoboti</h1>
         <p className="text-sm text-muted-foreground">
-          Davr: {PERIOD_LABELS[period]} · Sana: {new Date().toLocaleDateString('uz-UZ')}
+          Davr: {PERIOD_LABELS[period]} · Sana: {formatDate(new Date())}
         </p>
       </div>
 
@@ -237,7 +238,7 @@ export default function ReportsPage() {
                       {ECO_REPORT_STATUS_LABELS_UZ[r.status as EcoReportStatus]}
                     </td>
                     <td className="py-2 text-xs text-muted-foreground">
-                      {new Date(r.createdAt).toLocaleDateString('uz-UZ')}
+                      {formatDate(new Date(r.createdAt))}
                     </td>
                   </tr>
                 ))}

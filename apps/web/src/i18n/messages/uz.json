@@ -134,7 +134,7 @@
     },
     "eduCard": {
       "title": "Ta'lim va e-learning",
-      "description": "Maktabgacha, maktab va oliy ta'lim uchun kurslar, darslar va metodik materiallar.",
+      "description": "Oliy ta'lim uchun kurslar, darslar va metodik materiallar.",
       "cta": "Kurslarga o'tish",
       "chipLevels": "{value} daraja",
       "chipCourses": "{value} kurs",
@@ -209,6 +209,6 @@
     "equipment": "Kerakli jihozlar",
     "theory": "Nazariy qism",
     "practice": "Amaliy topshiriqlar",
-    "lessonNumber": "Dars #{n}"
+    "lessonNumber": "{n}-dars"
   }
 }

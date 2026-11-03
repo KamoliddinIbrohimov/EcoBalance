@@ -134,7 +134,7 @@ export function QuizEditorDialog({ quizId, onClose }: QuizEditorDialogProps) {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 pb-2">
-                              <Badge variant="outline">#{idx + 1}</Badge>
+                              <Badge variant="outline">{idx + 1}-savol</Badge>
                               <Badge variant="secondary">
                                 {QUIZ_QUESTION_TYPE_LABELS_UZ[q.type]}
                               </Badge>

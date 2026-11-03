@@ -21,19 +21,19 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
-  // Docker Desktop's Windows bind mount doesn't reliably forward native file
-  // change events into the Linux container, so webpack's default watcher
-  // silently misses edits. Polling guarantees changes are picked up.
+  // Docker (Windows bind mount) fayl hodisalarini konteynerga yetkazmaydi —
+  // faqat o'sha holatda polling yoqiladi (WATCH_POLL=1, docker-compose.yml).
+  // Next'ning standart `ignored` (node_modules, .git, .next) saqlanadi, aks
+  // holda polling node_modules'ni ham har soniyada aylanib CPU'ni yeydi.
   webpack: (config, { dev }) => {
-    if (dev) {
-      config.watchOptions = {
-        poll: 1000,
-        aggregateTimeout: 300,
-      };
+    if (dev && process.env.WATCH_POLL === '1') {
+      config.watchOptions = { ...config.watchOptions, poll: 1000, aggregateTimeout: 300 };
     }
     return config;
   },
   images: {
+    // Optimallashtirilgan rasmlar 1 kun keshlanadi (standart 60 soniya).
+    minimumCacheTTL: 86_400,
     remotePatterns: [
       { protocol: 'http', hostname: 'localhost' },
       { protocol: 'http', hostname: 'minio' },

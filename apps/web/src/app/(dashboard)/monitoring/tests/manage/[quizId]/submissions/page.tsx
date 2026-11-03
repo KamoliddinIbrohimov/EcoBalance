@@ -31,14 +31,10 @@ import {
 import { UnderDevelopment } from '@/shared/components/layout/under-development';
 import { cn } from '@/shared/lib/cn';
 import { useAuthStore } from '@/shared/stores/auth-store';
+import { formatDateTime } from '@/shared/lib/format-date';
 
-const DATE_FMT = new Intl.DateTimeFormat('uz-UZ', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
+// Chromium'da 'uz-UZ' "2026 M11 2" beradi — umumiy yordamchi ishlatiladi.
+const DATE_FMT = { format: (d: Date) => formatDateTime(d) };
 
 export default function QuizSubmissionsPage() {
   const params = useParams<{ quizId: string }>();

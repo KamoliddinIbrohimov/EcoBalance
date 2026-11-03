@@ -147,7 +147,8 @@ function NotificationsBell() {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { data: unreadCount = 0 } = useUnreadCount();
-  const { data: items = [], isLoading } = useNotifications(20);
+  // Ro'yxat faqat menyu ochilganda yuklanadi; badge uchun alohida unread-count bor.
+  const { data: items = [], isLoading } = useNotifications(20, open);
   const markRead = useMarkRead();
   const markAllRead = useMarkAllRead();
 

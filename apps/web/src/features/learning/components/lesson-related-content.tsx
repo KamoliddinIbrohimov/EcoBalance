@@ -118,7 +118,7 @@ export function LessonRelatedContent({
             {quizzes.map((q) => (
               <li key={q.id}>
                 <Link
-                  href={`/monitoring/tests?quizId=${q.id}`}
+                  href={`/monitoring/tests/${q.id}`}
                   className="block rounded-lg border border-border/60 p-3 hover:border-primary/40"
                 >
                   <div className="truncate font-medium text-foreground">{q.titleUz}</div>

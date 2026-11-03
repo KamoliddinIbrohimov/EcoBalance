@@ -15,13 +15,10 @@ import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
 import { ConfirmDialog } from '@/shared/components/ui/confirm-dialog';
 import { cn } from '@/shared/lib/cn';
+import { formatDateTime } from '@/shared/lib/format-date';
 
-const DATE_FMT = new Intl.DateTimeFormat('uz-UZ', {
-  day: 'numeric',
-  month: 'short',
-  hour: '2-digit',
-  minute: '2-digit',
-});
+// Chromium'da 'uz-UZ' "2026 M11 2" beradi — umumiy yordamchi ishlatiladi.
+const DATE_FMT = { format: (d: Date) => formatDateTime(d) };
 
 export default function ChatbotPage() {
   const [activeId, setActiveId] = useState<string | null>(null);

@@ -95,7 +95,19 @@ export function createApiClient(): AxiosInstance {
     headers: { 'X-Requested-With': 'XMLHttpRequest' },
   });
 
-  client.interceptors.request.use((config) => {
+  client.interceptors.request.use(async (config) => {
+    const state = useAuthStore.getState();
+    // Sahifa yuklanishida query'lar AuthBoot refresh'idan oldin ishga tushadi.
+    // Tokensiz yuborilsa hammasi 401 → refresh → qayta so'rov bo'lardi (2x so'rov).
+    // Shuning uchun sessiya hali tiklanmagan bo'lsa, o'sha yagona refresh kutiladi.
+    const isAuthCall = (config.url ?? '').startsWith('/auth/');
+    if (!state.accessToken && !state.hydrated && !isAuthCall && !(config as Retry)._skipAuthRetry) {
+      try {
+        await refreshAuthSession(client);
+      } catch {
+        // Sessiya yo'q yoki tarmoq xatosi — so'rov tokensiz ketadi, odatdagi oqim.
+      }
+    }
     const token = useAuthStore.getState().accessToken;
     if (token && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -115,6 +127,15 @@ export function createApiClient(): AxiosInstance {
         !original._skipAuthRetry
       ) {
         original._retry = true;
+        // So'rov eski token bilan ketgan, bu orada yangisi olingan bo'lsa —
+        // qayta refresh (va token rotatsiyasi) shart emas, shunchaki qayta yuboramiz.
+        const sent = String(original.headers?.Authorization ?? '');
+        const current = useAuthStore.getState().accessToken;
+        if (current && sent !== `Bearer ${current}`) {
+          original.headers = original.headers ?? {};
+          (original.headers as Record<string, string>).Authorization = `Bearer ${current}`;
+          return client(original);
+        }
         try {
           const result = await refreshAuthSession(client);
           original.headers = original.headers ?? {};
@@ -136,7 +157,7 @@ export function createApiClient(): AxiosInstance {
 
       // 5xx / nginx HTML / boshqa "flat" javoblar — status'ni HTTP dan olamiz.
       throw new ApiError({
-        title: httpStatus >= 500 ? 'Server error' : 'Network error',
+        title: httpStatus >= 500 ? 'Server xatosi. Birozdan so‘ng qayta urinib ko‘ring' : 'Tarmoq xatosi. Internet aloqasini tekshiring',
         status: httpStatus,
         detail: error.message,
       });

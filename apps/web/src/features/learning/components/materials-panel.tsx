@@ -24,6 +24,7 @@ import { ConfirmDialog } from '@/shared/components/ui/confirm-dialog';
 import type { ApiError } from '@/shared/lib/api-client';
 import { cn } from '@/shared/lib/cn';
 import { useAuthStore } from '@/shared/stores/auth-store';
+import { formatDate } from '@/shared/lib/format-date';
 
 interface MaterialsPanelProps {
   courseId: string;
@@ -183,7 +184,7 @@ export function MaterialsPanel({
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-foreground">{m.fileName}</div>
                   <div className="text-xs text-muted-foreground">
-                    {formatFileSize(m.sizeBytes)} · {new Date(m.createdAt).toLocaleDateString('uz-UZ')}
+                    {formatFileSize(m.sizeBytes)} · {formatDate(new Date(m.createdAt))}
                   </div>
                 </div>
               </div>

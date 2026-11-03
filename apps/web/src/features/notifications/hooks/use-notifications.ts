@@ -6,10 +6,11 @@ import { notificationsApi } from '../api/notifications-api';
 
 const KEY = ['notifications'] as const;
 
-export function useNotifications(limit = 30) {
+export function useNotifications(limit = 30, enabled = true) {
   return useQuery({
     queryKey: [...KEY, 'list', limit],
     queryFn: () => notificationsApi.list(limit),
+    enabled,
   });
 }
 

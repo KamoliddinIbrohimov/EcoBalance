@@ -22,6 +22,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
 import type { ApiError } from '@/shared/lib/api-client';
 import { cn } from '@/shared/lib/cn';
+import { quizBackLink } from '@/features/quizzes/lib/back-link';
 
 const LIKERT_LABELS: Record<number, string> = {
   1: 'Mutlaqo qo‘shilmayman',
@@ -33,7 +34,6 @@ const LIKERT_LABELS: Record<number, string> = {
 
 /** Standalone test uchun orqaga qaytish havolasi. Dars tagidagi testlar
  *  hozircha monitoring/tests ga ko'chmagan — biz /monitoring/tests ga qaytamiz. */
-const BACK_URL = '/monitoring/tests';
 
 export default function TakeQuizPage() {
   const params = useParams<{ quizId: string }>();
@@ -66,7 +66,7 @@ export default function TakeQuizPage() {
       error={error}
       setError={setError}
       submitting={submit.isPending}
-      onBack={() => router.push(BACK_URL)}
+      onBack={() => router.push(quizBackLink(quiz).href)}
       onSubmit={async () => {
         setError(null);
         const payload: SubmissionAnswerInput[] = Object.entries(answers).map(([questionId, value]) => ({
@@ -116,17 +116,20 @@ function TakeQuizView({ quiz, answers, setAnswers, error, submitting, onBack, on
   return (
     <div className="max-w-3xl space-y-5">
       <Link
-        href={BACK_URL}
+        href={quizBackLink(quiz).href}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
-        Ekologik testlar
+        {quizBackLink(quiz).label}
       </Link>
 
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">{quiz.questionCount} savol</Badge>
-          <Badge variant="secondary">O&apos;tish: {quiz.passPercent}%</Badge>
+          {/* Faqat so'rovnomadan iborat testda o'tish chegarasi ma'nosiz. */}
+          {quiz.questions.some((q) => q.type === 'SINGLE_CHOICE') ? (
+            <Badge variant="secondary">O&apos;tish: {quiz.passPercent}%</Badge>
+          ) : null}
           <Badge variant="outline">
             Javob berildi: {answeredCount}/{quiz.questions.length}
           </Badge>
@@ -192,7 +195,7 @@ function QuestionCard({ question, order, value, onChange }: QuestionCardProps) {
   return (
     <Card className="p-5">
       <div className="flex items-center gap-2 pb-3">
-        <Badge variant="outline">#{order}</Badge>
+        <Badge variant="outline">{order}-savol</Badge>
         <Badge variant="secondary">
           {question.type === 'SINGLE_CHOICE' ? 'Test' : 'So‘rovnoma (1–5)'}
         </Badge>

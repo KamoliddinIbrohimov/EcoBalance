@@ -97,3 +97,18 @@ export function formatDateTime(date: Date, locale: AppLocale = 'uz'): string {
   const mm = String(date.getMinutes()).padStart(2, '0');
   return `${day} ${month} ${year}, ${hh}:${mm}`;
 }
+
+/** Qisqa "DD oy YYYY" — `toLocaleDateString('uz-UZ')` o'rniga (u ham "2026 M10 15" beradi). */
+export function formatDate(date: Date, locale: AppLocale = 'uz'): string {
+  return `${date.getDate()} ${MONTHS[locale][date.getMonth()]} ${date.getFullYear()}`;
+}
+
+/** O'qish/sarflangan vaqt: "1 soat 5 daq", "12 daq", "40 soniya". */
+export function formatDuration(totalSeconds: number): string {
+  const total = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  if (h > 0) return m > 0 ? `${h} soat ${m} daq` : `${h} soat`;
+  if (m > 0) return `${m} daq`;
+  return `${total} soniya`;
+}

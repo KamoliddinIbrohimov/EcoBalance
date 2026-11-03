@@ -49,6 +49,7 @@ import {
 } from '@/shared/components/ui/table';
 import { UnderDevelopment } from '@/shared/components/layout/under-development';
 import { useAuthStore } from '@/shared/stores/auth-store';
+import { formatDate } from '@/shared/lib/format-date';
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   WASTE: Recycle,
@@ -267,7 +268,7 @@ export default function MonitoringPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {new Date(r.createdAt).toLocaleDateString('uz-UZ')}
+                      {formatDate(new Date(r.createdAt))}
                     </TableCell>
                   </TableRow>
                 );

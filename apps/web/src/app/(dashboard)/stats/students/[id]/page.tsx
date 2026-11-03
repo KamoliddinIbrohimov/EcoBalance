@@ -17,7 +17,7 @@ import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { Badge } from '@/shared/components/ui/badge';
 import { Card } from '@/shared/components/ui/card';
 import { apiClient } from '@/shared/lib/api-client';
-import { formatDateTime } from '@/shared/lib/format-date';
+import { formatDateTime, formatDuration } from '@/shared/lib/format-date';
 
 interface Overview {
   studentId: string;
@@ -101,15 +101,7 @@ export default function StudentCardPage() {
   }
 
   const totalSec = Math.max(0, Math.floor(overview.totalStudyTimeSec));
-  const hours = Math.floor(totalSec / 3600);
-  const minutes = Math.floor((totalSec % 3600) / 60);
-  const seconds = totalSec % 60;
-  const timeLabel =
-    hours > 0
-      ? `${hours} s ${minutes} daq`
-      : minutes > 0
-        ? `${minutes} daq`
-        : `${seconds} son`;
+  const timeLabel = formatDuration(totalSec);
 
   return (
     <div className="space-y-6">

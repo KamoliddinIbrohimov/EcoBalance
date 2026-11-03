@@ -31,7 +31,7 @@ export default function LearningPage() {
             <GraduationCap className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Ta&apos;lim</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Oliy ta&apos;lim</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
               Ekologiya bo&apos;yicha amaliy va laboratoriya mashg&apos;ulotlari.
             </p>

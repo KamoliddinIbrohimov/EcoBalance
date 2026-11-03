@@ -23,6 +23,7 @@ import { Card } from '@/shared/components/ui/card';
 import { UnderDevelopment } from '@/shared/components/layout/under-development';
 import { cn } from '@/shared/lib/cn';
 import { useAuthStore } from '@/shared/stores/auth-store';
+import { formatDateTime } from '@/shared/lib/format-date';
 
 export default function MonitoringTestsPage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
@@ -138,10 +139,10 @@ function TestCard({ quiz }: { quiz: QuizWithBinding }) {
             </Badge>
           ) : null}
           {binding?.opensAt ? (
-            <span>Ochildi: {new Date(binding.opensAt).toLocaleString('ru-RU')}</span>
+            <span>Ochildi: {formatDateTime(new Date(binding.opensAt))}</span>
           ) : null}
           {binding?.closesAt ? (
-            <span>Yopiladi: {new Date(binding.closesAt).toLocaleString('ru-RU')}</span>
+            <span>Yopiladi: {formatDateTime(new Date(binding.closesAt))}</span>
           ) : null}
           {latest ? (
             latest.scorePercent === null ? (

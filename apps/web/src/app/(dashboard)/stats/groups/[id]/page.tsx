@@ -16,7 +16,7 @@ import {
   TableRow,
 } from '@/shared/components/ui/table';
 import { apiClient } from '@/shared/lib/api-client';
-import { formatDateTime } from '@/shared/lib/format-date';
+import { formatDateTime, formatDuration } from '@/shared/lib/format-date';
 
 interface StudentRow {
   student: { id: string; firstName: string; lastName: string; email: string };
@@ -121,7 +121,7 @@ export default function GroupStudentsPage() {
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                   <Clock className="mr-1 inline h-3 w-3" />
-                  {formatStudyTime(r.totalStudyTimeSec)}
+                  {formatDuration(r.totalStudyTimeSec)}
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                   {r.lastActivityAt ? formatDateTime(new Date(r.lastActivityAt)) : '—'}
@@ -153,12 +153,3 @@ export default function GroupStudentsPage() {
   );
 }
 
-function formatStudyTime(sec: number): string {
-  const total = Math.max(0, Math.floor(sec));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h > 0) return `${h}s ${m}d`;
-  if (m > 0) return `${m} daq`;
-  return `${s} son`;
-}

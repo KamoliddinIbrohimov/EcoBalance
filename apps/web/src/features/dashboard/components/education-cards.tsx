@@ -1,36 +1,31 @@
 'use client';
 
-import { ArrowRight, BookOpen, FileText, GraduationCap, Layers } from 'lucide-react';
+import { ArrowRight, BookOpen, FileText, GraduationCap } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 
-import { useEducationLevels } from '@/features/learning/hooks/use-education-levels';
 import { useCoursesList } from '@/features/learning/hooks/use-learning';
 import { Card } from '@/shared/components/ui/card';
 import { cn } from '@/shared/lib/cn';
 import { EDUCATION_STATS, type EducationStat } from '../data/mock';
 
 const ICON_BY_KEY: Record<EducationStat['icon'], LucideIcon> = {
-  levels:    Layers,
   courses:   BookOpen,
   lessons:   GraduationCap,
   materials: FileText,
 };
 
 const CAPTIONS: Record<string, string> = {
-  levelsCaption:    "Maktabgacha, Maktab va Oliy ta'lim bo'limlari",
-  coursesCaption:   'Har darajaga mos ekologiya kursi',
+  coursesCaption:   "Oliy ta'lim ekologiya kurslari",
   lessonsCaption:   'Amaliy, laboratoriya va ekskursiya darslar',
   materialsCaption: 'Yuklab olish uchun docx metodichkalar',
-  levelsCta:        "Darajalar ro'yxati",
   coursesCta:       "Kurslarga o'tish",
   lessonsCta:       "Darslarga o'tish",
   materialsCta:     "Materiallarni ko'rish",
 };
 
 const TITLES: Record<EducationStat['key'], string> = {
-  levels:    "Ta'lim darajalari",
   courses:   'E-learning kurslari',
   lessons:   'Darslar',
   materials: 'Metodik materiallar',
@@ -44,14 +39,12 @@ const TONE_MAP = {
 };
 
 export function EducationCards() {
-  const { data: levels } = useEducationLevels();
   const { data: coursesData } = useCoursesList({ page: 1, perPage: 100, isPublished: true });
 
   // Real DB'dan kelgan qiymatlar. Backend ma'lumot bermasa mock qiymatlar
   // (docs/materials/ dan olingan sonlar) fallback bo'ladi.
   const liveValues = useMemo(() => {
     const map: Record<EducationStat['key'], string | null> = {
-      levels: levels ? `${levels.length} daraja` : null,
       courses: coursesData ? `${coursesData.data.length} kurs` : null,
       lessons: coursesData
         ? `${coursesData.data.reduce((s, c) => s + (c.lessonsCount ?? 0), 0)} dars`
@@ -60,12 +53,12 @@ export function EducationCards() {
       materials: null,
     };
     return map;
-  }, [levels, coursesData]);
+  }, [coursesData]);
 
   return (
     <section>
       <h2 className="mb-3 text-base font-semibold text-foreground">Ta&apos;lim jarayoni</h2>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {EDUCATION_STATS.map((s) => {
           const Icon = ICON_BY_KEY[s.icon];
           const value = liveValues[s.key] ?? s.value;

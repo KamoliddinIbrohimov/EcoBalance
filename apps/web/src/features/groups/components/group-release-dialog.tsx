@@ -17,6 +17,7 @@ import {
 } from '@/shared/components/ui/dialog';
 import { Input } from '@/shared/components/ui/input';
 import { ApiError, apiClient } from '@/shared/lib/api-client';
+import { formatDateTime } from '@/shared/lib/format-date';
 
 interface Envelope<T> {
   data: T;
@@ -196,7 +197,7 @@ export function GroupReleaseDialog({ open, onOpenChange, group }: Props) {
                           {r.opensAt ? (
                             <span className="inline-flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {new Date(r.opensAt).toLocaleString('ru-RU')}
+                              {formatDateTime(new Date(r.opensAt))}
                             </span>
                           ) : (
                             <span>sana belgilanmagan</span>

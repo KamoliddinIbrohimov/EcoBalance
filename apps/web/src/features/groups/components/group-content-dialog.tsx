@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/shared/components/ui/dialog';
 import { ApiError, apiClient } from '@/shared/lib/api-client';
+import { formatDateTime } from '@/shared/lib/format-date';
 
 interface Props {
   open: boolean;
@@ -288,10 +289,10 @@ export function GroupContentDialog({ open, onOpenChange, group }: Props) {
                       </div>
                       <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
                         {(b as unknown as { opensAt: string | null }).opensAt ? (
-                          <span>Ochilish: {new Date((b as unknown as { opensAt: string }).opensAt).toLocaleString('ru-RU')}</span>
+                          <span>Ochilish: {formatDateTime(new Date((b as unknown as { opensAt: string }).opensAt))}</span>
                         ) : null}
                         {(b as unknown as { closesAt: string | null }).closesAt ? (
-                          <span>Yopilish: {new Date((b as unknown as { closesAt: string }).closesAt).toLocaleString('ru-RU')}</span>
+                          <span>Yopilish: {formatDateTime(new Date((b as unknown as { closesAt: string }).closesAt))}</span>
                         ) : null}
                         {(b as unknown as { maxAttempts: number | null }).maxAttempts ? (
                           <span>Urinish: {(b as unknown as { maxAttempts: number }).maxAttempts}</span>

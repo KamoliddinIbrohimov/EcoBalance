@@ -18,20 +18,22 @@ const TYPE_ICON = {
 
 interface LessonListItemProps {
   lesson: LessonDto;
+  /** Kurs ichidagi tartib raqami (1 dan). orderIndex ma'lumotda 0 yoki 1 dan boshlanishi mumkin. */
+  position: number;
   courseSlug: string;
   /** O'zgartirish rejimida — o'chirish/tahrirlash tugmalarini ko'rsatadi. */
   onEdit?: (lesson: LessonDto) => void;
   onRemove?: (lesson: LessonDto) => void;
 }
 
-export function LessonListItem({ lesson, courseSlug, onEdit, onRemove }: LessonListItemProps) {
+export function LessonListItem({ lesson, position, courseSlug, onEdit, onRemove }: LessonListItemProps) {
   const Icon = TYPE_ICON[lesson.lessonType];
   const hasControls = !!onEdit || !!onRemove;
 
   const content = (
     <>
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-        {lesson.orderIndex + 1}
+        {position}
       </div>
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">

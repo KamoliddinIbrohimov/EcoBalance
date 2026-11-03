@@ -49,27 +49,18 @@ export const MAP_LEGEND = [
 ];
 
 export interface EducationStat {
-  key: 'courses' | 'lessons' | 'materials' | 'levels';
+  key: 'courses' | 'lessons' | 'materials';
   value: string;
   captionKey: string;
   ctaKey: string;
   href: string;
-  icon: 'courses' | 'lessons' | 'materials' | 'levels';
+  icon: 'courses' | 'lessons' | 'materials';
   tone: 'primary' | 'blue' | 'warning' | 'success';
 }
 
 // Ta'lim jarayoni bo'limi — E-learning platformasining hozirgi holati.
 // Sonlar `docs/materials/` papkasidan yuklab qo'yilgan kontentga muvofiq.
 export const EDUCATION_STATS: EducationStat[] = [
-  {
-    key: 'levels',
-    value: '3 daraja',
-    captionKey: 'levelsCaption',
-    ctaKey: 'levelsCta',
-    href: '/learning',
-    icon: 'levels',
-    tone: 'primary',
-  },
   {
     key: 'courses',
     value: '4 kurs',

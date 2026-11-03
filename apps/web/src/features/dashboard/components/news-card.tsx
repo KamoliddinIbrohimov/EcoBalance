@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { useNewsList } from '@/features/news/hooks/use-news';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { formatDate } from '@/shared/lib/format-date';
 
 /**
  * Bosh sahifadagi yangiliklar oqimi — real DB'dan olinadi
@@ -57,7 +58,7 @@ export function NewsCard() {
               <div className="min-w-0 flex-1">
                 <p className="line-clamp-3 text-sm leading-snug text-foreground">{n.titleUz}</p>
                 <time className="mt-1.5 block text-xs text-muted-foreground">
-                  {new Date(n.publishedAt ?? n.createdAt).toLocaleDateString('uz-UZ')}
+                  {formatDate(new Date(n.publishedAt ?? n.createdAt))}
                 </time>
               </div>
             </article>

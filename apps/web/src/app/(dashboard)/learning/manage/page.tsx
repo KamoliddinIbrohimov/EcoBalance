@@ -11,10 +11,8 @@ import { useMemo, useState } from 'react';
 
 import { CourseFormDialog } from '@/features/learning/components/course-form-dialog';
 import { LessonFormDialog } from '@/features/learning/components/lesson-form-dialog';
-import { LevelsPanel } from '@/features/learning/components/levels-panel';
 import { MaterialsPanel } from '@/features/learning/components/materials-panel';
 import { ModulesPanel } from '@/features/learning/components/modules-panel';
-import { useEducationLevels } from '@/features/learning/hooks/use-education-levels';
 import {
   useCourseLessons,
   useCoursesList,
@@ -66,12 +64,6 @@ export default function LearningManagePage() {
     perPage: 50,
   });
   const courses = useMemo(() => coursesData?.data ?? [], [coursesData]);
-  const { data: levels } = useEducationLevels();
-  const levelNameBySlug = useMemo(() => {
-    const map = new Map<string, string>();
-    (levels ?? []).forEach((l) => map.set(l.slug, l.nameUz));
-    return map;
-  }, [levels]);
   const currentCourse = useMemo(
     () => courses.find((c) => c.id === selectedCourseId) ?? courses[0] ?? null,
     [courses, selectedCourseId],
@@ -108,9 +100,6 @@ export default function LearningManagePage() {
         </div>
       </div>
 
-      {/* Ta'lim darajalari (sidebar bo'limlari) */}
-      <LevelsPanel />
-
       {/* Kurslar */}
       <Card className="p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
@@ -139,7 +128,6 @@ export default function LearningManagePage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nomi</TableHead>
-                <TableHead>Ta&apos;lim darajasi</TableHead>
                 <TableHead>Slug</TableHead>
                 <TableHead>Darslar</TableHead>
                 <TableHead>Holati</TableHead>
@@ -150,11 +138,6 @@ export default function LearningManagePage() {
               {courses.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.nameUz}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {levelNameBySlug.get(c.educationLevel) ?? c.educationLevel}
-                    </Badge>
-                  </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{c.slug}</TableCell>
                   <TableCell>{c.lessonsCount}</TableCell>
                   <TableCell>

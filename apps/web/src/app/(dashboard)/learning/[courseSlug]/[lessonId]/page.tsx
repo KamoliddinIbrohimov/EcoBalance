@@ -9,7 +9,7 @@ import { useParams } from 'next/navigation';
 import { LessonCompleteButton } from '@/features/learning/components/lesson-complete-button';
 import { LessonRelatedContent } from '@/features/learning/components/lesson-related-content';
 import { MaterialsPanel } from '@/features/learning/components/materials-panel';
-import { useLesson } from '@/features/learning/hooks/use-learning';
+import { useCourseLessons, useLesson } from '@/features/learning/hooks/use-learning';
 import { Badge } from '@/shared/components/ui/badge';
 import { Card } from '@/shared/components/ui/card';
 import { UnderDevelopment } from '@/shared/components/layout/under-development';
@@ -32,6 +32,14 @@ export default function LessonDetailPage() {
   const canRead = hasPermission(PERMISSION.COURSES_READ);
 
   const { data: lesson, isLoading } = useLesson(lessonId);
+  // Raqam kursdagi tartibdan olinadi (orderIndex 0 yoki 1 dan boshlanishi mumkin).
+  const { data: courseLessons } = useCourseLessons(lesson?.course.id);
+  const position = courseLessons
+    ? courseLessons
+        .slice()
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .findIndex((l) => l.id === lesson?.id) + 1
+    : 0;
 
   if (!canRead) {
     return <UnderDevelopment description="Ushbu bo'limni ko'rish uchun ruxsatingiz yo'q." />;
@@ -63,9 +71,9 @@ export default function LessonDetailPage() {
             <Icon className="h-3.5 w-3.5" />
             {LESSON_TYPE_LABELS_UZ[lesson.lessonType]}
           </Badge>
-          <span className="text-xs text-muted-foreground">
-            {t('lessonNumber', { n: lesson.orderIndex + 1 })}
-          </span>
+          {position > 0 ? (
+            <span className="text-xs text-muted-foreground">{t('lessonNumber', { n: position })}</span>
+          ) : null}
         </div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{lesson.titleUz}</h1>
       </div>

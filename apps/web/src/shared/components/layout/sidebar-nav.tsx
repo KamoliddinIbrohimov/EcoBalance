@@ -1,74 +1,16 @@
 'use client';
 
 import {
-  Award,
   BarChart3,
-  Baby,
-  Backpack,
-  Bike,
-  BookMarked,
   Bot,
-  BookOpen,
-  Brain,
-  Briefcase,
-  Building2,
-  Calendar,
-  Cat,
   ChevronDown,
-  CircuitBoard,
   ClipboardList,
-  Cloud,
-  Code,
-  Compass,
-  Cpu,
-  Droplet,
-  Dumbbell,
-  Feather,
-  FileText,
-  FlaskConical,
-  Flower2,
-  Gamepad2,
   GraduationCap,
-  Hammer,
-  Headphones,
-  Heart,
   Home,
-  Landmark,
-  Languages,
-  Leaf,
-  Library,
-  LineChart,
-  Lightbulb,
   LogOut,
-  Map as MapIcon,
-  Medal,
-  Microscope,
-  MoreHorizontal,
-  Mountain,
-  MousePointer2,
-  Music,
-  Newspaper,
-  Palette,
-  Paperclip,
-  PawPrint,
-  PenTool,
-  Puzzle,
-  Rocket,
-  School,
-  Scroll,
   Settings,
-  ShieldCheck,
-  Sparkles,
-  Star,
-  Sun,
-  Target,
-  Telescope,
-  TreeDeciduous,
-  Trees,
-  Trophy,
   UserCircle,
   Users,
-  Wrench,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -76,78 +18,10 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ComponentType, type SVGProps } from 'react';
 
 import { useLogout } from '@/features/auth/hooks/use-auth';
-import { useEducationLevels } from '@/features/learning/hooks/use-education-levels';
 import { cn } from '@/shared/lib/cn';
 import { useAuthStore } from '@/shared/stores/auth-store';
 import { Logo } from './logo';
 
-// Lucide icon name → component map. Custom levels can pick from these.
-// Bu ro'yxat level-form-dialog.tsx ICON_OPTIONS bilan sinxron bo'lishi kerak.
-const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
-  Award,
-  Baby,
-  Backpack,
-  BarChart3,
-  Bike,
-  BookMarked,
-  BookOpen,
-  Bot,
-  Brain,
-  Briefcase,
-  Building2,
-  Calendar,
-  Cat,
-  CircuitBoard,
-  Cloud,
-  Code,
-  Compass,
-  Cpu,
-  Droplet,
-  Dumbbell,
-  Feather,
-  FileText,
-  FlaskConical,
-  Flower2,
-  Gamepad2,
-  GraduationCap,
-  Hammer,
-  Headphones,
-  Heart,
-  Home,
-  Landmark,
-  Languages,
-  Leaf,
-  Library,
-  LineChart,
-  Lightbulb,
-  MapIcon,
-  Medal,
-  Microscope,
-  MoreHorizontal,
-  Mountain,
-  MousePointer2,
-  Music,
-  Newspaper,
-  Palette,
-  Paperclip,
-  PawPrint,
-  PenTool,
-  Puzzle,
-  Rocket,
-  School,
-  Scroll,
-  ShieldCheck,
-  Sparkles,
-  Star,
-  Sun,
-  Target,
-  Telescope,
-  TreeDeciduous,
-  Trees,
-  Trophy,
-  Users,
-  Wrench,
-};
 
 type LabelKey =
   | 'home'
@@ -203,7 +77,7 @@ const NAV_SUPER_ADMIN: NavItem[] = [
   { href: '/', icon: Home, labelKey: 'home' },
   { href: '/users', icon: Users, labelKey: 'users' },
   { href: '/groups', icon: Users, labelKey: 'groups' },
-  { href: '/learning', icon: GraduationCap, labelKey: 'learning', children: [] },
+  { href: '/learning', icon: GraduationCap, labelKey: 'learningHigher' },
   { href: '/assignments', icon: ClipboardList, labelKey: 'assignments' },
   { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
   { href: '/stats', icon: BarChart3, labelKey: 'statistics' },
@@ -216,7 +90,7 @@ const NAV_SUPER_ADMIN: NavItem[] = [
 const NAV_TEACHER: NavItem[] = [
   { href: '/', icon: Home, labelKey: 'home' },
   { href: '/groups', icon: Users, labelKey: 'groups' },
-  { href: '/learning', icon: GraduationCap, labelKey: 'learning', children: [] },
+  { href: '/learning', icon: GraduationCap, labelKey: 'learningHigher' },
   { href: '/assignments', icon: ClipboardList, labelKey: 'assignments' },
   { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
   { href: '/stats', icon: BarChart3, labelKey: 'statistics' },
@@ -227,7 +101,7 @@ const NAV_TEACHER: NavItem[] = [
 /** STUDENT — o'z darslari, testlari, topshiriqlari, natijalari. */
 const NAV_STUDENT: NavItem[] = [
   { href: '/', icon: Home, labelKey: 'home' },
-  { href: '/learning', icon: GraduationCap, labelKey: 'learning', children: [] },
+  { href: '/learning', icon: GraduationCap, labelKey: 'learningHigher' },
   { href: '/assignments', icon: ClipboardList, labelKey: 'assignments' },
   { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
   { href: '/stats/me', icon: BarChart3, labelKey: 'myStats' },
@@ -255,7 +129,6 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const t = useTranslations('sidebar');
   const pathname = usePathname();
   const logout = useLogout();
-  const { data: levels } = useEducationLevels();
   const roles = useAuthStore((s) => s.user?.roles) ?? [];
 
   const roleGroup = getRoleGroup(roles as string[]);
@@ -267,20 +140,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     return pathname?.startsWith(href) ?? false;
   };
 
-  // Ta'lim darajalarini dinamik ravishda /learning bandi ostiga qo'shamiz.
-  const learningChildren: NavItem[] = (levels ?? [])
-    .slice()
-    .sort((a, b) => a.orderIndex - b.orderIndex)
-    .map((l) => ({
-      href: `/learning/level/${l.slug}`,
-      icon: ICON_MAP[l.iconName] ?? GraduationCap,
-      labelKey: 'learning',
-      dynamicLabel: l.nameUz,
-    }));
-
-  const enrichedNav: NavItem[] = baseNav.map((item) =>
-    item.href === '/learning' ? { ...item, children: learningChildren } : item,
-  );
+  const enrichedNav: NavItem[] = baseNav;
 
   // Yig'iladigan sub-menyular uchun holat. Default — yopiq. Faqat foydalanuvchi
   // hozir kirgan sahifa qaysidir bo'limning ostidagi bo'lsa, o'sha avtomatik

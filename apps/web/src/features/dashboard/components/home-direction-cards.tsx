@@ -7,7 +7,6 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import { useCoursesList } from '@/features/learning/hooks/use-learning';
-import { useEducationLevels } from '@/features/learning/hooks/use-education-levels';
 import { useHomeMedia, useUploadHomeMedia } from '@/features/platform-settings/use-home-media';
 import type { HomeMediaCardKey } from '@/features/platform-settings/home-media-api';
 import { cn } from '@/shared/lib/cn';
@@ -42,11 +41,9 @@ export function HomeDirectionCards() {
   const t = useTranslations('home');
   const isSuperAdmin = useAuthStore((s) => s.hasRole('SUPER_ADMIN'));
 
-  const { data: levels } = useEducationLevels();
   const { data: coursesData } = useCoursesList({ page: 1, perPage: 100, isPublished: true });
   const { data: homeMedia } = useHomeMedia();
 
-  const levelsValue = levels ? String(levels.length) : '3';
   const coursesValue = coursesData ? String(coursesData.data.length) : '4';
   const lessonsValue = coursesData
     ? String(coursesData.data.reduce((sum, c) => sum + (c.lessonsCount ?? 0), 0))
@@ -59,9 +56,9 @@ export function HomeDirectionCards() {
   const cards: DirectionCardSpec[] = [
     {
       cardKey: 'eco',
-      fallbackImage: '/images/home/hm-eco.jpg',
+      fallbackImage: '/images/home/hm-eco-v2.jpg',
       fullFallbackGradient: 'from-primary/80 via-primary/50 to-primary/20',
-      objectPosition: 'center 35%',
+      objectPosition: 'center 12%',
       // Karta sarlavhasi/tavsifi/chip'lari monitoring mavzusida — tugma ham
       // shunga mos (bosh-sahifa-prompt.md). "Topshiriqlar" allaqachon
       // "Boshqaruv modullari" to'rida bor, shuning uchun bu yerda qaytarilmaydi.
@@ -75,13 +72,12 @@ export function HomeDirectionCards() {
     },
     {
       cardKey: 'edu',
-      fallbackImage: '/images/home/hm-ped.jpg',
+      fallbackImage: '/images/home/hm-ped-v2.jpg',
       fullFallbackGradient: 'from-info/80 via-info/50 to-info/20',
       objectPosition: 'center 30%',
       href: '/learning',
       titleKey: 'eduCard',
       chips: [
-        t('eduCard.chipLevels', { value: levelsValue }),
         t('eduCard.chipCourses', { value: coursesValue }),
         t('eduCard.chipLessons', { value: lessonsValue }),
       ],

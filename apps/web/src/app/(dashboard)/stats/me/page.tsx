@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { Card } from '@/shared/components/ui/card';
 import { UnderDevelopment } from '@/shared/components/layout/under-development';
 import { apiClient } from '@/shared/lib/api-client';
-import { formatDateTime } from '@/shared/lib/format-date';
+import { formatDateTime, formatDuration } from '@/shared/lib/format-date';
 import { useAuthStore } from '@/shared/stores/auth-store';
 
 interface Overview {
@@ -115,7 +115,7 @@ export default function MyStatsPage() {
         <StatCard
           icon={<Clock className="h-5 w-5" />}
           label="O'qish vaqti"
-          value={formatStudyTime(data.totalStudyTimeSec)}
+          value={formatDuration(data.totalStudyTimeSec)}
           sub={
             data.lastActivityAt
               ? `oxirgi: ${formatDateTime(new Date(data.lastActivityAt))}`
@@ -134,15 +134,6 @@ export default function MyStatsPage() {
   );
 }
 
-function formatStudyTime(sec: number): string {
-  const total = Math.max(0, Math.floor(sec));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h > 0) return `${h} s ${m} daq`;
-  if (m > 0) return `${m} daq`;
-  return `${s} son`;
-}
 
 function StatCard({
   icon,

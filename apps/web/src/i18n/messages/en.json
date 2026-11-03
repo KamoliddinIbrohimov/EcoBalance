@@ -130,7 +130,7 @@
     },
     "eduCard": {
       "title": "Education & e-learning",
-      "description": "Courses, lessons and teaching materials for preschool, school and higher education.",
+      "description": "Courses, lessons and teaching materials for higher education.",
       "cta": "Go to courses",
       "chipLevels": "{value} levels",
       "chipCourses": "{value} courses",
@@ -205,6 +205,6 @@
     "equipment": "Equipment",
     "theory": "Theory",
     "practice": "Practice tasks",
-    "lessonNumber": "Lesson #{n}"
+    "lessonNumber": "Lesson {n}"
   }
 }

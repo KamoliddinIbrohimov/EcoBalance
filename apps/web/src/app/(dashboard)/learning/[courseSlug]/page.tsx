@@ -49,6 +49,17 @@ export default function CourseDetailPage() {
 
   // Darslarni modullar bo'yicha guruhlaymiz: har modul uchun o'z darslari + "Umumiy"
   // (moduleId=null) bo'limi oxirida. Modul tartibi orderIndex bo'yicha.
+  const positionById = useMemo(
+    () =>
+      new Map(
+        (lessons ?? [])
+          .slice()
+          .sort((a, b) => a.orderIndex - b.orderIndex)
+          .map((l, i) => [l.id, i + 1] as const),
+      ),
+    [lessons],
+  );
+
   const grouped = useMemo(() => {
     if (!lessons) return [] as Array<{ module: ModuleDto | null; lessons: LessonDto[] }>;
     const byModule = new Map<string | null, LessonDto[]>();
@@ -201,6 +212,7 @@ export default function CourseDetailPage() {
                     <LessonListItem
                       key={lesson.id}
                       lesson={lesson}
+                      position={positionById.get(lesson.id) ?? 0}
                       courseSlug={course.slug}
                       onEdit={
                         editMode && canManageLessons

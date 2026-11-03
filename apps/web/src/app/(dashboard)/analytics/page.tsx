@@ -16,7 +16,6 @@ import {
   BookOpen,
   Building2,
   FileText,
-  Layers,
   Leaf,
   TrendingUp,
   Users,
@@ -38,7 +37,6 @@ import {
 } from 'recharts';
 
 import { useAnalyticsOverview } from '@/features/analytics/hooks/use-analytics';
-import { useEducationLevels } from '@/features/learning/hooks/use-education-levels';
 import { Card } from '@/shared/components/ui/card';
 import { UnderDevelopment } from '@/shared/components/layout/under-development';
 import { useAuthStore } from '@/shared/stores/auth-store';
@@ -65,7 +63,8 @@ const CHART_COLORS = [
 export default function AnalyticsPage() {
   const canRead = useAuthStore((s) => s.hasPermission(PERMISSION.AUDIT_READ));
   const { data, isLoading } = useAnalyticsOverview();
-  const { data: levels } = useEducationLevels();
+  // Platforma faqat oliy ta'lim uchun — daraja bitta.
+  const levels = [{ id: 'oliy-talim', slug: 'oliy-talim', nameUz: "Oliy ta'lim" }];
 
   if (!canRead) {
     return (
@@ -88,7 +87,6 @@ export default function AnalyticsPage() {
   const kpis: Array<{ label: string; value: string; icon: typeof Users; tone: string }> = [
     { label: 'Foydalanuvchilar', value: String(data.totals.users), icon: Users, tone: 'primary' },
     { label: 'Tashkilotlar', value: String(data.totals.organizations), icon: Building2, tone: 'info' },
-    { label: "Ta'lim darajalari", value: String(data.totals.levels), icon: Layers, tone: 'primary' },
     { label: 'Kurslar', value: String(data.totals.courses), icon: BookOpen, tone: 'warning' },
     {
       label: 'Materiallar',

@@ -10,7 +10,6 @@ import { FileText, Loader2, Paperclip, Upload, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
-import { useEducationLevels } from '@/features/learning/hooks/use-education-levels';
 import { useCreateCourse, useUpdateCourse } from '@/features/learning/hooks/use-learning';
 import { materialsApi } from '@/features/learning/api/materials-api';
 import { Alert, AlertDescription } from '@/shared/components/ui/alert';
@@ -25,13 +24,6 @@ import {
 } from '@/shared/components/ui/dialog';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/shared/components/ui/select';
 import type { ApiError } from '@/shared/lib/api-client';
 import { cn } from '@/shared/lib/cn';
 import { makeSlug } from '@/shared/lib/slug';
@@ -53,10 +45,8 @@ export function CourseFormDialog({ open, onOpenChange, course }: CourseFormDialo
   const isEdit = !!course;
   const create = useCreateCourse();
   const update = useUpdateCourse();
-  const { data: levels } = useEducationLevels();
   const pending = create.isPending || update.isPending;
 
-  const defaultLevel = levels?.[0]?.slug ?? '';
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [files, setFiles] = useState<File[]>([]);
@@ -80,7 +70,6 @@ export function CourseFormDialog({ open, onOpenChange, course }: CourseFormDialo
       slug: '',
       nameUz: '',
       descriptionUz: '',
-      educationLevel: defaultLevel,
       isPublished: false,
     },
   });
@@ -94,13 +83,12 @@ export function CourseFormDialog({ open, onOpenChange, course }: CourseFormDialo
       slug: course?.slug ?? '',
       nameUz: course?.nameUz ?? '',
       descriptionUz: course?.descriptionUz ?? '',
-      educationLevel: course?.educationLevel ?? defaultLevel,
       isPublished: course?.isPublished ?? false,
     });
     setFiles([]);
     setFileError(null);
     setUploadProgress(null);
-  }, [open, course, reset, defaultLevel]);
+  }, [open, course, reset]);
 
   useEffect(() => {
     if (isEdit) return;
@@ -108,7 +96,6 @@ export function CourseFormDialog({ open, onOpenChange, course }: CourseFormDialo
   }, [watchedName, isEdit, setValue]);
 
   const err = (create.error ?? update.error) as ApiError | undefined;
-  const noLevels = !levels || levels.length === 0;
 
   function addFiles(newFiles: File[]) {
     setFileError(null);
@@ -182,15 +169,6 @@ export function CourseFormDialog({ open, onOpenChange, course }: CourseFormDialo
           <DialogTitle>{isEdit ? 'Kursni tahrirlash' : 'Yangi kurs qo‘shish'}</DialogTitle>
         </DialogHeader>
 
-        {noLevels ? (
-          <Alert variant="destructive">
-            <AlertDescription>
-              Avval kamida bitta ta&apos;lim darajasini yarating (yuqorida &laquo;Ta&apos;lim
-              darajalari&raquo; bo&apos;limi &rarr; Yangi daraja).
-            </AlertDescription>
-          </Alert>
-        ) : null}
-
         {err ? (
           <Alert variant="destructive">
             <AlertDescription>{err.message}</AlertDescription>
@@ -215,31 +193,6 @@ export function CourseFormDialog({ open, onOpenChange, course }: CourseFormDialo
             ) : null}
             {errors.slug ? (
               <p className="text-xs font-medium text-destructive">{errors.slug.message}</p>
-            ) : null}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Ta&apos;lim darajasi</Label>
-            <Select
-              value={watch('educationLevel')}
-              onValueChange={(v) => setValue('educationLevel', v)}
-              disabled={noLevels}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Daraja tanlang" />
-              </SelectTrigger>
-              <SelectContent>
-                {(levels ?? []).map((l) => (
-                  <SelectItem key={l.id} value={l.slug}>
-                    {l.nameUz}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.educationLevel ? (
-              <p className="text-xs font-medium text-destructive">
-                {errors.educationLevel.message}
-              </p>
             ) : null}
           </div>
 
@@ -356,7 +309,7 @@ export function CourseFormDialog({ open, onOpenChange, course }: CourseFormDialo
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
               Bekor qilish
             </Button>
-            <Button type="submit" disabled={busy || noLevels}>
+            <Button type="submit" disabled={busy}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {isEdit ? 'Saqlash' : 'Yaratish'}
             </Button>
