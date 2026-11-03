@@ -76,6 +76,8 @@ export function GroupContentDialog({ open, onOpenChange, group }: Props) {
     onSuccess: () => {
       setCourseId('');
       qc.invalidateQueries({ queryKey: ['groups', group.id, 'courses'] });
+      // API kurs biriktirilganda uning dars testlarini ham avtomatik bog'laydi.
+      qc.invalidateQueries({ queryKey: ['groups', group.id, 'quizzes'] });
     },
   });
   const unbindCourseMut = useMutation({
