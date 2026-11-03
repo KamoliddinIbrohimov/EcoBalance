@@ -4,6 +4,7 @@ import type { BindQuizSettingsInput } from '@eco/shared';
 
 import { PrismaService, isUniqueViolation } from '../../infra/prisma.service';
 import type { Actor } from '../auth/actor';
+import { HIGHER_EDUCATION } from '../courses/course-access.service';
 import { GroupAccess, canBindContent } from './group-access.service';
 import { assertOpenBeforeClose } from './release-policy';
 
@@ -33,7 +34,7 @@ export class BindingsService {
   async courses(groupId: string, actor: Actor) {
     await this.access.owned(groupId, actor);
     const rows = await this.prisma.courseGroup.findMany({
-      where: { groupId },
+      where: { groupId, course: { educationLevel: HIGHER_EDUCATION } },
       include: { course: { select: { id: true, slug: true, nameUz: true, isPublished: true } } },
       orderBy: { createdAt: 'asc' },
     });
@@ -44,9 +45,11 @@ export class BindingsService {
     await this.access.owned(groupId, actor);
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
-      select: { ownerId: true, visibility: true },
+      select: { ownerId: true, visibility: true, educationLevel: true },
     });
-    if (!course || !canBindContent(course, actor)) throw new NotFoundException('Kurs topilmadi');
+    if (!course || course.educationLevel !== HIGHER_EDUCATION || !canBindContent(course, actor)) {
+      throw new NotFoundException('Kurs topilmadi');
+    }
     try {
       await this.prisma.courseGroup.create({ data: { courseId, groupId } });
     } catch (err) {
