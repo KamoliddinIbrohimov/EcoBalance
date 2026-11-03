@@ -6,6 +6,7 @@ import { ROLE_LABELS_UZ } from '@eco/shared';
 import { PrismaClient, RoleSlug } from '@prisma/client';
 import * as argon2 from 'argon2';
 
+import { importOliyEkologiya, resetHomeMedia } from './data/oliy-ekologiya';
 import { importPdvDiagnostika } from './data/pdv-diagnostika';
 
 const prisma = new PrismaClient();
@@ -62,6 +63,8 @@ async function main() {
 async function runDataImportsOnce() {
   const imports: Array<[key: string, run: () => Promise<boolean>]> = [
     ['data_import:pdv-diagnostika-v1', () => importPdvDiagnostika(prisma)],
+    ['data_import:oliy-ekologiya-v1', () => importOliyEkologiya(prisma)],
+    ['data_import:home-media-reset-v1', () => resetHomeMedia(prisma)],
   ];
   for (const [key, run] of imports) {
     if (await prisma.platformSetting.findUnique({ where: { key } })) continue;
