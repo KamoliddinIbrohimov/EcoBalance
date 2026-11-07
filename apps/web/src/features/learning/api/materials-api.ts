@@ -40,6 +40,14 @@ export const materialsApi = {
     await apiClient.delete(`/materials/${id}`);
   },
 
+  /** Qisqa muddatli (5 daqiqa) imzolangan URL — video pleer uchun. */
+  async signedUrl(id: string): Promise<string> {
+    const { data } = await apiClient.get<Envelope<{ url: string; fileName: string }>>(
+      `/materials/${id}/download`,
+    );
+    return data.data.url;
+  },
+
   async download(id: string): Promise<void> {
     const { data } = await apiClient.get<Envelope<{ url: string; fileName: string }>>(
       `/materials/${id}/download`,

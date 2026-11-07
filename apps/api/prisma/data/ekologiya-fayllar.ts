@@ -1,6 +1,6 @@
 /**
- * Oliy ta'lim ekologiya darslariga manba docx fayllarini biriktiradi
- * (prisma/data/files/ekologiya → MinIO private bucket + course_materials).
+ * Oliy ta'lim darslariga fayl biriktirish (prisma/data/files → MinIO private
+ * bucket + course_materials): ekologiya darslarining manba docx'lari va video darsliklar.
  * Darsda shu nomli fayl bo'lsa o'tkazib yuboriladi — qayta ishga tushirish xavfsiz.
  */
 import { randomBytes } from 'node:crypto';
@@ -12,20 +12,40 @@ import type { PrismaClient } from '@prisma/client';
 import mammoth from 'mammoth';
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const MP4_MIME = 'video/mp4';
 const INDEX_MAX_CHARS = 200_000;
-const FILES_DIR = join(__dirname, 'files', 'ekologiya');
+const FILES_ROOT = join(__dirname, 'files');
 
-const FILES = [
+interface LessonFile {
+  courseSlug: string;
+  orderIndex: number;
+  /** prisma/data/files ichidagi yo'l; fayl nomi materialda shunday ko'rinadi. */
+  path: string;
+  mimeType: string;
+}
+
+const EKOLOGIYA_DOCX: LessonFile[] = [
   ...Array.from({ length: 9 }, (_, i) => ({
     courseSlug: 'ekologiya-asoslari',
     orderIndex: i + 1,
-    fileName: `Ekologiya_asoslari_${i + 1}-mashgulot.docx`,
+    path: `ekologiya/Ekologiya_asoslari_${i + 1}-mashgulot.docx`,
+    mimeType: DOCX_MIME,
   })),
   ...Array.from({ length: 6 }, (_, i) => ({
     courseSlug: 'ozbekiston-tabiati-va-siyosati',
     orderIndex: i + 1,
-    fileName: `Ozbekiston_tabiati_${i + 1}-mashgulot.docx`,
+    path: `ekologiya/Ozbekiston_tabiati_${i + 1}-mashgulot.docx`,
+    mimeType: DOCX_MIME,
   })),
+];
+
+const VIDEO_DARSLIKLAR: LessonFile[] = [
+  {
+    courseSlug: 'ekologiya-asoslari',
+    orderIndex: 5,
+    path: 'video/5-dars_Qishloq_xojaligi_va_biosfera.mp4',
+    mimeType: MP4_MIME,
+  },
 ];
 
 function s3() {
@@ -44,30 +64,35 @@ function s3() {
   };
 }
 
-export async function importEkologiyaFayllar(prisma: PrismaClient, log: (msg: string) => void = console.log) {
+/** Nechta fayl biriktirilganini qaytaradi. */
+async function attachLessonFiles(prisma: PrismaClient, files: LessonFile[]) {
   const { client, bucket } = s3();
   let attached = 0;
-  for (const f of FILES) {
+  for (const f of files) {
+    const fileName = f.path.split('/').pop()!;
     const lesson = await prisma.lesson.findFirst({
       where: { course: { slug: f.courseSlug }, orderIndex: f.orderIndex, archivedAt: null },
       select: { id: true, courseId: true, materials: { select: { fileName: true } } },
     });
-    if (!lesson || lesson.materials.some((m) => m.fileName === f.fileName)) continue;
+    if (!lesson || lesson.materials.some((m) => m.fileName === fileName)) continue;
 
-    const body = await readFile(join(FILES_DIR, f.fileName));
-    const text = (await mammoth.extractRawText({ buffer: body })).value.replaceAll('\u0000', '');
-    const storageKey = `materials/${lesson.courseId}/${randomBytes(8).toString('hex')}-${f.fileName}`;
-    await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, Body: body, ContentType: DOCX_MIME }));
+    const body = await readFile(join(FILES_ROOT, f.path));
+    const text =
+      f.mimeType === DOCX_MIME
+        ? (await mammoth.extractRawText({ buffer: body })).value.replaceAll('\u0000', '').slice(0, INDEX_MAX_CHARS)
+        : null;
+    const storageKey = `materials/${lesson.courseId}/${randomBytes(8).toString('hex')}-${fileName}`;
+    await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, Body: body, ContentType: f.mimeType }));
     try {
       await prisma.courseMaterial.create({
         data: {
           courseId: lesson.courseId,
           lessonId: lesson.id,
-          fileName: f.fileName,
+          fileName,
           storageKey,
-          mimeType: DOCX_MIME,
+          mimeType: f.mimeType,
           sizeBytes: body.length,
-          contentText: text.slice(0, INDEX_MAX_CHARS),
+          contentText: text,
         },
       });
     } catch (err) {
@@ -76,6 +101,17 @@ export async function importEkologiyaFayllar(prisma: PrismaClient, log: (msg: st
     }
     attached += 1;
   }
-  log(`✓ Ekologiya darslariga ${attached} ta fayl biriktirildi`);
+  return attached;
+}
+
+export async function importEkologiyaFayllar(prisma: PrismaClient, log: (msg: string) => void = console.log) {
+  const n = await attachLessonFiles(prisma, EKOLOGIYA_DOCX);
+  log(`✓ Ekologiya darslariga ${n} ta fayl biriktirildi`);
+  return true;
+}
+
+export async function importVideoDarsliklar(prisma: PrismaClient, log: (msg: string) => void = console.log) {
+  const n = await attachLessonFiles(prisma, VIDEO_DARSLIKLAR);
+  log(`✓ Video darsliklar: ${n} ta video biriktirildi`);
   return true;
 }
