@@ -85,6 +85,11 @@ async function runDataImportsOnce() {
       replace: true,
       only: ['6-dars_Suv_muhitiga_moslashish.mp4'],
     })],
+    // 8-dars: chet ellik odamlar tushgan suratlar odamsiz suratlarga almashtirilgan
+    ['data_import:video-8dars-v3', () => importVideoDarsliklar2(prisma, {
+      replace: true,
+      only: ['8-dars_Shaharlarda_shovqin.mp4'],
+    })],
   ];
   for (const [key, run] of imports) {
     if (await prisma.platformSetting.findUnique({ where: { key } })) continue;
