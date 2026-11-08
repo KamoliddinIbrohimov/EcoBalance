@@ -1,10 +1,11 @@
 'use client';
 
 import type { StudentStatsDto } from '@eco/shared';
-import { Award, BookOpen, ClipboardList, Loader2 } from 'lucide-react';
+import { Award, BookOpen, ClipboardList, Loader2, PlayCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 
+import { VideoLessonsList } from '@/features/learning/components/video-lessons-list';
 import { Card } from '@/shared/components/ui/card';
 import { apiClient } from '@/shared/lib/api-client';
 import { useAuthStore } from '@/shared/stores/auth-store';
@@ -67,6 +68,19 @@ export default function StudentHomePage() {
           />
         </div>
       ) : null}
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+            <PlayCircle className="h-5 w-5 text-primary" />
+            Video darslar
+          </h2>
+          <Link href="/videos" className="text-sm font-medium text-primary hover:underline">
+            Barchasi →
+          </Link>
+        </div>
+        <VideoLessonsList limit={3} />
+      </section>
 
       <div className="grid gap-3 md:grid-cols-2">
         <ActionCard title="Darslarim" subtitle="Guruhingizga biriktirilgan kurslar" href="/learning" />

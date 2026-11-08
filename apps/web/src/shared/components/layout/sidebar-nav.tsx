@@ -8,6 +8,7 @@ import {
   GraduationCap,
   Home,
   LogOut,
+  PlayCircle,
   Settings,
   UserCircle,
   Users,
@@ -32,6 +33,7 @@ type LabelKey =
   | 'learningPreschool'
   | 'learningSchool'
   | 'learningHigher'
+  | 'videoLessons'
   | 'learningReserved'
   | 'chatbot'
   | 'dashboard'
@@ -78,6 +80,7 @@ const NAV_SUPER_ADMIN: NavItem[] = [
   { href: '/users', icon: Users, labelKey: 'users' },
   { href: '/groups', icon: Users, labelKey: 'groups' },
   { href: '/learning', icon: GraduationCap, labelKey: 'learningHigher' },
+  { href: '/videos', icon: PlayCircle, labelKey: 'videoLessons' },
   { href: '/assignments', icon: ClipboardList, labelKey: 'assignments' },
   { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
   { href: '/stats', icon: BarChart3, labelKey: 'statistics' },
@@ -91,6 +94,7 @@ const NAV_TEACHER: NavItem[] = [
   { href: '/', icon: Home, labelKey: 'home' },
   { href: '/groups', icon: Users, labelKey: 'groups' },
   { href: '/learning', icon: GraduationCap, labelKey: 'learningHigher' },
+  { href: '/videos', icon: PlayCircle, labelKey: 'videoLessons' },
   { href: '/assignments', icon: ClipboardList, labelKey: 'assignments' },
   { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
   { href: '/stats', icon: BarChart3, labelKey: 'statistics' },
@@ -102,6 +106,7 @@ const NAV_TEACHER: NavItem[] = [
 const NAV_STUDENT: NavItem[] = [
   { href: '/', icon: Home, labelKey: 'home' },
   { href: '/learning', icon: GraduationCap, labelKey: 'learningHigher' },
+  { href: '/videos', icon: PlayCircle, labelKey: 'videoLessons' },
   { href: '/assignments', icon: ClipboardList, labelKey: 'assignments' },
   { href: '/monitoring/tests', icon: ClipboardList, labelKey: 'monitoringTests' },
   { href: '/stats/me', icon: BarChart3, labelKey: 'myStats' },
