@@ -8,6 +8,7 @@ import { useParams } from 'next/navigation';
 
 import { LessonCompleteButton } from '@/features/learning/components/lesson-complete-button';
 import { LessonRelatedContent } from '@/features/learning/components/lesson-related-content';
+import { LessonVideos } from '@/features/learning/components/lesson-videos';
 import { MaterialsPanel } from '@/features/learning/components/materials-panel';
 import { useCourseLessons, useLesson } from '@/features/learning/hooks/use-learning';
 import { Badge } from '@/shared/components/ui/badge';
@@ -77,6 +78,8 @@ export default function LessonDetailPage() {
         </div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{lesson.titleUz}</h1>
       </div>
+
+      <LessonVideos courseId={lesson.course.id} lessonId={lesson.id} />
 
       {lesson.objectiveUz ? (
         <Card className="p-5">

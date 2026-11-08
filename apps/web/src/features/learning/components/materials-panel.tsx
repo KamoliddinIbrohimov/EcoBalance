@@ -6,7 +6,6 @@ import { useTranslations } from 'next-intl';
 import { useRef, useState } from 'react';
 
 import { materialsApi, type CourseMaterialDto } from '@/features/learning/api/materials-api';
-import { MaterialVideo } from '@/features/learning/components/material-video';
 import {
   useCourseMaterials,
   useRemoveMaterial,
@@ -169,16 +168,6 @@ export function MaterialsPanel({
           <AlertDescription>{uploadErr.message}</AlertDescription>
         </Alert>
       ) : null}
-
-      {lessonId
-        ? data
-            .filter((m) => m.mimeType.startsWith('video/'))
-            .map((m) => (
-              <div key={`video-${m.id}`} className="mb-3">
-                <MaterialVideo material={m} />
-              </div>
-            ))
-        : null}
 
       {isLoading ? (
         <div className="py-6 text-center text-sm text-muted-foreground">{t('loading')}</div>
