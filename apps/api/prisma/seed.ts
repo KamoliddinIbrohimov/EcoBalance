@@ -72,6 +72,8 @@ async function runDataImportsOnce() {
     ['data_import:ekologiya-fayllar-v1', () => importEkologiyaFayllar(prisma)],
     ['data_import:darslar-tuzatish-v1', () => fixDarslar(prisma)],
     ['data_import:video-5dars-v1', () => importVideoDarsliklar(prisma)],
+    // v2: o'zbek odamlari suratlari bilan qayta tayyorlangan video
+    ['data_import:video-5dars-v2', () => importVideoDarsliklar(prisma, { replace: true })],
   ];
   for (const [key, run] of imports) {
     if (await prisma.platformSetting.findUnique({ where: { key } })) continue;

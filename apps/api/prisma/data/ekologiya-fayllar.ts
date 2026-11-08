@@ -65,16 +65,22 @@ function s3() {
 }
 
 /** Nechta fayl biriktirilganini qaytaradi. */
-async function attachLessonFiles(prisma: PrismaClient, files: LessonFile[]) {
+/**
+ * Nechta fayl biriktirilganini qaytaradi. `replace` — shu nomli eski material bo'lsa,
+ * yangisi yozilgach eskisi (qator + MinIO obyekti) o'chiriladi.
+ */
+async function attachLessonFiles(prisma: PrismaClient, files: LessonFile[], replace = false) {
   const { client, bucket } = s3();
   let attached = 0;
   for (const f of files) {
     const fileName = f.path.split('/').pop()!;
     const lesson = await prisma.lesson.findFirst({
       where: { course: { slug: f.courseSlug }, orderIndex: f.orderIndex, archivedAt: null },
-      select: { id: true, courseId: true, materials: { select: { fileName: true } } },
+      select: { id: true, courseId: true, materials: { select: { id: true, fileName: true, storageKey: true } } },
     });
-    if (!lesson || lesson.materials.some((m) => m.fileName === fileName)) continue;
+    if (!lesson) continue;
+    const old = lesson.materials.filter((m) => m.fileName === fileName);
+    if (old.length && !replace) continue;
 
     const body = await readFile(join(FILES_ROOT, f.path));
     const text =
@@ -99,6 +105,10 @@ async function attachLessonFiles(prisma: PrismaClient, files: LessonFile[]) {
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: storageKey })).catch(() => undefined);
       throw err;
     }
+    for (const m of old) {
+      await prisma.courseMaterial.delete({ where: { id: m.id } });
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: m.storageKey })).catch(() => undefined);
+    }
     attached += 1;
   }
   return attached;
@@ -110,8 +120,13 @@ export async function importEkologiyaFayllar(prisma: PrismaClient, log: (msg: st
   return true;
 }
 
-export async function importVideoDarsliklar(prisma: PrismaClient, log: (msg: string) => void = console.log) {
-  const n = await attachLessonFiles(prisma, VIDEO_DARSLIKLAR);
-  log(`✓ Video darsliklar: ${n} ta video biriktirildi`);
+/** `replace` — video qayta tayyorlanganda eski nusxa yangisiga almashtiriladi. */
+export async function importVideoDarsliklar(
+  prisma: PrismaClient,
+  { replace = false }: { replace?: boolean } = {},
+  log: (msg: string) => void = console.log,
+) {
+  const n = await attachLessonFiles(prisma, VIDEO_DARSLIKLAR, replace);
+  log(`✓ Video darsliklar: ${n} ta video ${replace ? 'yangilandi' : 'biriktirildi'}`);
   return true;
 }
