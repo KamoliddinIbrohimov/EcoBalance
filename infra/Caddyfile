@@ -22,6 +22,17 @@
         header Cache-Control "public, max-age=600"
     }
 
+    # Private bucket (dars materiallari, video darsliklar) — faqat API bergan
+    # imzolangan (5 daqiqalik) URL bilan ochiladi; imzo Host'ni o'z ichiga oladi,
+    # shuning uchun S3_PUBLIC_ENDPOINT shu domen bo'lishi va Host o'zgarmasligi kerak.
+    # Range so'rovlari (video oldinga/orqaga surish) MinIO'ga to'g'ridan-to'g'ri o'tadi.
+    handle /ecobalance-private/* {
+        @disallowedMethod not method GET HEAD
+        respond @disallowedMethod 405
+        reverse_proxy minio:9000
+        header Cache-Control "private, no-store"
+    }
+
     # Everything else -> Next.js
     handle {
         reverse_proxy web:3000
