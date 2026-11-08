@@ -75,6 +75,11 @@ async function runDataImportsOnce() {
     // v2: o'zbek odamlari suratlari bilan qayta tayyorlangan video
     ['data_import:video-5dars-v2', () => importVideoDarsliklar(prisma, { replace: true })],
     ['data_import:video-darsliklar-2-v1', () => importVideoDarsliklar2(prisma)],
+    // ko'rsichqon, shovqin xaritasi va yangi suratlar bilan qayta tayyorlangan 7- va 8-dars
+    ['data_import:video-7-8dars-v2', () => importVideoDarsliklar2(prisma, {
+      replace: true,
+      only: ['7-dars_Tuproq_muhitiga_moslashish.mp4', '8-dars_Shaharlarda_shovqin.mp4'],
+    })],
   ];
   for (const [key, run] of imports) {
     if (await prisma.platformSetting.findUnique({ where: { key } })) continue;

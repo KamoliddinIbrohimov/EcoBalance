@@ -152,8 +152,14 @@ export async function importVideoDarsliklar(
   return true;
 }
 
-export async function importVideoDarsliklar2(prisma: PrismaClient, log: (msg: string) => void = console.log) {
-  const n = await attachLessonFiles(prisma, VIDEO_DARSLIKLAR_2);
-  log(`✓ Video darsliklar (2-to'plam): ${n} ta video biriktirildi`);
+/** `only` — faqat shu fayllar (masalan, qayta tayyorlangan videolar `replace` bilan almashtiriladi). */
+export async function importVideoDarsliklar2(
+  prisma: PrismaClient,
+  { replace = false, only }: { replace?: boolean; only?: string[] } = {},
+  log: (msg: string) => void = console.log,
+) {
+  const files = only ? VIDEO_DARSLIKLAR_2.filter((f) => only.some((name) => f.path.endsWith(name))) : VIDEO_DARSLIKLAR_2;
+  const n = await attachLessonFiles(prisma, files, replace);
+  log(`✓ Video darsliklar (2-to'plam): ${n} ta video ${replace ? 'yangilandi' : 'biriktirildi'}`);
   return true;
 }
