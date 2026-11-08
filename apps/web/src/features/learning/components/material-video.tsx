@@ -15,6 +15,10 @@ export function MaterialVideo({ material }: { material: CourseMaterialDto }) {
   const [failed, setFailed] = useState(false);
   const resumeAt = useRef(0);
   const retries = useRef(0);
+  // Xato paytida brauzer currentTime'ni 0 ga tushirib qo'yishi mumkin — oxirgi
+  // ko'rilgan joy va o'ynash holati alohida saqlanadi.
+  const lastTime = useRef(0);
+  const wasPlaying = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -34,7 +38,7 @@ export function MaterialVideo({ material }: { material: CourseMaterialDto }) {
       return;
     }
     retries.current += 1;
-    resumeAt.current = v.currentTime;
+    resumeAt.current = Math.max(v.currentTime, lastTime.current);
     try {
       setSrc(await materialsApi.signedUrl(material.id));
     } catch {
@@ -63,9 +67,19 @@ export function MaterialVideo({ material }: { material: CourseMaterialDto }) {
       onLoadedMetadata={(e) => {
         if (resumeAt.current > 0) {
           e.currentTarget.currentTime = resumeAt.current;
-          void e.currentTarget.play().catch(() => undefined);
+          if (wasPlaying.current) void e.currentTarget.play().catch(() => undefined);
           resumeAt.current = 0;
         }
+      }}
+      onTimeUpdate={(e) => {
+        if (e.currentTarget.currentTime > 0) lastTime.current = e.currentTarget.currentTime;
+      }}
+      onPlay={() => {
+        wasPlaying.current = true;
+      }}
+      onPause={(e) => {
+        // Xato sababli to'xtash emas, foydalanuvchi pauzasi bo'lsa.
+        if (!e.currentTarget.error) wasPlaying.current = false;
       }}
       onPlaying={() => {
         retries.current = 0;
