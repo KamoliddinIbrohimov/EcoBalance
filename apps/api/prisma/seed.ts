@@ -7,7 +7,7 @@ import { PrismaClient, RoleSlug } from '@prisma/client';
 import * as argon2 from 'argon2';
 
 import { fixDarslar } from './data/darslar-tuzatish';
-import { importEkologiyaFayllar, importVideoDarsliklar } from './data/ekologiya-fayllar';
+import { importEkologiyaFayllar, importVideoDarsliklar, importVideoDarsliklar2 } from './data/ekologiya-fayllar';
 import { importOliyEkologiya, resetHomeMedia } from './data/oliy-ekologiya';
 import { importPdvDarslar } from './data/pdv-darslar';
 import { importPdvDiagnostika } from './data/pdv-diagnostika';
@@ -74,6 +74,7 @@ async function runDataImportsOnce() {
     ['data_import:video-5dars-v1', () => importVideoDarsliklar(prisma)],
     // v2: o'zbek odamlari suratlari bilan qayta tayyorlangan video
     ['data_import:video-5dars-v2', () => importVideoDarsliklar(prisma, { replace: true })],
+    ['data_import:video-darsliklar-2-v1', () => importVideoDarsliklar2(prisma)],
   ];
   for (const [key, run] of imports) {
     if (await prisma.platformSetting.findUnique({ where: { key } })) continue;

@@ -75,3 +75,6 @@ logs/
 
 # DB backups (local pg_dump)
 backups/
+
+# Video darsliklar 2-to'plam: serverda bind-mount orqali import qilinadi (~90 MB)
+apps/api/prisma/data/files/video2/

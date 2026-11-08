@@ -48,6 +48,27 @@ const VIDEO_DARSLIKLAR: LessonFile[] = [
   },
 ];
 
+/**
+ * Ikkinchi to'plam (2026-11-08). Fayllar git'da emas (~90 MB): serverda
+ * /opt/eco-balance/video-import ga yuklanib, seed bir marta shu papka
+ * files/video2 sifatida ulangan holda ishga tushiriladi. Fayl topilmasa import
+ * yiqiladi, belgi qo'yilmaydi va keyingi ishga tushishda qayta urinadi.
+ */
+const VIDEO_DARSLIKLAR_2: LessonFile[] = [
+  ['ekologiya-asoslari', 6, '6-dars_Suv_muhitiga_moslashish.mp4'],
+  ['ekologiya-asoslari', 7, '7-dars_Tuproq_muhitiga_moslashish.mp4'],
+  ['ekologiya-asoslari', 8, '8-dars_Shaharlarda_shovqin.mp4'],
+  ['ekologiya-asoslari', 9, '9-dars_Biosfera_chegaralari.mp4'],
+  ['ozbekiston-tabiati-va-siyosati', 1, '1-dars_Orol_boyi_muammolari.mp4'],
+  ['ozbekiston-tabiati-va-siyosati', 3, '3-dars_Hayvonot_olamini_muhofaza_qilish.mp4'],
+  ['ozbekiston-tabiati-va-siyosati', 4, '4-dars_Osimlik_qoplamini_muhofaza_qilish.mp4'],
+].map(([courseSlug, orderIndex, file]) => ({
+  courseSlug: courseSlug as string,
+  orderIndex: orderIndex as number,
+  path: `video2/${file}`,
+  mimeType: MP4_MIME,
+}));
+
 function s3() {
   const env = process.env;
   return {
@@ -128,5 +149,11 @@ export async function importVideoDarsliklar(
 ) {
   const n = await attachLessonFiles(prisma, VIDEO_DARSLIKLAR, replace);
   log(`✓ Video darsliklar: ${n} ta video ${replace ? 'yangilandi' : 'biriktirildi'}`);
+  return true;
+}
+
+export async function importVideoDarsliklar2(prisma: PrismaClient, log: (msg: string) => void = console.log) {
+  const n = await attachLessonFiles(prisma, VIDEO_DARSLIKLAR_2);
+  log(`✓ Video darsliklar (2-to'plam): ${n} ta video biriktirildi`);
   return true;
 }
