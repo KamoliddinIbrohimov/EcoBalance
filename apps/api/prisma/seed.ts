@@ -80,6 +80,11 @@ async function runDataImportsOnce() {
       replace: true,
       only: ['7-dars_Tuproq_muhitiga_moslashish.mp4', '8-dars_Shaharlarda_shovqin.mp4'],
     })],
+    // 6-dars: yangi ovoz yozuvi bilan qayta tayyorlangan
+    ['data_import:video-6dars-v2', () => importVideoDarsliklar2(prisma, {
+      replace: true,
+      only: ['6-dars_Suv_muhitiga_moslashish.mp4'],
+    })],
   ];
   for (const [key, run] of imports) {
     if (await prisma.platformSetting.findUnique({ where: { key } })) continue;
