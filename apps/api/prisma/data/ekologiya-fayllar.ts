@@ -11,14 +11,16 @@ import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client
 import type { PrismaClient } from '@prisma/client';
 import mammoth from 'mammoth';
 
-const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+export const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+export const HTML_MIME = 'text/html';
 const MP4_MIME = 'video/mp4';
 const INDEX_MAX_CHARS = 200_000;
 const FILES_ROOT = join(__dirname, 'files');
 
-interface LessonFile {
+export interface LessonFile {
   courseSlug: string;
-  orderIndex: number;
+  /** null — kurs sathidagi material (darsga bog'lanmagan). */
+  orderIndex: number | null;
   /** prisma/data/files ichidagi yo'l; fayl nomi materialda shunday ko'rinadi. */
   path: string;
   mimeType: string;
@@ -85,36 +87,56 @@ function s3() {
   };
 }
 
-/** Nechta fayl biriktirilganini qaytaradi. */
+/** Chatbot qidiruvi uchun matn: docx — mammoth, html — teglarsiz matn. */
+async function extractText(body: Buffer, mimeType: string): Promise<string | null> {
+  let text: string | null = null;
+  if (mimeType === DOCX_MIME) text = (await mammoth.extractRawText({ buffer: body })).value;
+  else if (mimeType === HTML_MIME) {
+    text = body
+      .toString('utf8')
+      .replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ');
+  }
+  return text ? text.replaceAll('\u0000', '').trim().slice(0, INDEX_MAX_CHARS) : null;
+}
+
 /**
- * Nechta fayl biriktirilganini qaytaradi. `replace` — shu nomli eski material bo'lsa,
+ * Nechta fayl biriktirilganini qaytaradi. `orderIndex: null` — kursning umumiy
+ * materiali (darsga bog'lanmagan). `replace` — shu nomli eski material bo'lsa,
  * yangisi yozilgach eskisi (qator + MinIO obyekti) o'chiriladi.
  */
-async function attachLessonFiles(prisma: PrismaClient, files: LessonFile[], replace = false) {
+export async function attachLessonFiles(prisma: PrismaClient, files: LessonFile[], replace = false) {
   const { client, bucket } = s3();
   let attached = 0;
   for (const f of files) {
     const fileName = f.path.split('/').pop()!;
-    const lesson = await prisma.lesson.findFirst({
-      where: { course: { slug: f.courseSlug }, orderIndex: f.orderIndex, archivedAt: null },
-      select: { id: true, courseId: true, materials: { select: { id: true, fileName: true, storageKey: true } } },
-    });
-    if (!lesson) continue;
-    const old = lesson.materials.filter((m) => m.fileName === fileName);
+    const materialSelect = { select: { id: true, fileName: true, storageKey: true, lessonId: true } } as const;
+    let target: { courseId: string; lessonId: string | null; materials: { id: string; fileName: string; storageKey: string }[] } | null = null;
+    if (f.orderIndex === null) {
+      const course = await prisma.course.findUnique({ where: { slug: f.courseSlug }, select: { id: true, materials: materialSelect } });
+      if (course) target = { courseId: course.id, lessonId: null, materials: course.materials.filter((m) => m.lessonId === null) };
+    } else {
+      const lesson = await prisma.lesson.findFirst({
+        where: { course: { slug: f.courseSlug }, orderIndex: f.orderIndex, archivedAt: null },
+        select: { id: true, courseId: true, materials: materialSelect },
+      });
+      if (lesson) target = { courseId: lesson.courseId, lessonId: lesson.id, materials: lesson.materials };
+    }
+    if (!target) continue;
+    const old = target.materials.filter((m) => m.fileName === fileName);
     if (old.length && !replace) continue;
 
     const body = await readFile(join(FILES_ROOT, f.path));
-    const text =
-      f.mimeType === DOCX_MIME
-        ? (await mammoth.extractRawText({ buffer: body })).value.replaceAll('\u0000', '').slice(0, INDEX_MAX_CHARS)
-        : null;
-    const storageKey = `materials/${lesson.courseId}/${randomBytes(8).toString('hex')}-${fileName}`;
+    const text = await extractText(body, f.mimeType);
+    const storageKey = `materials/${target.courseId}/${randomBytes(8).toString('hex')}-${fileName}`;
     await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, Body: body, ContentType: f.mimeType }));
     try {
       await prisma.courseMaterial.create({
         data: {
-          courseId: lesson.courseId,
-          lessonId: lesson.id,
+          courseId: target.courseId,
+          lessonId: target.lessonId,
           fileName,
           storageKey,
           mimeType: f.mimeType,

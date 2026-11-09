@@ -10,6 +10,7 @@ import { fixDarslar } from './data/darslar-tuzatish';
 import { importEkologiyaFayllar, importVideoDarsliklar, importVideoDarsliklar2 } from './data/ekologiya-fayllar';
 import { importOliyEkologiya, resetHomeMedia } from './data/oliy-ekologiya';
 import { importPdvDarslar } from './data/pdv-darslar';
+import { importRaxmatullayeva } from './data/raxmatullayeva';
 import { importPdvDiagnostika } from './data/pdv-diagnostika';
 
 const prisma = new PrismaClient();
@@ -90,6 +91,7 @@ async function runDataImportsOnce() {
       replace: true,
       only: ['8-dars_Shaharlarda_shovqin.mp4'],
     })],
+    ['data_import:raxmatullayeva-v1', () => importRaxmatullayeva(prisma)],
   ];
   for (const [key, run] of imports) {
     if (await prisma.platformSetting.findUnique({ where: { key } })) continue;
